@@ -24,8 +24,10 @@
 #include <math.h>
 #include <sched.h>
 
-#ifndef _WIN32
+#ifndef _WIN32 // POSIX only
 #	include <pthread.h>
+#else
+#	include <windows.h>
 #endif
 
 #include <tjost.h>
@@ -46,7 +48,12 @@ struct _Data {
 	uv_loop_t *loop;
 	uv_thread_t thread;
 	uv_async_t quit;
+
+#ifndef _WIN32 // POSIX only
 	struct sched_param schedp;
+#else
+	int mcss_sched_priority;
+#endif
 };
 
 static const char * bundle_str = "#bundle";
@@ -229,6 +236,31 @@ _thread(void *arg)
 #ifndef _WIN32 // POSIX only
 	if(dat->schedp.sched_priority)
 		pthread_setschedparam(dat->thread, SCHED_RR, &dat->schedp);
+#else
+	// Multimedia Class Scheduler Service
+	DWORD dummy = 0;
+	HANDLE task = AvSetMmThreadCharacteristics("Games", &dummy);
+	if(!task)
+		fprintf(stderr, "AvSetMmThreadCharacteristics error: %d\n", GetLastError());
+	else if(!AvSetMmThreadPriority(task, dat->mcss_sched_priority))
+		fprintf(stderr, "AvSetMmThreadPriority error: %d\n", GetLastError());
+
+	/*
+	Audio
+	Capture
+	Distribution
+	Games
+	Playback
+	Pro Audio
+	Window Manager
+	*/
+
+	/*
+	AVRT_PRIORITY_CRITICAL (2)
+	AVRT_PRIORITY_HIGH (1)
+	AVRT_PRIORITY_LOW (-1)
+	AVRT_PRIORITY_NORMAL (0)
+	*/
 #endif
 
 	uv_run(dat->loop, UV_RUN_DEFAULT);
@@ -254,7 +286,11 @@ add(Tjost_Module *module, int argc, const char **argv)
 		fprintf(stderr, "could not initialize socket\n");
 
 	if(argv[1])
+#ifndef _WIN32 // POSIX only
 		dat->schedp.sched_priority = atoi(argv[1]);
+#else
+		dat->mcss_sched_priority = atoi(argv[1]);
+#endif
 
 	module->dat = dat;
 	module->type = TJOST_MODULE_INPUT;
