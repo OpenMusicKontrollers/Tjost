@@ -173,9 +173,9 @@ static Jack_OSC_Method methods [] = {
 
 // non real time
 void
-tjost_uplink_tx_drain(struct ev_loop *loop, struct ev_async *w, int revents)
+tjost_uplink_tx_drain(uv_async_t *handle, int status)
 {
-	Tjost_Host *host = w->data;
+	Tjost_Host *host = handle->data;
 
 	// Rx
 	Tjost_Event tev;

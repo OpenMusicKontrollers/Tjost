@@ -22,8 +22,11 @@
  */
 
 #include <math.h>
-#include <pthread.h>
 #include <sched.h>
+
+#ifndef _WIN32
+#	include <pthread.h>
+#endif
 
 #include <tjost.h>
 
@@ -34,15 +37,15 @@ typedef struct _Data Data;
 struct _Data {
 	jack_ringbuffer_t *rb;
 
-	NetAddr src;
+	NetAddr_UDP_Responder src;
 
-	ev_timer sync;
+	uv_timer_t sync;
 	jack_time_t sync_jack;
 	struct timespec sync_osc;
 
-	struct ev_loop *loop;
-	pthread_t thread;
-	ev_async quit;
+	uv_loop_t *loop;
+	uv_thread_t thread;
+	uv_async_t quit;
 	struct sched_param schedp;
 };
 
@@ -51,9 +54,9 @@ static const char * bundle_str = "#bundle";
 static double slice;
 
 static void
-_sync(struct ev_loop *loop, struct ev_timer *w, int revents)
+_sync(uv_timer_t *handle, int status)
 {
-	Tjost_Module *module = w->data;
+	Tjost_Module *module = handle->data;
 	Data *dat = module->dat;
 
 	clock_gettime(CLOCK_REALTIME, &dat->sync_osc);
@@ -165,7 +168,7 @@ _handle_bundle(Tjost_Module *module, uint8_t *buf, size_t len)
 }
 
 static void
-_netaddr_cb(NetAddr *netaddr, uint8_t *buf, size_t len, void *data)
+_netaddr_cb(NetAddr_UDP_Responder *netaddr, uint8_t *buf, size_t len, void *data)
 {
 	Tjost_Module *module = data;
 
@@ -213,23 +216,22 @@ process(jack_nframes_t nframes, void *arg)
 }
 
 static void
-_quit(struct ev_loop *loop, struct ev_async *w, int revents)
+_quit(uv_async_t *handle, int status)
 {
-	ev_break(loop, EVBREAK_ALL);
+	uv_stop(handle->loop);
 }
 
-void *
+void
 _thread(void *arg)
 {
 	Data *dat = arg;
 
+#ifndef _WIN32 // POSIX only
 	if(dat->schedp.sched_priority)
 		pthread_setschedparam(dat->thread, SCHED_RR, &dat->schedp);
+#endif
 
-	ev_run(dat->loop, EVRUN_NOWAIT);
-	ev_run(dat->loop, 0);
-
-	return NULL;
+	uv_run(dat->loop, UV_RUN_DEFAULT);
 }
 
 void
@@ -237,21 +239,19 @@ add(Tjost_Module *module, int argc, const char **argv)
 {
 	Data *dat = tjost_alloc(module->host, sizeof(Data));
 
-	dat->loop = ev_loop_new(0);
+	dat->loop = uv_loop_new();
 
 	if(!(dat->rb = jack_ringbuffer_create(TJOST_RINGBUF_SIZE)))
 		fprintf(stderr, "could not initialize ringbuffer\n");
 
-	ev_async_init(&dat->quit, _quit);
-	ev_async_start(dat->loop, &dat->quit);
+	uv_async_init(dat->loop, &dat->quit, _quit);
 
 	dat->sync.data = module;
-	ev_timer_init(&dat->sync, _sync, 0.f, 1.f);
-	ev_timer_start(dat->loop, &dat->sync);
+	uv_timer_init(dat->loop, &dat->sync);
+	uv_timer_start(&dat->sync, _sync, 0, 1000); // ms
 
-	if(netaddr_udp_init(&dat->src, argv[0]))
+	if(netaddr_udp_responder_init(&dat->src, dat->loop, argv[0], _netaddr_cb, module))
 		fprintf(stderr, "could not initialize socket\n");
-	netaddr_udp_listen(&dat->src, dat->loop, _netaddr_cb, module);
 
 	if(argv[1])
 		dat->schedp.sched_priority = atoi(argv[1]);
@@ -259,7 +259,7 @@ add(Tjost_Module *module, int argc, const char **argv)
 	module->dat = dat;
 	module->type = TJOST_MODULE_INPUT;
 
-	pthread_create(&dat->thread, NULL, _thread, dat);
+	uv_thread_create(&dat->thread, _thread, dat);
 }
 
 void
@@ -267,16 +267,15 @@ del(Tjost_Module *module)
 {
 	Data *dat = module->dat;
 
-	ev_async_send(dat->loop, &dat->quit);
-	pthread_join(dat->thread, NULL);
+	uv_async_send(&dat->quit);
+	uv_thread_join(&dat->thread);
 
-	netaddr_udp_unlisten(&dat->src, dat->loop);
-	netaddr_udp_deinit(&dat->src);
+	netaddr_udp_responder_deinit(&dat->src);
 
-	ev_timer_stop(dat->loop, &dat->sync);
-	ev_async_stop(dat->loop, &dat->quit);
+	uv_timer_stop(&dat->sync);
+	uv_close((uv_handle_t *)&dat->quit, NULL);
 
-	ev_loop_destroy(dat->loop);
+	uv_loop_delete(dat->loop);
 
 	if(dat->rb)
 		jack_ringbuffer_free(dat->rb);

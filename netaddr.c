@@ -24,32 +24,104 @@
 #include <netdb.h>
 
 #include <netaddr.h>
-#include <tjost.h>
-
-static uint8_t buf_i [TJOST_BUF_SIZE];
 
 static void
-_watcher(struct ev_loop *loop, ev_io *w, int revents)
+_alloc(uv_handle_t *handle, size_t suggested_size, uv_buf_t *buf)
 {
-	NetAddr *netaddr = w->data;
-	if(netaddr)
-	{
-		socklen_t slen = sizeof(struct sockaddr_in);
-		int len;
-		while((len = recvfrom(netaddr->fd, buf_i, sizeof(buf_i), MSG_DONTWAIT | MSG_WAITALL, (struct sockaddr*) &(netaddr->addr), &slen)) != -1)
-			netaddr->cb(netaddr, buf_i, len, netaddr->dat);
-	}
+	NetAddr_UDP_Responder *netaddr = handle->data;
+
+	buf->base = (char *)netaddr->buf;
+	buf->len = TJOST_BUF_SIZE;
+}
+
+static void
+_recv_cb(uv_udp_t *handle, ssize_t nread, const uv_buf_t *buf, const struct sockaddr *addr, unsigned flags)
+{
+	NetAddr_UDP_Responder *netaddr = handle->data;
+
+	if(nread > 0)
+		netaddr->cb(netaddr, (uint8_t *)buf->base, nread, netaddr->dat);
+	else if (nread < 0)
+		fprintf(stderr, "%s\n", uv_err_name(nread));
 }
 
 int
-netaddr_udp_init(NetAddr *netaddr, const char *addr)
+netaddr_udp_responder_init(NetAddr_UDP_Responder *netaddr, uv_loop_t *loop, const char *addr, NetAddr_Cb cb, void *dat)
 {
-	uint32_t ip;
-	uint16_t port;
-	int server;
-
 	// Server: "osc.udp://:3333"
+
+	netaddr->cb = cb;
+	netaddr->dat = dat;
+	netaddr->recv_socket.data = netaddr;
+
+	if(strncmp(addr, "osc.udp://", 10))
+	{
+		fprintf(stderr, "unsupported protocol in address %s\n", addr);
+		return -1;
+	}
+	addr += 10;
+
+	char *colon = strchr(addr, ':');
+	if(!colon)
+	{
+		fprintf(stderr, "address must have a port\n");
+		return -1;
+	}
+
+	const char *host = "0.0.0.0";
+	uint16_t port = atoi(colon+1);
+
+	int err;
+	struct sockaddr_in recv_addr;
+	if((err = uv_udp_init(loop, &netaddr->recv_socket)))
+	{
+		fprintf(stderr, "%s\n", uv_err_name(err));
+		return -1;
+	}
+	if((err = uv_ip4_addr(host, port, &recv_addr)))
+	{
+		fprintf(stderr, "%s\n", uv_err_name(err));
+		return -1;
+	}
+	if((err = uv_udp_bind(&netaddr->recv_socket, (const struct sockaddr *)&recv_addr, 0)))
+	{
+		fprintf(stderr, "%s\n", uv_err_name(err));
+		return -1;
+	}
+	if((err = uv_udp_recv_start(&netaddr->recv_socket, _alloc, _recv_cb)))
+	{
+		fprintf(stderr, "%s\n", uv_err_name(err));
+		return -1;
+	}
+
+	return 0;
+}
+
+void
+netaddr_udp_responder_deinit(NetAddr_UDP_Responder *netaddr)
+{
+	uv_udp_recv_stop(&netaddr->recv_socket);
+}
+
+static void
+_send_cb(uv_udp_send_t *req, int status)
+{
+	uv_udp_t *handle = req->handle;
+	NetAddr_UDP_Sender *netaddr = handle->data;
+
+	if(status)
+		fprintf(stderr, "%s\n", uv_err_name(status));
+
+	eina_mempool_free(netaddr->pool, req);
+}
+
+int
+netaddr_udp_sender_init(NetAddr_UDP_Sender *netaddr, uv_loop_t *loop, const char *addr)
+{
 	// Client: "osc.udp://name.local:4444"
+
+	netaddr->send_socket.data = netaddr;
+	netaddr->pool = eina_mempool_add("chained_mempool", "requests", NULL, sizeof(uv_udp_send_t), 64); //TODO how big?
 
 	if(strncmp(addr, "osc.udp://", 10))
 	{
@@ -68,20 +140,16 @@ netaddr_udp_init(NetAddr *netaddr, const char *addr)
 	const char *host = NULL;
 
 	if(colon == addr)
-	{
-		host = "localhost";
-		server = 1;
-	}
+		host = "255.255.255.255"; //FIXME implement broadcast and multicast
 	else
 	{
 		*colon = '\0';
 		host = addr;
-		server = 0;
 	}
 
+	// DNS resolve
 	struct addrinfo hints;
 	struct addrinfo *ai;
-
 	memset(&hints, 0, sizeof(hints));
 	hints.ai_family = PF_INET;
 	hints.ai_socktype = SOCK_DGRAM;
@@ -90,29 +158,24 @@ netaddr_udp_init(NetAddr *netaddr, const char *addr)
 		fprintf(stderr, "address could not be resolved\n");
 		return -1;
 	}
+	char remote [17] = {'\0'};
 	struct sockaddr_in *ptr = (struct sockaddr_in *)ai->ai_addr;
-	ip = server ? htonl(INADDR_ANY) : ptr->sin_addr.s_addr;
-	port = ptr->sin_port;
+	uint16_t port = ntohs(ptr->sin_port);
 
-	bzero(&(netaddr->addr), sizeof(netaddr->addr));
-
-	netaddr->addr.sin_family = AF_INET;
-	netaddr->addr.sin_port = port;
-	netaddr->addr.sin_addr.s_addr = ip;
-
-	netaddr->cb = NULL;
-	netaddr->dat = NULL;
-	netaddr->fd = -1;
-
-	if(!server)
-		return 0;
-	
-	netaddr->fd = socket(PF_INET, SOCK_DGRAM, IPPROTO_UDP);
-	//int optval = 1;
-	//setsockopt(netaddr->fd, SOL_SOCKET, SO_REUSEPORT, &optval, sizeof(optval));
-	if(bind(netaddr->fd, (struct sockaddr*) &(netaddr->addr), sizeof(netaddr->addr)) != 0)
+	int err;
+	if((err = uv_ip4_name((struct sockaddr_in *)ai->ai_addr, remote, 16)))
 	{
-		fprintf(stderr, "socket could not be bound\n");
+		fprintf(stderr, "%s\n", uv_err_name(err));
+		return -1;
+	}
+	if((err = uv_udp_init(loop, &netaddr->send_socket)))
+	{
+		fprintf(stderr, "%s\n", uv_err_name(err));
+		return -1;
+	}
+	if((err = uv_ip4_addr(remote, port, &netaddr->send_addr)))
+	{
+		fprintf(stderr, "%s\n", uv_err_name(err));
 		return -1;
 	}
 
@@ -120,41 +183,21 @@ netaddr_udp_init(NetAddr *netaddr, const char *addr)
 }
 
 void
-netaddr_udp_deinit(NetAddr *netaddr)
+netaddr_udp_sender_deinit(NetAddr_UDP_Sender *netaddr)
 {
-	if(netaddr->fd != -1)
-		close(netaddr->fd);
-	netaddr->fd = -1;
+	eina_mempool_del(netaddr->pool);
 }
 
 void
-netaddr_udp_listen(NetAddr *netaddr, struct ev_loop *loop, NetAddrCb cb, void *dat)
+netaddr_udp_sender_send(NetAddr_UDP_Sender *netaddr, const uint8_t *buf, size_t len)
 {
-	if(!netaddr->cb && cb)
-	{
-		netaddr->cb = cb;
-		netaddr->dat = dat;
+	uv_udp_send_t *send_req = eina_mempool_malloc(netaddr->pool, sizeof(uv_udp_send_t));
+	uv_buf_t msg;
 
-		netaddr->watcher.data = netaddr;
-		ev_io_init(&(netaddr->watcher), _watcher, netaddr->fd, EV_READ);
-		ev_io_start(loop, &(netaddr->watcher));
-	}
-}
+	msg.base = (char *)buf;
+	msg.len = len;
 
-void
-netaddr_udp_unlisten(NetAddr *netaddr, struct ev_loop *loop)
-{
-	if(netaddr->cb)
-	{
-		netaddr->watcher.data = NULL;
-		ev_io_stop(loop, &(netaddr->watcher));
-		netaddr->cb = NULL;
-	}
-}
-
-inline void
-netaddr_udp_sendto(NetAddr *netaddr, NetAddr *dest, const uint8_t *buf, size_t len)
-{
-	if(sendto(netaddr->fd, buf, len, 0, (const struct sockaddr *) &(dest->addr), sizeof(dest->addr)) != len)
-		fprintf(stderr, "sendto failed\n");
+	int err;
+	if((err = uv_udp_send(send_req, &netaddr->send_socket, &msg, 1, (const struct sockaddr *)&netaddr->send_addr, _send_cb)))
+		fprintf(stderr, "%s", uv_err_name(err)); //FIXME use tjost_message_push
 }

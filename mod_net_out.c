@@ -30,16 +30,15 @@ typedef struct _Data Data;
 struct _Data {
 	jack_ringbuffer_t *rb;
 
-	NetAddr src;
-	NetAddr snk;
+	NetAddr_UDP_Sender snk;
 
-	ev_timer sync;
+	uv_timer_t sync;
 	jack_time_t sync_jack;
 	struct timespec sync_osc;
 	int32_t delay_sec;
 	uint32_t delay_nsec;
 	
-	ev_async asio;
+	uv_async_t asio;
 };
 
 static uint8_t buffer [TJOST_BUF_SIZE] __attribute__((aligned (8)));
@@ -48,9 +47,9 @@ static char * bundle_str = "#bundle";
 #define NSEC_PER_NTP_SLICE 4.2950f
 
 static void
-_sync(struct ev_loop *loop, struct ev_timer *w, int revents)
+_sync(uv_timer_t *handle, int status)
 {
-	Tjost_Module *module = w->data;
+	Tjost_Module *module = handle->data;
 	Data *dat = module->dat;
 
 	clock_gettime(CLOCK_REALTIME, &dat->sync_osc);
@@ -60,9 +59,9 @@ _sync(struct ev_loop *loop, struct ev_timer *w, int revents)
 }
 
 static void
-_asio(struct ev_loop *loop, struct ev_async *w, int revents)
+_asio(uv_async_t *handle, int status)
 {
-	Tjost_Module *module = w->data;
+	Tjost_Module *module = handle->data;
 	Data *dat = module->dat;
 
 	Tjost_Event tev;
@@ -95,7 +94,7 @@ _asio(struct ev_loop *loop, struct ev_async *w, int revents)
 			jack_ringbuffer_read(dat->rb, (char *)(buffer+20), tev.size);
 
 			if(jack_osc_message_check(buffer+20, tev.size))
-				netaddr_udp_sendto(&dat->src, &dat->snk, buffer, tev.size+20);
+				netaddr_udp_sender_send(&dat->snk, buffer, tev.size+20);
 			else
 				fprintf(stderr, "tx OSC message invalid\n");
 		}
@@ -142,7 +141,7 @@ process(jack_nframes_t nframes, void *arg)
 		tjost_free(host, tev);
 	}
 
-	ev_async_send(EV_DEFAULT, &dat->asio);
+	uv_async_send(&dat->asio);
 
 	return 0;
 }
@@ -152,20 +151,19 @@ add(Tjost_Module *module, int argc, const char **argv)
 {
 	Data *dat = tjost_alloc(module->host, sizeof(Data));
 
-	if(netaddr_udp_init(&dat->src, "osc.udp://:0"))
-		fprintf(stderr, "could not initialize socket\n");
-	if(netaddr_udp_init(&dat->snk, argv[0]))
+	uv_loop_t *loop = uv_default_loop();
+
+	if(netaddr_udp_sender_init(&dat->snk, loop, argv[0]))
 		fprintf(stderr, "could not initialize socket\n");
 	if(!(dat->rb = jack_ringbuffer_create(TJOST_RINGBUF_SIZE)))
 		fprintf(stderr, "could not initialize ringbuffer\n");
 
 	dat->asio.data = module;
-	ev_async_init(&dat->asio, _asio);
-	ev_async_start(EV_DEFAULT, &dat->asio);
+	uv_async_init(loop, &dat->asio, _asio);
 
 	dat->sync.data = module;
-	ev_timer_init(&dat->sync, _sync, 0.f, 1.f);
-	ev_timer_start(EV_DEFAULT, &dat->sync);
+	uv_timer_init(loop, &dat->sync);
+	uv_timer_start(&dat->sync, _sync, 0, 1000); // ms
 
 	module->dat = dat;
 	module->type = TJOST_MODULE_OUTPUT;
@@ -176,14 +174,13 @@ del(Tjost_Module *module)
 {
 	Data *dat = module->dat;
 
-	ev_timer_stop(EV_DEFAULT, &dat->sync);
-	ev_async_stop(EV_DEFAULT, &dat->asio);
+	uv_timer_stop(&dat->sync);
+	uv_close((uv_handle_t *)&dat->asio, NULL);
 
 	if(dat->rb)
 		jack_ringbuffer_free(dat->rb);
 
-	netaddr_udp_deinit(&dat->src);
-	netaddr_udp_deinit(&dat->snk);
+	netaddr_udp_sender_deinit(&dat->snk);
 
 	tjost_free(module->host, dat);
 }

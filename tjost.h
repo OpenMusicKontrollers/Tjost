@@ -28,8 +28,8 @@
 extern "C" {
 #endif
 
-// libev for the event system
-#include <ev.h>
+// libuv for the event system
+#include <uv.h>
 
 // Lua as embedded scripting language
 #define LUA_COMPAT_ALL
@@ -98,18 +98,18 @@ struct _Tjost_Host {
 
 	lua_State *L;
 
-	ev_signal sigterm, sigquit, sigint;
-	ev_async quit;
+	uv_signal_t sigterm, sigquit, sigint;
+	uv_async_t quit;
 
 	jack_ringbuffer_t *rb_msg;
-	ev_async msg;
+	uv_async_t msg;
 
 	jack_ringbuffer_t *rb_uplink_tx;
 	jack_ringbuffer_t *rb_uplink_rx;
-	ev_async uplink_tx;
+	uv_async_t uplink_tx;
 
 	jack_ringbuffer_t *rb_rtmem;
-	ev_async rtmem;
+	uv_async_t rtmem;
 	size_t rtmem_sum;
 
 	Eina_Array *arr; // modules
@@ -145,7 +145,7 @@ extern const luaL_Reg tjost_uplink_mt [];
 extern const luaL_Reg tjost_globals [];
 
 // in tjost_uplink.c
-void tjost_uplink_tx_drain(struct ev_loop *loop, struct ev_async *w, int revents);
+void tjost_uplink_tx_drain(uv_async_t *handle, int status);
 void tjost_uplink_tx_push(Tjost_Host *host, Tjost_Event *tev);
 void tjost_uplink_rx_drain(Tjost_Host *host);
 

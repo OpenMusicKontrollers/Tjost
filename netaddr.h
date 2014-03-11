@@ -30,28 +30,35 @@
 #include <resolv.h>
 #include <unistd.h>
 
-#include <ev.h>
+#include <tjost.h>
 
-typedef struct _NetAddr NetAddr;
-typedef void (*NetAddrCb) (NetAddr *netaddr, uint8_t *buf, size_t len, void *dat);
+#include <uv.h>
+#include <Eina.h>
 
-struct _NetAddr {
-	// server and destination
-	struct sockaddr_in addr;
+typedef struct _NetAddr_UDP_Sender NetAddr_UDP_Sender;
+typedef struct _NetAddr_UDP_Responder NetAddr_UDP_Responder;
+typedef void (*NetAddr_Cb) (NetAddr_UDP_Responder *netaddr, uint8_t *buf, size_t len, void *dat);
 
-	// server-specific
-	int fd;
-	ev_io watcher;
-	NetAddrCb cb;
-	void *dat;
+struct _NetAddr_UDP_Sender {
+	uv_udp_t send_socket;
+
+	struct sockaddr_in send_addr;
+	Eina_Mempool *pool;
 };
 
-int netaddr_udp_init(NetAddr *netaddr, const char *addr);
-void netaddr_udp_deinit(NetAddr *netaddr);
+struct _NetAddr_UDP_Responder {
+	uv_udp_t recv_socket;
+	NetAddr_Cb cb;
 
-void netaddr_udp_listen(NetAddr *netaddr, struct ev_loop *loop, NetAddrCb cb, void *dat);
-void netaddr_udp_unlisten(NetAddr *netaddr, struct ev_loop *loop);
+	void *dat;
+	uint8_t buf [TJOST_BUF_SIZE];
+};
 
-void netaddr_udp_sendto(NetAddr *netaddr, NetAddr *dest, const uint8_t *buf, size_t len);
+int netaddr_udp_responder_init(NetAddr_UDP_Responder *netaddr, uv_loop_t *loop, const char *addr, NetAddr_Cb cb, void *dat);
+void netaddr_udp_responder_deinit(NetAddr_UDP_Responder *netaddr);
+
+int netaddr_udp_sender_init(NetAddr_UDP_Sender *netaddr, uv_loop_t *loop, const char *addr);
+void netaddr_udp_sender_deinit(NetAddr_UDP_Sender *netaddr);
+void netaddr_udp_sender_send(NetAddr_UDP_Sender *netaddr, const uint8_t *buf, size_t len);
 
 #endif // _NETADDR_H

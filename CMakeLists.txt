@@ -6,16 +6,16 @@ set (CMAKE_MODULE_PATH ${CMAKE_SOURCE_DIR}/cmake)
 
 set(LIBS "-lm")
 
-# libev
-find_package(LibEV REQUIRED)
-include_directories(${LIBEV_INCLUDE_DIR})
-set(LIBS ${LIBS} ${LIBEV_LIBRARIES})
-
 # pkg-config
 find_package(PkgConfig REQUIRED)
 
 include_directories("${PROJECT_SOURCE_DIR}")
 include_directories("${PROJECT_SOURCE_DIR}/tlsf")
+
+# libuv
+pkg_search_module(UV REQUIRED libuv)
+include_directories(${UV_INCLUDE_DIRS})
+set(LIBS ${LIBS} ${UV_LDFLAGS})
 
 # jack
 pkg_search_module(JACK REQUIRED jack)

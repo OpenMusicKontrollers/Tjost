@@ -36,30 +36,23 @@
 #include <tjost.h>
 
 static void
-_err(const char *msg)
+_sig(uv_signal_t *handle, int signum)
 {
-	fprintf(stderr, "libev main loop error: %s\n", msg);
-	ev_break(EV_DEFAULT, EVBREAK_ALL);
+	uv_stop(handle->loop);
 }
 
 static void
-_sig(struct ev_loop *loop, struct ev_signal *w, int revents)
+_quit(uv_async_t *handle, int status)
 {
-	ev_break(loop, EVBREAK_ALL);
+	uv_stop(handle->loop);
 }
 
 static void
-_quit(struct ev_loop *loop, struct ev_async *w, int revents)
-{
-	ev_break(loop, EVBREAK_ALL);
-}
-
-static void
-_msg(struct ev_loop *loop, struct ev_async *w, int revents)
+_msg(uv_async_t *handle, int status)
 {
 	static char str [1024]; // TODO how big?
 
-	Tjost_Host *host = w->data;
+	Tjost_Host *host = handle->data;
 
 	while(tjost_host_message_pull(host, str))
 		fprintf(stderr, "MESSAGE: %s\n", str);
@@ -69,7 +62,8 @@ static void
 _shutdown(void *arg)
 {
 	Tjost_Host *host = arg;
-	ev_async_send(EV_DEFAULT, &host->quit);
+
+	uv_async_send(&host->quit);
 }
 
 static void *
@@ -156,7 +150,7 @@ tjost_host_message_push(Tjost_Host *host, const char *fmt, ...)
 		jack_ringbuffer_write(host->rb_msg, str, size);
 	}
 
-	ev_async_send(EV_DEFAULT, &host->msg);
+	uv_async_send(&host->msg);
 }
 
 int
@@ -181,9 +175,9 @@ static const size_t area_size = 0x1000000UL; // 16MB
 //static const size_t area_size = 0x10000UL; // 64KB
 
 static void
-tjost_request_memory(struct ev_loop *loop, struct ev_async *w, int revents)
+tjost_request_memory(uv_async_t *handle, int status)
 {
-	Tjost_Host *host = w->data;
+	Tjost_Host *host = handle->data;
 	void *area;
 
 	printf("requesting new memory chunk\n");
@@ -228,7 +222,7 @@ tjost_alloc(Tjost_Host *host, size_t len)
 	size_t used = get_used_size(host->pool);
 	if(used > host->rtmem_sum/2) //TODO make this configurable
 	{
-		ev_async_send(EV_DEFAULT, &host->rtmem);
+		uv_async_send(&host->rtmem);
 		host->rtmem_sum += area_size;
 	}
 
@@ -251,7 +245,7 @@ tjost_realloc(Tjost_Host *host, size_t len, void *buf)
 	size_t used = get_used_size(host->pool);
 	if(used > host->rtmem_sum/2) //TODO make this configurable
 	{
-		ev_async_send(EV_DEFAULT, &host->rtmem);
+		uv_async_send(&host->rtmem);
 		host->rtmem_sum += area_size;
 	}
 
@@ -317,7 +311,7 @@ _process_indirect(jack_nframes_t nframes, void *arg)
 		module->process(nframes, module);
 
 	// write uplink events to rinbbuffer
-	ev_async_send(EV_DEFAULT, &host->uplink_tx);
+	uv_async_send(&host->uplink_tx);
 
 	// run garbage collection step
 	lua_gc(host->L, LUA_GCSTEP, 0);
@@ -365,7 +359,7 @@ _process_direct(jack_nframes_t nframes, void *arg)
 		module->process(nframes, module);
 
 	// write uplink events to rinbbuffer
-	ev_async_send(EV_DEFAULT, &host->uplink_tx);
+	uv_async_send(&host->uplink_tx);
 	
 	return 0;
 }
@@ -506,51 +500,48 @@ main(int argc, const char **argv)
 		FAIL("error loading file: %s\n", lua_tostring(host.L, -1));
 	lua_gc(host.L, LUA_GCSTOP, 0); // disable automatic garbage collection
 
+	uv_loop_t *loop = uv_default_loop();
+
+	// init libev
+	uv_signal_init(loop, &host.sigterm);
+	uv_signal_start(&host.sigterm, _sig, SIGTERM);
+
+	uv_signal_init(loop, &host.sigquit);
+	uv_signal_start(&host.sigquit, _sig, SIGQUIT);
+
+	uv_signal_init(loop, &host.sigint);
+	uv_signal_start(&host.sigint, _sig, SIGINT);
+
+	uv_async_init(loop, &host.quit, _quit);
+
+	host.msg.data = &host;
+	uv_async_init(loop, &host.msg, _msg);
+
+	host.uplink_tx.data = &host;
+	uv_async_init(loop, &host.uplink_tx, tjost_uplink_tx_drain);
+
+	host.rtmem.data = &host;
+	uv_async_init(loop, &host.rtmem, tjost_request_memory);
+
 	// activate JACK
 	if(jack_activate(host.client))
 		FAIL("could not activate jack client\n");
 
-	// init libev
-	ev_signal_init(&host.sigterm, _sig, SIGTERM);
-	ev_signal_init(&host.sigquit, _sig, SIGQUIT);
-	ev_signal_init(&host.sigint, _sig, SIGINT);
-	ev_signal_start(EV_DEFAULT, &host.sigterm);
-	ev_signal_start(EV_DEFAULT, &host.sigquit);
-	ev_signal_start(EV_DEFAULT, &host.sigint);
-
-	ev_async_init(&host.quit, _quit);
-	ev_async_start(EV_DEFAULT, &host.quit);
-
-	host.msg.data = &host;
-	ev_async_init(&host.msg, _msg);
-	ev_async_start(EV_DEFAULT, &host.msg);
-
-	host.uplink_tx.data = &host;
-	ev_async_init(&host.uplink_tx, tjost_uplink_tx_drain);
-	ev_async_start(EV_DEFAULT, &host.uplink_tx);
-
-	host.rtmem.data = &host;
-	ev_async_init(&host.rtmem, tjost_request_memory);
-	ev_async_start(EV_DEFAULT, &host.rtmem);
-
-	ev_set_syserr_cb(_err);
-
 	// run libev
-	ev_run(EV_DEFAULT, EVRUN_NOWAIT);
-	ev_run(EV_DEFAULT, 0);
+	uv_run(loop, UV_RUN_DEFAULT);
 
 cleanup:
 	fprintf(stderr, "cleaning up\n");
 
 	// deinit libev
-	ev_async_stop(EV_DEFAULT, &host.rtmem);
-	ev_async_stop(EV_DEFAULT, &host.uplink_tx);
-	ev_async_stop(EV_DEFAULT, &host.msg);
-	ev_async_stop(EV_DEFAULT, &host.quit);
+	uv_close((uv_handle_t *)&host.rtmem, NULL);
+	uv_close((uv_handle_t *)&host.uplink_tx, NULL);
+	uv_close((uv_handle_t *)&host.msg, NULL);
+	uv_close((uv_handle_t *)&host.quit, NULL);
 
-	ev_signal_stop(EV_DEFAULT, &host.sigterm);
-	ev_signal_stop(EV_DEFAULT, &host.sigquit);
-	ev_signal_stop(EV_DEFAULT, &host.sigint);
+	uv_signal_stop(&host.sigterm);
+	uv_signal_stop(&host.sigquit);
+	uv_signal_stop(&host.sigint);
 	
 	if(host.client)
 		jack_deactivate(host.client);

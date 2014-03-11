@@ -29,15 +29,15 @@ typedef struct _Data Data;
 
 struct _Data {
 	jack_ringbuffer_t *rb;
-	ev_async asio;
+	uv_async_t asio;
 };
 
 static uint8_t buffer [TJOST_BUF_SIZE] __attribute__((aligned (8)));
 
 static void
-_asio(struct ev_loop *loop, struct ev_async *w, int revents)
+_asio(uv_async_t *handle, int status)
 {
-	Tjost_Module *module = w->data;
+	Tjost_Module *module = handle->data;
 	Data *dat = module->dat;
 
 	struct timespec now;
@@ -199,7 +199,7 @@ process(jack_nframes_t nframes, void *arg)
 		tjost_free(host, tev);
 	}
 
-	ev_async_send(EV_DEFAULT, &dat->asio);
+	uv_async_send(&dat->asio);
 
 	return 0;
 }
@@ -211,10 +211,11 @@ add(Tjost_Module *module, int argc, const char **argv)
 
 	if(!(dat->rb = jack_ringbuffer_create(TJOST_RINGBUF_SIZE)))
 		fprintf(stderr, "could not initialize ringbuffer\n");
+	
+	uv_loop_t *loop = uv_default_loop();
 
 	dat->asio.data = module;
-	ev_async_init(&dat->asio, _asio);
-	ev_async_start(EV_DEFAULT, &dat->asio);
+	uv_async_init(loop, &dat->asio, _asio);
 
 	module->dat = dat;
 	module->type = TJOST_MODULE_OUTPUT;
@@ -225,7 +226,7 @@ del(Tjost_Module *module)
 {
 	Data *dat = module->dat;
 
-	ev_async_stop(EV_DEFAULT, &dat->asio);
+	uv_close((uv_handle_t *)&dat->asio, NULL);
 
 	if(dat->rb)
 		jack_ringbuffer_free(dat->rb);
