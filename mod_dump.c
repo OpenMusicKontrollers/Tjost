@@ -170,6 +170,8 @@ process(jack_nframes_t nframes, void *arg)
 
 	jack_nframes_t last = jack_last_frame_time(host->client);
 
+	unsigned int count = eina_inlist_count(module->queue);
+
 	// handle events
 	Eina_Inlist *l;
 	Tjost_Event *tev;
@@ -199,7 +201,8 @@ process(jack_nframes_t nframes, void *arg)
 		tjost_free(host, tev);
 	}
 
-	uv_async_send(&dat->asio);
+	if(count > 0)
+		uv_async_send(&dat->asio);
 
 	return 0;
 }

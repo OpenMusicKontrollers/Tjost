@@ -34,12 +34,17 @@
 
 #include <netaddr.h>
 
+typedef enum _Socket_Type {SOCKET_UDP, SOCKET_TCP} Socket_Type;
 typedef struct _Data Data;
 
 struct _Data {
 	jack_ringbuffer_t *rb;
 
-	NetAddr_UDP_Responder src;
+	Socket_Type type;
+	union {
+		NetAddr_UDP_Responder udp;
+		NetAddr_TCP_Responder tcp;
+	} src;
 
 	uv_timer_t sync;
 	jack_time_t sync_jack;
@@ -56,7 +61,7 @@ struct _Data {
 #endif
 };
 
-static const char * bundle_str = "#bundle";
+static const char *bundle_str = "#bundle";
 #define JAN_1970 (uint32_t)0x83aa7e80
 static double slice;
 
@@ -175,7 +180,7 @@ _handle_bundle(Tjost_Module *module, uint8_t *buf, size_t len)
 }
 
 static void
-_netaddr_cb(NetAddr_UDP_Responder *netaddr, uint8_t *buf, size_t len, void *data)
+_netaddr_cb(uint8_t *buf, size_t len, void *data)
 {
 	Tjost_Module *module = data;
 
@@ -282,8 +287,24 @@ add(Tjost_Module *module, int argc, const char **argv)
 	uv_timer_init(dat->loop, &dat->sync);
 	uv_timer_start(&dat->sync, _sync, 0, 1000); // ms
 
-	if(netaddr_udp_responder_init(&dat->src, dat->loop, argv[0], _netaddr_cb, module))
-		fprintf(stderr, "could not initialize socket\n");
+	if(!strncmp(argv[0], "osc.udp://", 10))
+		dat->type = SOCKET_UDP;
+	else if(!strncmp(argv[0], "osc.tcp://", 10))
+		dat->type = SOCKET_TCP;
+	else
+		; //FIXME error
+
+	switch(dat->type)
+	{
+		case SOCKET_UDP:
+			if(netaddr_udp_responder_init(&dat->src.udp, dat->loop, argv[0], _netaddr_cb, module))
+				fprintf(stderr, "could not initialize socket\n");
+			break;
+		case SOCKET_TCP:
+			if(netaddr_tcp_responder_init(&dat->src.tcp, dat->loop, argv[0], _netaddr_cb, module))
+				fprintf(stderr, "could not initialize socket\n");
+			break;
+	}
 
 	if(argv[1])
 #ifndef _WIN32 // POSIX only
@@ -306,7 +327,15 @@ del(Tjost_Module *module)
 	uv_async_send(&dat->quit);
 	uv_thread_join(&dat->thread);
 
-	netaddr_udp_responder_deinit(&dat->src);
+	switch(dat->type)
+	{
+		case SOCKET_UDP:
+			netaddr_udp_responder_deinit(&dat->src.udp);
+			break;
+		case SOCKET_TCP:
+			netaddr_tcp_responder_deinit(&dat->src.tcp);
+			break;
+	}
 
 	uv_timer_stop(&dat->sync);
 	uv_close((uv_handle_t *)&dat->quit, NULL);

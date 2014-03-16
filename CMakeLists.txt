@@ -49,7 +49,7 @@ install(TARGETS jack_osc DESTINATION lib)
 install(FILES jack_osc.h DESTINATION include)
 
 # tjost
-add_executable(tjost tjost.c tjost_lua.c tjost_uplink.c tlsf/tlsf.c)
+add_executable(tjost tjost.c tjost_lua.c tjost_uplink.c netaddr_udp.c netaddr_tcp.c tlsf/tlsf.c)
 target_link_libraries(tjost jack_osc ${LIBS} "${CMAKE_SOURCE_DIR}/LuaJIT-2.0.2/src/libluajit.a" "-ldl")
 install(TARGETS tjost DESTINATION bin)
 
@@ -78,6 +78,11 @@ add_library(dump MODULE mod_dump.c)
 set_target_properties(dump PROPERTIES PREFIX "")
 install(TARGETS dump DESTINATION lib/tjost)
 
+# mod_send
+add_library(send MODULE mod_send.c)
+set_target_properties(send PROPERTIES PREFIX "")
+install(TARGETS send DESTINATION lib/tjost)
+
 # mod_midi_in
 add_library(midi_in MODULE mod_midi_in.c)
 set_target_properties(midi_in PROPERTIES PREFIX "")
@@ -99,12 +104,12 @@ set_target_properties(audio_out PROPERTIES PREFIX "")
 install(TARGETS audio_out DESTINATION lib/tjost)
 
 # mod_net_out
-add_library(net_out MODULE mod_net_out.c netaddr.c)
+add_library(net_out MODULE mod_net_out.c)
 set_target_properties(net_out PROPERTIES PREFIX "")
 install(TARGETS net_out DESTINATION lib/tjost)
 
 # mod_net_in
-add_library(net_in MODULE mod_net_in.c netaddr.c)
+add_library(net_in MODULE mod_net_in.c)
 set_target_properties(net_in PROPERTIES PREFIX "")
 install(TARGETS net_in DESTINATION lib/tjost)
 

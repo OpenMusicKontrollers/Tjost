@@ -25,12 +25,17 @@
 
 #include <netaddr.h>
 
+typedef enum _Socket_Type {SOCKET_UDP, SOCKET_TCP} Socket_Type;
 typedef struct _Data Data;
 
 struct _Data {
 	jack_ringbuffer_t *rb;
 
-	NetAddr_UDP_Sender snk;
+	Socket_Type type;
+	union {
+		NetAddr_UDP_Sender udp;
+		NetAddr_TCP_Sender tcp;
+	} snk;
 
 	uv_timer_t sync;
 	jack_time_t sync_jack;
@@ -41,8 +46,7 @@ struct _Data {
 	uv_async_t asio;
 };
 
-static uint8_t buffer [TJOST_BUF_SIZE] __attribute__((aligned (8)));
-static char * bundle_str = "#bundle";
+static const char *bundle_str = "#bundle";
 #define JAN_1970 (uint32_t)0x83aa7e80
 #define NSEC_PER_NTP_SLICE 4.2950f
 
@@ -58,14 +62,25 @@ _sync(uv_timer_t *handle, int status)
 	dat->sync_jack = jack_get_time();
 }
 
+static void _next(Tjost_Module *module);
+
 static void
-_asio(uv_async_t *handle, int status)
+_advance(size_t len, void *arg)
 {
-	Tjost_Module *module = handle->data;
+	Tjost_Module *module = arg;
+	Data *dat = module->dat;
+
+	jack_ringbuffer_read_advance(dat->rb, len);
+	_next(module);
+}
+
+static void
+_next(Tjost_Module *module)
+{
 	Data *dat = module->dat;
 
 	Tjost_Event tev;
-	while(jack_ringbuffer_read_space(dat->rb) >= sizeof(Tjost_Event))
+	if(jack_ringbuffer_read_space(dat->rb) >= sizeof(Tjost_Event))
 	{
 		jack_ringbuffer_peek(dat->rb, (char *)&tev, sizeof(Tjost_Event));
 		if(jack_ringbuffer_read_space(dat->rb) >= sizeof(Tjost_Event) + tev.size)
@@ -73,7 +88,7 @@ _asio(uv_async_t *handle, int status)
 			jack_ringbuffer_read_advance(dat->rb, sizeof(Tjost_Event));
 
 			jack_time_t usecs = jack_frames_to_time(module->host->client, tev.time) - dat->sync_jack;
-		
+
 			uint32_t size = tev.size;
 			uint32_t sec = dat->sync_osc.tv_sec + JAN_1970 + dat->delay_sec;
 			uint64_t nsec = dat->sync_osc.tv_nsec + usecs*1e3 + dat->delay_nsec;
@@ -85,22 +100,60 @@ _asio(uv_async_t *handle, int status)
 			uint32_t frac = nsec * NSEC_PER_NTP_SLICE;
 			sec = htonl(sec);
 			frac = htonl(frac);
-			size = htonl(size);
-			memcpy(buffer, bundle_str, 8);
-			memcpy(buffer+8, &sec, 4);
-			memcpy(buffer+12, &frac, 4);
-			memcpy(buffer+16, &size, 4);
+			uint32_t nsize = htonl(size);
 
-			jack_ringbuffer_read(dat->rb, (char *)(buffer+20), tev.size);
+			static uint8_t header [20];
+			memcpy(header, bundle_str, 8);
+			memcpy(header+8, &sec, 4);
+			memcpy(header+12, &frac, 4);
+			memcpy(header+16, &nsize, 4);
+			
+			uv_buf_t msg [3];
+			msg[0].base = (char *)header;
+			msg[0].len = 20;
 
-			if(jack_osc_message_check(buffer+20, tev.size))
-				netaddr_udp_sender_send(&dat->snk, buffer, tev.size+20);
-			else
-				fprintf(stderr, "tx OSC message invalid\n");
+			jack_ringbuffer_data_t vec [2];
+			jack_ringbuffer_get_read_vector(dat->rb, vec);
+
+			if(size <= vec[0].len)
+			{
+				msg[1].base = vec[0].buf;
+				msg[1].len = size;
+
+				msg[2].len = 0;
+			}
+			else // size > vec[0].len //FIXME check for vec[1].len
+			{
+				msg[1].base = vec[0].buf;
+				msg[1].len = vec[0].len;
+
+				msg[2].base = vec[1].buf;
+				msg[2].len = size - vec[0].len;
+			}
+
+			//if(jack_osc_message_check(buffer+20, tev.size)) //FIXME
+				switch(dat->type)
+				{
+					case SOCKET_UDP:
+						netaddr_udp_sender_send(&dat->snk.udp, msg, msg[2].len > 0 ? 3 : 2, _advance, module);
+						break;
+					case SOCKET_TCP:
+						netaddr_tcp_sender_send(&dat->snk.tcp, msg, msg[2].len > 0 ? 3 : 2, _advance, module);
+						break;
+				}
+			//else
+			//	fprintf(stderr, "tx OSC message invalid\n");
+
 		}
-		else
-			break;
 	}
+}
+
+static void
+_asio(uv_async_t *handle, int status)
+{
+	Tjost_Module *module = handle->data;
+
+	_next(module);
 }
 
 int
@@ -111,6 +164,8 @@ process(jack_nframes_t nframes, void *arg)
 	Data *dat = module->dat;
 
 	jack_nframes_t last = jack_last_frame_time(host->client);
+
+	unsigned int count = eina_inlist_count(module->queue);
 
 	// handle events
 	Eina_Inlist *l;
@@ -141,7 +196,8 @@ process(jack_nframes_t nframes, void *arg)
 		tjost_free(host, tev);
 	}
 
-	uv_async_send(&dat->asio);
+	if(count > 0)
+		uv_async_send(&dat->asio);
 
 	return 0;
 }
@@ -153,8 +209,24 @@ add(Tjost_Module *module, int argc, const char **argv)
 
 	uv_loop_t *loop = uv_default_loop();
 
-	if(netaddr_udp_sender_init(&dat->snk, loop, argv[0]))
-		fprintf(stderr, "could not initialize socket\n");
+	if(!strncmp(argv[0], "osc.udp://", 10))
+		dat->type = SOCKET_UDP;
+	else if(!strncmp(argv[0], "osc.tcp://", 10))
+		dat->type = SOCKET_TCP;
+	else
+		; //FIXME error
+
+	switch(dat->type)
+	{
+		case SOCKET_UDP:
+			if(netaddr_udp_sender_init(&dat->snk.udp, loop, argv[0])) //TODO close?
+				fprintf(stderr, "could not initialize socket\n");
+			break;
+		case SOCKET_TCP:
+			if(netaddr_tcp_sender_init(&dat->snk.tcp, loop, argv[0])) //TODO close?
+				fprintf(stderr, "could not initialize socket\n");
+			break;
+	}
 	if(!(dat->rb = jack_ringbuffer_create(TJOST_RINGBUF_SIZE)))
 		fprintf(stderr, "could not initialize ringbuffer\n");
 
@@ -180,7 +252,15 @@ del(Tjost_Module *module)
 	if(dat->rb)
 		jack_ringbuffer_free(dat->rb);
 
-	netaddr_udp_sender_deinit(&dat->snk);
+	switch(dat->type)
+	{
+		case SOCKET_UDP:
+			netaddr_udp_sender_deinit(&dat->snk.udp);
+			break;
+		case SOCKET_TCP:
+			netaddr_tcp_sender_deinit(&dat->snk.tcp);
+			break;
+	}
 
 	tjost_free(module->host, dat);
 }

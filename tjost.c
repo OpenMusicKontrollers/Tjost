@@ -311,7 +311,7 @@ _process_indirect(jack_nframes_t nframes, void *arg)
 		module->process(nframes, module);
 
 	// write uplink events to rinbbuffer
-	uv_async_send(&host->uplink_tx);
+	uv_async_send(&host->uplink_tx); //TODO check if there are any
 
 	// run garbage collection step
 	lua_gc(host->L, LUA_GCSTEP, 0);

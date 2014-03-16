@@ -26,7 +26,7 @@
 #include <netaddr.h>
 
 static void
-_alloc(uv_handle_t *handle, size_t suggested_size, uv_buf_t *buf)
+_udp_alloc(uv_handle_t *handle, size_t suggested_size, uv_buf_t *buf)
 {
 	NetAddr_UDP_Responder *netaddr = handle->data;
 
@@ -35,18 +35,21 @@ _alloc(uv_handle_t *handle, size_t suggested_size, uv_buf_t *buf)
 }
 
 static void
-_recv_cb(uv_udp_t *handle, ssize_t nread, const uv_buf_t *buf, const struct sockaddr *addr, unsigned flags)
+_udp_recv_cb(uv_udp_t *handle, ssize_t nread, const uv_buf_t *buf, const struct sockaddr *addr, unsigned flags)
 {
 	NetAddr_UDP_Responder *netaddr = handle->data;
 
 	if(nread > 0)
-		netaddr->cb(netaddr, (uint8_t *)buf->base, nread, netaddr->dat);
+		netaddr->cb((uint8_t *)buf->base, nread, netaddr->dat);
 	else if (nread < 0)
+	{
+		uv_close((uv_handle_t *)handle, NULL);
 		fprintf(stderr, "%s\n", uv_err_name(nread));
+	}
 }
 
 int
-netaddr_udp_responder_init(NetAddr_UDP_Responder *netaddr, uv_loop_t *loop, const char *addr, NetAddr_Cb cb, void *dat)
+netaddr_udp_responder_init(NetAddr_UDP_Responder *netaddr, uv_loop_t *loop, const char *addr, NetAddr_Recv_Cb cb, void *dat)
 {
 	// Server: "osc.udp://:3333"
 
@@ -88,7 +91,7 @@ netaddr_udp_responder_init(NetAddr_UDP_Responder *netaddr, uv_loop_t *loop, cons
 		fprintf(stderr, "%s\n", uv_err_name(err));
 		return -1;
 	}
-	if((err = uv_udp_recv_start(&netaddr->recv_socket, _alloc, _recv_cb)))
+	if((err = uv_udp_recv_start(&netaddr->recv_socket, _udp_alloc, _udp_recv_cb)))
 	{
 		fprintf(stderr, "%s\n", uv_err_name(err));
 		return -1;
@@ -103,25 +106,12 @@ netaddr_udp_responder_deinit(NetAddr_UDP_Responder *netaddr)
 	uv_udp_recv_stop(&netaddr->recv_socket);
 }
 
-static void
-_send_cb(uv_udp_send_t *req, int status)
-{
-	uv_udp_t *handle = req->handle;
-	NetAddr_UDP_Sender *netaddr = handle->data;
-
-	if(status)
-		fprintf(stderr, "%s\n", uv_err_name(status));
-
-	eina_mempool_free(netaddr->pool, req);
-}
-
 int
 netaddr_udp_sender_init(NetAddr_UDP_Sender *netaddr, uv_loop_t *loop, const char *addr)
 {
 	// Client: "osc.udp://name.local:4444"
 
 	netaddr->send_socket.data = netaddr;
-	netaddr->pool = eina_mempool_add("chained_mempool", "requests", NULL, sizeof(uv_udp_send_t), 64); //TODO how big?
 
 	if(strncmp(addr, "osc.udp://", 10))
 	{
@@ -185,19 +175,32 @@ netaddr_udp_sender_init(NetAddr_UDP_Sender *netaddr, uv_loop_t *loop, const char
 void
 netaddr_udp_sender_deinit(NetAddr_UDP_Sender *netaddr)
 {
-	eina_mempool_del(netaddr->pool);
+	//TODO
+}
+
+static void
+_udp_send_cb(uv_udp_send_t *req, int status)
+{
+	uv_udp_t *handle = req->handle;
+	NetAddr_UDP_Sender *netaddr = handle->data;
+
+	if(status)
+		fprintf(stderr, "%s\n", uv_err_name(status));
+
+	netaddr->cb(netaddr->len, netaddr->dat);
 }
 
 void
-netaddr_udp_sender_send(NetAddr_UDP_Sender *netaddr, const uint8_t *buf, size_t len)
+netaddr_udp_sender_send(NetAddr_UDP_Sender *netaddr, uv_buf_t *bufs, int nbufs, NetAddr_Send_Cb cb, void *dat)
 {
-	uv_udp_send_t *send_req = eina_mempool_malloc(netaddr->pool, sizeof(uv_udp_send_t));
-	uv_buf_t msg;
-
-	msg.base = (char *)buf;
-	msg.len = len;
+	netaddr->cb = cb;
+	netaddr->dat = dat;
+	netaddr->len = 0;
+	int i;
+	for(i=1; i<nbufs; i++) // skip bundle header
+		netaddr->len += bufs[i].len;
 
 	int err;
-	if((err = uv_udp_send(send_req, &netaddr->send_socket, &msg, 1, (const struct sockaddr *)&netaddr->send_addr, _send_cb)))
+	if((err = uv_udp_send(&netaddr->req, &netaddr->send_socket, bufs, nbufs, (const struct sockaddr *)&netaddr->send_addr, _udp_send_cb)))
 		fprintf(stderr, "%s", uv_err_name(err)); //FIXME use tjost_message_push
 }

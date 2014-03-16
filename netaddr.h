@@ -37,28 +37,65 @@
 
 typedef struct _NetAddr_UDP_Sender NetAddr_UDP_Sender;
 typedef struct _NetAddr_UDP_Responder NetAddr_UDP_Responder;
-typedef void (*NetAddr_Cb) (NetAddr_UDP_Responder *netaddr, uint8_t *buf, size_t len, void *dat);
+typedef struct _NetAddr_TCP_Sender NetAddr_TCP_Sender;
+typedef struct _NetAddr_TCP_Responder NetAddr_TCP_Responder;
+typedef void (*NetAddr_Recv_Cb) (uint8_t *buf, size_t len, void *dat);
+typedef void (*NetAddr_Send_Cb) (size_t len, void *dat);
 
 struct _NetAddr_UDP_Sender {
 	uv_udp_t send_socket;
 
 	struct sockaddr_in send_addr;
 	Eina_Mempool *pool;
+
+	uv_udp_send_t req;
+	NetAddr_Send_Cb cb;
+	size_t len;
+	void *dat;
 };
 
 struct _NetAddr_UDP_Responder {
 	uv_udp_t recv_socket;
-	NetAddr_Cb cb;
+	NetAddr_Recv_Cb cb;
 
 	void *dat;
 	uint8_t buf [TJOST_BUF_SIZE];
 };
 
-int netaddr_udp_responder_init(NetAddr_UDP_Responder *netaddr, uv_loop_t *loop, const char *addr, NetAddr_Cb cb, void *dat);
+struct _NetAddr_TCP_Sender {
+	uv_tcp_t send_socket;
+	uv_connect_t send_remote;
+
+	struct sockaddr_in send_addr;
+	Eina_Mempool *pool;
+
+	uv_write_t req;
+	NetAddr_Send_Cb cb;
+	size_t len;
+	void *dat;
+};
+
+struct _NetAddr_TCP_Responder {
+	uv_tcp_t recv_socket;
+	uv_tcp_t recv_client;
+	NetAddr_Recv_Cb cb;
+
+	void *dat;
+	uint8_t buf [TJOST_BUF_SIZE];
+};
+
+int netaddr_udp_responder_init(NetAddr_UDP_Responder *netaddr, uv_loop_t *loop, const char *addr, NetAddr_Recv_Cb cb, void *dat);
 void netaddr_udp_responder_deinit(NetAddr_UDP_Responder *netaddr);
 
 int netaddr_udp_sender_init(NetAddr_UDP_Sender *netaddr, uv_loop_t *loop, const char *addr);
 void netaddr_udp_sender_deinit(NetAddr_UDP_Sender *netaddr);
-void netaddr_udp_sender_send(NetAddr_UDP_Sender *netaddr, const uint8_t *buf, size_t len);
+void netaddr_udp_sender_send(NetAddr_UDP_Sender *netaddr, uv_buf_t *bufs, int nbufs, NetAddr_Send_Cb cb, void *dat);
+
+int netaddr_tcp_responder_init(NetAddr_TCP_Responder *netaddr, uv_loop_t *loop, const char *addr, NetAddr_Recv_Cb cb, void *dat);
+void netaddr_tcp_responder_deinit(NetAddr_TCP_Responder *netaddr);
+
+int netaddr_tcp_sender_init(NetAddr_TCP_Sender *netaddr, uv_loop_t *loop, const char *addr);
+void netaddr_tcp_sender_deinit(NetAddr_TCP_Sender *netaddr);
+void netaddr_tcp_sender_send(NetAddr_TCP_Sender *netaddr, uv_buf_t *bufs, int nbufs, NetAddr_Send_Cb cb, void *dat);
 
 #endif // _NETADDR_H
