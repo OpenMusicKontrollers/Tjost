@@ -60,8 +60,8 @@ hostname = f:read('*l')
 f:close()
 
 n = 144
-bot = 2*12 - 0.5 - (n/3 % 12 / 2);
-range = n/3 + 1
+bot = 2*12 - 0.5 - (n % 18 / 6);
+range = n/3
 
 rate = 3000
 chim(0, '/comm/address', 'is', id(), hostname..'.local')

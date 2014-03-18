@@ -272,8 +272,8 @@ _new(lua_State *L)
 	//midi_client->double_precision = 1;
 	midi_client->effect = 0x4a;
 	midi_client->double_precision = 0;
-	midi_client->bot = 2*12 - 0.5 - (fmod(n/3.f, 12.f) / 2.f);
-	midi_client->range = n/3.f + 1.f;;
+	midi_client->bot = 2*12 - 0.5 - ( (n % 18) / 6.f);
+	midi_client->range = n/3.f;
 
 	if(lua_isfunction(L, 2) || lua_isuserdata(L, 2))
 		lua_pushcclosure(L, _func, 1);

@@ -51,8 +51,8 @@ local m = {
 
 --TODO make this configurable
 local n = 96
-local bot = 3*12 - 0.5 - (n/3 % 12 / 2);
-local range = n/3 + 1
+local bot = 3*12 - 0.5 - (n % 18 / 6);
+local range = n/3
 
 local midi = {
 	[0] = plugin('midi_out', 'base'),
