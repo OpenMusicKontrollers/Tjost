@@ -111,7 +111,12 @@ _ports(jack_nframes_t time, const char *path, const char *fmt, uint8_t *buf, voi
 		tjost_uplink_rx_push(host, module, buf_rx, ptr-buf_rx);
 	}
 	else
-		; // do nothing
+	{
+		uint8_t *ptr = buf_rx;
+		ptr = jack_osc_set_path(ptr, "/jack/ports");
+		ptr = jack_osc_set_fmt(ptr, "");
+		tjost_uplink_rx_push(host, module, buf_rx, ptr-buf_rx);
+	}
 
 	return 1;
 }
@@ -156,7 +161,12 @@ _connections(jack_nframes_t time, const char *path, const char *fmt, uint8_t *bu
 		tjost_uplink_rx_push(host, module, buf_rx, ptr-buf_rx);
 	}
 	else
-		; // do nothing
+	{
+		uint8_t *ptr = buf_rx;
+		ptr = jack_osc_set_path(ptr, "/jack/connections");
+		ptr = jack_osc_set_fmt(ptr, "");
+		tjost_uplink_rx_push(host, module, buf_rx, ptr-buf_rx);
+	}
 
 	return 1;
 }
@@ -208,7 +218,7 @@ tjost_uplink_tx_push(Tjost_Host *host, Tjost_Event *tev)
 
 // real time
 void
-tjost_uplink_rx_drain(Tjost_Host *host)
+tjost_uplink_rx_drain(Tjost_Host *host, int ignore)
 {
 	Tjost_Event tev;
 	while(jack_ringbuffer_read_space(host->rb_uplink_rx) >= sizeof(Tjost_Event))
@@ -218,8 +228,13 @@ tjost_uplink_rx_drain(Tjost_Host *host)
 		{
 			jack_ringbuffer_read_advance(host->rb_uplink_rx, sizeof(Tjost_Event));
 
-			uint8_t *bf = tjost_host_schedule_inline(host, tev.module, tev.time, tev.size);
-			jack_ringbuffer_read(host->rb_uplink_rx, (char *)bf, tev.size);
+			if(ignore)
+				jack_ringbuffer_read_advance(host->rb_uplink_rx, tev.size);
+			else
+			{
+				uint8_t *bf = tjost_host_schedule_inline(host, tev.module, tev.time, tev.size);
+				jack_ringbuffer_read(host->rb_uplink_rx, (char *)bf, tev.size);
+			}
 		}
 		else
 			break;

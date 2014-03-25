@@ -32,40 +32,37 @@
 
 // inline SLIP encoding
 size_t
-slip_encode(uint8_t *buf, size_t len)
+slip_encode(uint8_t *buf, uv_buf_t *bufs, int nbufs)
 {
-	uint8_t *src;
-	uint8_t *end = buf + len;
-	uint8_t *dst;
+	uint8_t *dst = buf;
 
-	size_t count = 0;
-	for(src=buf; src<end; src++)
-		if( (*src == SLIP_END) || (*src == SLIP_ESC) )
-			count++;
-
-	src = end - 1;
-	dst = end + count;
-	*dst-- = SLIP_END;
-
-	while( (src >= 0) && (src != dst) )
+	int i;
+	for(i=0; i<nbufs; i++)
 	{
-		if(*src == SLIP_END)
-		{
-			*dst-- = SLIP_END_REPLACE;
-			*dst-- = SLIP_ESC;
-			src--;
-		}
-		else if(*src == SLIP_ESC)
-		{
-			*dst-- = SLIP_ESC_REPLACE;
-			*dst-- = SLIP_ESC;
-			src--;
-		}
-		else
-			*dst-- = *src--;
-	}
+		uv_buf_t *ptr = &bufs[i];
+		uint8_t *base = (uint8_t *)ptr->base;
+		uint8_t *end = base + ptr->len;
 
-	return len + count + 1;
+		uint8_t *src;
+		for(src=base; src<end; src++)
+			switch(*src)
+			{
+				case SLIP_END:
+					*dst++ = SLIP_ESC;
+					*dst++ = SLIP_END_REPLACE;
+					break;
+				case SLIP_ESC:
+					*dst++ = SLIP_ESC;
+					*dst++ = SLIP_ESC_REPLACE;
+					break;
+				default:
+					*dst++ = *src;
+					break;
+			}
+	}
+	*dst++ = SLIP_END;
+
+	return dst - buf;
 }
 
 // inline SLIP decoding
@@ -120,21 +117,21 @@ _tcp_alloc(uv_handle_t *handle, size_t suggested_size, uv_buf_t *buf)
 static void
 _tcp_recv_cb(uv_stream_t *stream, ssize_t nread, const uv_buf_t *buf)
 {
-	//printf("_tcp_recv_cb %zu\n", nread);
+	fprintf(stderr, "_tcp_recv_cb %zi\n", nread);
 
 	NetAddr_TCP_Responder *netaddr = stream->data;
 
 	if(nread > 0)
 	{
-		uint8_t *ptr0 = (uint8_t *)buf->base;
-		uint8_t *end = ptr0 + nread;
-		while(ptr0 < end)
+		uint8_t *base = (uint8_t *)buf->base;
+		uint8_t *end = base + nread;
+		while(base < end)
 		{
 			size_t len;
-			size_t size = slip_decode(ptr0, end-ptr0, &len);
-			netaddr->cb(ptr0, len, netaddr->dat);
+			size_t size = slip_decode(base, end-base, &len);
+			netaddr->cb(base, len, netaddr->dat);
 
-			ptr0 += size;
+			base += size;
 		}
 	}
 	else if (nread < 0)
@@ -154,11 +151,25 @@ _server_connect(uv_stream_t *server, int status)
 		return; //TODO
 
 	NetAddr_TCP_Responder *netaddr = server->data;
+
+	int err;
+	if((err = uv_tcp_init(server->loop, &netaddr->recv_client)))
+	{
+		fprintf(stderr, "%s\n", uv_err_name(err));
+		return;
+	}
 	
-	if (uv_accept(server, (uv_stream_t *)&netaddr->recv_client) == 0)
-		uv_read_start((uv_stream_t *)&netaddr->recv_client, _tcp_alloc, _tcp_recv_cb);
-	else
-		uv_close((uv_handle_t *)&netaddr->recv_client, NULL);
+	if((err = uv_accept(server, (uv_stream_t *)&netaddr->recv_client)))
+	{
+		fprintf(stderr, "%s\n", uv_err_name(err));
+		return;
+	}
+
+	if((err = uv_read_start((uv_stream_t *)&netaddr->recv_client, _tcp_alloc, _tcp_recv_cb)))
+	{
+		fprintf(stderr, "%s\n", uv_err_name(err));
+		return;
+	}
 }
 
 int
@@ -191,11 +202,6 @@ netaddr_tcp_responder_init(NetAddr_TCP_Responder *netaddr, uv_loop_t *loop, cons
 	int err;
 	struct sockaddr_in recv_addr;
 	if((err = uv_tcp_init(loop, &netaddr->recv_socket)))
-	{
-		fprintf(stderr, "%s\n", uv_err_name(err));
-		return -1;
-	}
-	if((err = uv_tcp_init(loop, &netaddr->recv_client)))
 	{
 		fprintf(stderr, "%s\n", uv_err_name(err));
 		return -1;
@@ -342,13 +348,23 @@ _tcp_send_cb(uv_write_t *req, int status)
 	netaddr->cb(netaddr->len, netaddr->dat);
 }
 
+static uint8_t tmp [TJOST_BUF_SIZE];
+
 void
 netaddr_tcp_sender_send(NetAddr_TCP_Sender *netaddr, uv_buf_t *bufs, int nbufs, NetAddr_Send_Cb cb, void *dat)
 {
 	netaddr->cb = cb;
 	netaddr->dat = dat;
+	netaddr->len = 0;
+	int i;
+	for(i=1; i<nbufs; i++) // skip bundle header
+		netaddr->len += bufs[i].len;
+	
+	uv_buf_t msg;
+	msg.base = (char *)tmp;
+	msg.len = slip_encode(tmp, bufs, nbufs);
 
 	int err;
-	if((err =	uv_write(&netaddr->req, (uv_stream_t *)&netaddr->send_socket, bufs, nbufs, _tcp_send_cb)))
+	if((err =	uv_write(&netaddr->req, (uv_stream_t *)&netaddr->send_socket, &msg, 1, _tcp_send_cb)))
 		fprintf(stderr, "%s", uv_err_name(err)); //FIXME use tjost_message_push
 }

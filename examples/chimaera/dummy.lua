@@ -28,17 +28,36 @@ status = plugin('osc_out', 'osc.jack://status')
 data = plugin('osc_out', 'osc.jack://data')
 chim = plugin('net_out', 'osc.udp://chimaera.local:4444')
 
-midi = require('midi')
+midi = require('midi_explicit')
 
 control = plugin('osc_in', 'osc.jack://control', function(time, path, fmt, ...)
-	if path:find('/chimaera') then
-		chim(time, path, fmt, ...)
-	end
+	chim(time, path, fmt, ...)
 end)
 
-conf = plugin('net_in', 'osc.udp://:4444', function(time, path, fmt, id, ...)
-	status(time, path, fmt, id, ...)
-	message(time, path, fmt, id, ...)
+success = function(time, uuid, path, ...)
+	local methods = {
+		['/sensors/number'] = function(time, n)
+			local bot = 3*12 - 0.5 - (n % 18 / 6);
+			local range = n/3
+
+			midi.bot = bot
+			midi.range = range
+			message(time, '/number', 'iff', n, bot, range)
+		end
+	}
+
+	local cb = methods[path]
+	if cb then
+		cb(time, ...)
+	end
+end
+
+conf = plugin('net_in', 'osc.udp://:4444', function(time, path, fmt, ...)
+	status(time, path, fmt, ...)
+	message(time, path, fmt, ...)
+	if path == '/success' then
+		success(time, ...)
+	end
 end)
 
 debug = plugin('net_in', 'osc.udp://:6666', function(...)
@@ -47,19 +66,19 @@ end)
 
 methods = {
 	['/on'] = function(time, fmt, ...)
-		midi.on(time, ...)
+		midi:on(time, ...)
 	end,
 
 	['/off'] = function(time, fmt, ...)
-		midi.off(time, ...)
+		midi:off(time, ...)
 	end,
 
 	['/set'] = function(time, fmt, ...)
-		midi.set(time, ...)
+		midi:set(time, ...)
 	end,
 
 	['/idle'] = function(time, fmt)
-		midi.idle(time)
+		midi:idle(time)
 	end
 }
 
@@ -80,9 +99,14 @@ id = coroutine.wrap(function()
 	end
 end)
 
-rate = 3000
-chim(0, '/comm/address', 'is', id(), 'melifaro.local')
+f = io.popen('hostname')
+hostname = f:read('*l')
+f:close()
 
+rate = 3000
+chim(0, '/comm/address', 'is', id(), hostname..'.local')
+
+chim(0, '/sensors/number', 'i', id())
 chim(0, '/sensors/rate', 'ii', id(), rate)
 chim(0, '/sensors/group/reset', 'i', id())
 chim(0, '/sensors/group/attributes', 'iiiffi', id(), 0, 256, 0.0, 1.0, 0)

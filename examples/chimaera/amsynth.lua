@@ -38,10 +38,7 @@ local m = {
 	{0, 0, 0, 0}
 }
 
---TODO make this configurable
-local n = 144
-local bot = 2*12 - 0.5 - (n % 18 / 6);
-local range = n/3
+local n = 128
 
 local midi = {
 	[0] = plugin('midi_out', 'midi.base'),
@@ -54,12 +51,15 @@ local lv2 = {
 }
 
 return {
-	on = function(time, sid, gid, pid, x, y)
+	bot = 2*12 - 0.5 - (n % 18 / 6),
+	range = n/3,
+
+	on = function(self, time, sid, gid, pid, x, y)
 		local key, base, bend, eff
 
-		key = bot + x*range
+		key = self.bot + x*self.range
 		base = math.floor(key)
-		bend = (key-base)/range*0x2000 + 0x1fff
+		bend = (key-base)/self.range*0x2000 + 0x1fff
 
 		m[1][1] = gid
 		m[1][2] = 0x90
@@ -78,7 +78,7 @@ return {
 		bases[sid] = base
 	end,
 
-	off = function(time, sid, gid, pid)
+	off = function(self, time, sid, gid, pid)
 		local base
 
 		base = bases[sid]
@@ -93,12 +93,12 @@ return {
 		midi[gid](time, mpath, 'm', m[1])
 	end,
 
-	set = function(time, sid, gid, pid, x, y)
+	set = function(self, time, sid, gid, pid, x, y)
 		local key, base, bend, eff
 
-		key = bot + x*range
+		key = self.bot + x*self.range
 		base = bases[sid]
-		bend = (key-base)/range*0x2000 + 0x1fff
+		bend = (key-base)/self.range*0x2000 + 0x1fff
 
 		m[1][1] = gid
 		m[1][2] = PITCHBEND
@@ -110,7 +110,7 @@ return {
 		lv2[gid](time, lv2path, 'if', 17, math.sqrt(y)*0.5+0.5)
 	end,
 
-	idle = function(time)
+	idle = function(self, time)
 		-- do nothing
 	end
 }

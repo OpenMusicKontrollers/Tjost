@@ -63,7 +63,7 @@ struct _Data {
 
 static const char *bundle_str = "#bundle";
 #define JAN_1970 (uint32_t)0x83aa7e80
-static double slice;
+#define SLICE (double)0x0.00000001p0 // smallest NTP time slice
 
 static void
 _sync(uv_timer_t *handle, int status)
@@ -87,11 +87,11 @@ _update_tstamp(Tjost_Module *module, uint64_t tstamp)
 	if(tstamp == 1ULL)
 		return 0; // immediate execution
 
-	int64_t tstamp_sec = tstamp >> 32;
+	uint64_t tstamp_sec = tstamp >> 32;
 	uint32_t tstamp_frac = tstamp & 0xffffffff;
 
 	diff = tstamp_sec - dat->sync_osc.tv_sec;
-	diff += tstamp_frac * slice;
+	diff += tstamp_frac * SLICE;
 	diff -= dat->sync_osc.tv_nsec * 1e-9;
 
 	jack_time_t future = dat->sync_jack + diff*1e6; // us
@@ -357,7 +357,6 @@ init()
 	printf("clock resolution: %ld %ld\n", res.tv_sec, res.tv_nsec);
 	*/
 
-	slice = pow(2.f, -32.f); // smallest NTP time slice
 	return EINA_TRUE;
 }
 

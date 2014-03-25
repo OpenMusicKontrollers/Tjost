@@ -33,14 +33,36 @@ midi = require('midi')
 tuio2 = require('tuio2')
 
 control = plugin('osc_in', 'osc.jack://control', function(time, path, fmt, ...)
-	if path:find('/chimaera') then
-		chim(time, path, fmt, ...)
-	end
+	chim(time, path, fmt, ...)
 end)
 
-conf = plugin('net_in', 'osc.udp://:4444', function(...)
-	status(...)
-	message(...)
+success = function(time, uuid, path, ...)
+	local methods = {
+		['/sensors/number'] = function(time, n)
+			local bot = 3*12 - 0.5 - (n % 18 / 6);
+			local range = n/3
+
+			midi_fltr(time, '/bottom', 'f', bot)
+			midi_fltr(time, '/range', 'f', range)
+			midi_fltr(time, '/effect', 'i', 0x4a)
+			midi_fltr(time, '/double_precision', 'i', 0)
+
+			message(time, '/number', 'iff', n, bot, range)
+		end
+	}
+
+	local cb = methods[path]
+	if cb then
+		cb(time, ...)
+	end
+end
+
+conf = plugin('net_in', 'osc.udp://:4444', function(time, path, fmt, ...)
+	status(time, path, fmt, ...)
+	message(time, path, fmt, ...)
+	if path == '/success' then
+		success(time, ...)
+	end
 end)
 
 debug = plugin('net_in', 'osc.udp://:6666', function(...)
@@ -48,7 +70,7 @@ debug = plugin('net_in', 'osc.udp://:6666', function(...)
 end)
 
 midi_out = plugin('midi_out', 'midi')
-midi_fltr = midi(96, midi_out) --TODO effect, double_precision
+midi_fltr = midi(midi_out)
 tuio2_fltr = tuio2(midi_fltr)
 stream = plugin('net_in', 'osc.udp://:3333', '60', tuio2_fltr)
 
@@ -67,6 +89,7 @@ f:close()
 rate = 3000
 chim(0, '/comm/address', 'is', id(), hostname..'.local')
 
+chim(0, '/sensors/number', 'i', id())
 chim(0, '/sensors/rate', 'ii', id(), rate)
 chim(0, '/sensors/group/reset', 'i', id())
 chim(0, '/sensors/group/attributes', 'iiiffi', id(), 0, 256, 0.0, 1.0, 0)

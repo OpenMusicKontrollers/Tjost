@@ -40,7 +40,7 @@ struct _Data {
 	uv_timer_t sync;
 	jack_time_t sync_jack;
 	struct timespec sync_osc;
-	int32_t delay_sec;
+	uint32_t delay_sec;
 	uint32_t delay_nsec;
 	
 	uv_async_t asio;
@@ -48,7 +48,7 @@ struct _Data {
 
 static const char *bundle_str = "#bundle";
 #define JAN_1970 (uint32_t)0x83aa7e80
-#define NSEC_PER_NTP_SLICE 4.2950f
+#define NSEC_PER_NTP_SLICE (1e-9 / 0x0.00000001p0)
 
 static void
 _sync(uv_timer_t *handle, int status)
@@ -90,7 +90,7 @@ _next(Tjost_Module *module)
 			jack_time_t usecs = jack_frames_to_time(module->host->client, tev.time) - dat->sync_jack;
 
 			uint32_t size = tev.size;
-			uint32_t sec = dat->sync_osc.tv_sec + JAN_1970 + dat->delay_sec;
+			uint32_t sec = dat->sync_osc.tv_sec + dat->delay_sec;
 			uint64_t nsec = dat->sync_osc.tv_nsec + usecs*1e3 + dat->delay_nsec;
 			while(nsec > 1e9)
 			{
@@ -206,6 +206,10 @@ void
 add(Tjost_Module *module, int argc, const char **argv)
 {
 	Data *dat = tjost_alloc(module->host, sizeof(Data));
+
+	dat->delay_sec = 0;
+	//dat->delay_nsec = 1e6; // 1 ms
+	dat->delay_nsec = 7e5; // 700 us
 
 	uv_loop_t *loop = uv_default_loop();
 

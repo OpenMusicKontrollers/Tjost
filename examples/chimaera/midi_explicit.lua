@@ -32,11 +32,6 @@ local VOLUME = 0x07
 local SOUND_EFFECT_5 = 0x4a
 local ALL_NOTES_OFF = 0x7b
 
---local effect = VOLUME
---local double_precision = true
-local effect = SOUND_EFFECT_5
-local double_precision = false
-
 local mpath = '/midi'
 
 local bases = {}
@@ -49,10 +44,7 @@ local m = {
 	{0, 0, 0, 0}
 }
 
---TODO make this configurable
-local n = 96
-local bot = 3*12 - 0.5 - (n % 18 / 6);
-local range = n/3
+local n = 128
 
 local midi = {
 	[0] = plugin('midi_out', 'base'),
@@ -60,12 +52,19 @@ local midi = {
 }
 
 return {
-	on = function(time, sid, gid, pid, x, y)
+	bot = 3*12 - 0.5 - (n % 18 / 6),
+	range = n/3,
+	--effect = VOLUME,
+	--double_precision = true,
+	effect = SOUND_EFFECT_5,
+	double_precision = false,
+
+	on = function(self, time, sid, gid, pid, x, y)
 		local key, base, bend, eff
 
-		key = bot + x*range
+		key = self.bot + x*self.range
 		base = math.floor(key)
-		bend = (key-base)/range*0x2000 + 0x1fff
+		bend = (key-base)/self.range*0x2000 + 0x1fff
 		eff = y * 0x3fff
 
 		m[1][1] = gid
@@ -78,22 +77,22 @@ return {
 		m[2][3] = bit32.band(bend, 0x7f)
 		m[2][4] = bit32.rshift(bend, 7)
 
-		if double_precision then
+		if self.double_precision then
 			m[3][1] = gid
 			m[3][2] = CONTROLLER
-			m[3][3] = bit32.bor(effect, 0x20)
+			m[3][3] = bit32.bor(self.effect, 0x20)
 			m[3][4] = bit32.band(eff, 0x7f)
 
 			m[4][1] = gid
 			m[4][2] = CONTROLLER
-			m[4][3] = effect
+			m[4][3] = self.effect
 			m[4][4] = bit32.rshift(eff, 7)
 
 			midi[gid](time, mpath, 'mmmm', m[1], m[2], m[3], m[4])
 		else
 			m[3][1] = gid
 			m[3][2] = CONTROLLER
-			m[3][3] = effect
+			m[3][3] = self.effect
 			m[3][4] = bit32.rshift(eff, 7)
 
 			midi[gid](time, mpath, 'mmm', m[1], m[2], m[3])
@@ -102,7 +101,7 @@ return {
 		bases[sid] = base
 	end,
 
-	off = function(time, sid, gid, pid)
+	off = function(self, time, sid, gid, pid)
 		local base
 
 		base = bases[sid]
@@ -117,12 +116,12 @@ return {
 		midi[gid](time, mpath, 'm', m[1])
 	end,
 
-	set = function(time, sid, gid, pid, x, y)
+	set = function(self, time, sid, gid, pid, x, y)
 		local key, base, bend, eff
 
-		key = bot + x*range
+		key = self.bot + x*self.range
 		base = bases[sid]
-		bend = (key-base)/range*0x2000 + 0x1fff
+		bend = (key-base)/self.range*0x2000 + 0x1fff
 		eff = y * 0x3fff
 
 		m[1][1] = gid
@@ -130,29 +129,29 @@ return {
 		m[1][3] = bit32.band(bend, 0x7f)
 		m[1][4] = bit32.rshift(bend, 7)
 
-		if double_precision then
+		if self.double_precision then
 			m[2][1] = gid
 			m[2][2] = CONTROLLER
-			m[2][3] = bit32.bor(effect, 0x20)
+			m[2][3] = bit32.bor(self.effect, 0x20)
 			m[2][4] = bit32.band(eff, 0x7f)
 
 			m[3][1] = gid
 			m[3][2] = CONTROLLER
-			m[3][3] = effect
+			m[3][3] = self.effect
 			m[3][4] = bit32.rshift(eff, 7)
 
 			midi[gid](time, mpath, 'mmm', m[1], m[2], m[3])
 		else
 			m[2][1] = gid
 			m[2][2] = CONTROLLER
-			m[2][3] = effect
+			m[2][3] = self.effect
 			m[2][4] = bit32.rshift(eff, 7)
 
 			midi[gid](time, mpath, 'mm', m[1], m[2])
 		end
 	end,
 
-	idle = function(time)
+	idle = function(self, time)
 		m[1][1] = 0
 		m[1][2] = CONTROLLER
 		m[1][3] = ALL_NOTES_OFF

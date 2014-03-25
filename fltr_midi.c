@@ -243,6 +243,38 @@ _idle(jack_nframes_t time, const char *path, const char *fmt, lua_State *L)
 }
 
 static int
+_bottom(jack_nframes_t time, const char *path, const char *fmt, lua_State *L)
+{
+	midi_client->bot = luaL_checknumber(L, 4);
+
+	return 0;
+}
+
+static int
+_range(jack_nframes_t time, const char *path, const char *fmt, lua_State *L)
+{
+	midi_client->range = luaL_checknumber(L, 4);
+
+	return 0;
+}
+
+static int
+_effect(jack_nframes_t time, const char *path, const char *fmt, lua_State *L)
+{
+	midi_client->effect = luaL_checkint(L, 4); // TODO check range
+
+	return 0;
+}
+
+static int
+_double_precision(jack_nframes_t time, const char *path, const char *fmt, lua_State *L)
+{
+	midi_client->double_precision = lua_toboolean(L, 4);
+
+	return 0;
+}
+
+static int
 _func(lua_State *L)
 {	
 	jack_nframes_t time = luaL_checkint(L, 1);
@@ -251,15 +283,27 @@ _func(lua_State *L)
 
 	if(!strcmp(path, "/on") && !strcmp(fmt, "iiiifff"))
 		return _on(time, path, fmt, L);
-
-	if(!strcmp(path, "/off") && !strcmp(fmt, "iiii"))
+		
+	else if(!strcmp(path, "/off") && !strcmp(fmt, "iiii"))
 		return _off(time, path, fmt, L);
 
-	if(!strcmp(path, "/set") && !strcmp(fmt, "iiiifff"))
+	else if(!strcmp(path, "/set") && !strcmp(fmt, "iiiifff"))
 		return _set(time, path, fmt, L);
 
-	if(!strcmp(path, "/idle"))
+	else if(!strcmp(path, "/idle"))
 		return _idle(time, path, fmt, L);
+
+	else if(!strcmp(path, "/bottom") && !strcmp(fmt, "f"))
+		return _bottom(time, path, fmt, L);
+
+	else if(!strcmp(path, "/range") && !strcmp(fmt, "f"))
+		return _range(time, path, fmt, L);
+
+	else if(!strcmp(path, "/effect") && !strcmp(fmt, "i"))
+		return _effect(time, path, fmt, L);
+
+	else if(!strcmp(path, "/double_precision") && !strcmp(fmt, "i"))
+		return _double_precision(time, path, fmt, L);
 
 	return 0;
 }
@@ -267,15 +311,13 @@ _func(lua_State *L)
 static int
 _new(lua_State *L)
 {
-	uint8_t n = luaL_checkint(L, 1);
-	//midi_client->effect = 0x07;
-	//midi_client->double_precision = 1;
-	midi_client->effect = 0x4a;
-	midi_client->double_precision = 0;
+	uint8_t n = 128;
+	midi_client->effect = 0x07;
+	midi_client->double_precision = 1;
 	midi_client->bot = 2*12 - 0.5 - ( (n % 18) / 6.f);
 	midi_client->range = n/3.f;
 
-	if(lua_isfunction(L, 2) || lua_isuserdata(L, 2))
+	if(lua_isfunction(L, 1) || lua_isuserdata(L, 1))
 		lua_pushcclosure(L, _func, 1);
 	else
 		lua_pushnil(L);

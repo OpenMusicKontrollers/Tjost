@@ -98,4 +98,7 @@ int netaddr_tcp_sender_init(NetAddr_TCP_Sender *netaddr, uv_loop_t *loop, const 
 void netaddr_tcp_sender_deinit(NetAddr_TCP_Sender *netaddr);
 void netaddr_tcp_sender_send(NetAddr_TCP_Sender *netaddr, uv_buf_t *bufs, int nbufs, NetAddr_Send_Cb cb, void *dat);
 
+size_t slip_encode(uint8_t *buf, uv_buf_t *bufs, int nbufs);
+size_t slip_decode(uint8_t *buf, size_t len, size_t *size);
+
 #endif // _NETADDR_H

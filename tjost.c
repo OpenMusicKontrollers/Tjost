@@ -270,7 +270,7 @@ _process_indirect(jack_nframes_t nframes, void *arg)
 	tjost_add_memory(host);
 
 	// receive from uplink ringbuffer
-	tjost_uplink_rx_drain(host);
+	tjost_uplink_rx_drain(host, 0);
 
 	// receive on all inputs
 	EINA_INLIST_FOREACH(host->inputs, module)
@@ -331,7 +331,7 @@ _process_direct(jack_nframes_t nframes, void *arg)
 	tjost_add_memory(host);
 
 	// receive from uplink ringbuffer
-	tjost_uplink_rx_drain(host);
+	tjost_uplink_rx_drain(host, 1);
 
 	// receive on all inputs
 	EINA_INLIST_FOREACH(host->inputs, module)
@@ -342,7 +342,6 @@ _process_direct(jack_nframes_t nframes, void *arg)
 	Tjost_Event *tev;
 	EINA_INLIST_FOREACH_SAFE(host->queue, l, tev)
 	{
-
 		EINA_INLIST_FOREACH(host->outputs, module)
 			tjost_module_schedule(module, tev->time, tev->size, tev->buf);
 

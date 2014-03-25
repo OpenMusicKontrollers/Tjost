@@ -80,7 +80,6 @@ methods = {
 
 	['/thres'] = function(time, gid)
 		if gid ~= 0 then return end
-
 		--TODO
 	end
 }
@@ -91,14 +90,3 @@ control = plugin('osc_in', 'osc.jack://trig', function(time, path, fmt, ...)
 		cb(time, ...)
 	end
 end)
-
---[[
-dump = plugin('dump')
-
-loopback = plugin('loopback', function(time, ...)
-	dump(time, ...)
-	loopback(time, ...)
-end)
-
-loopback(0, '/keepalive', '')
---]]
