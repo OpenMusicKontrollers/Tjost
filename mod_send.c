@@ -197,7 +197,9 @@ _tty_recv_cb(uv_stream_t *stream, ssize_t nread, const uv_buf_t *buf)
 	}
 	else if (nread < 0)
 	{
-		uv_read_stop((uv_stream_t *)&dat->recv_client);
+		int err;
+		if((err = uv_read_stop((uv_stream_t *)&dat->recv_client)))
+			fprintf(stderr, "send: %s\n", uv_err_name(err));
 		uv_close((uv_handle_t *)&dat->recv_client, NULL);
 		fprintf(stderr, "%s\n", uv_err_name(nread));
 	}
@@ -242,8 +244,11 @@ add(Tjost_Module *module, int argc, const char **argv)
 	uv_loop_t *loop = uv_default_loop();
 
 	dat->recv_client.data = module;
-	uv_tty_init(loop, &dat->recv_client, 0, 1);
-	uv_read_start((uv_stream_t *)&dat->recv_client, _tty_alloc, _tty_recv_cb);
+	int err;
+	if((err = uv_tty_init(loop, &dat->recv_client, 0, 1)))
+		fprintf(stderr, "send: %s\n", uv_err_name(err));
+	if((err = uv_read_start((uv_stream_t *)&dat->recv_client, _tty_alloc, _tty_recv_cb)))
+		fprintf(stderr, "send: %s\n", uv_err_name(err));
 
 	module->dat = dat;
 	module->type = TJOST_MODULE_OUTPUT;

@@ -44,7 +44,7 @@ _udp_recv_cb(uv_udp_t *handle, ssize_t nread, const uv_buf_t *buf, const struct 
 	else if (nread < 0)
 	{
 		uv_close((uv_handle_t *)handle, NULL);
-		fprintf(stderr, "%s\n", uv_err_name(nread));
+		fprintf(stderr, "_udp_recv_cb: %s\n", uv_err_name(nread));
 	}
 }
 
@@ -78,22 +78,22 @@ netaddr_udp_responder_init(NetAddr_UDP_Responder *netaddr, uv_loop_t *loop, cons
 	struct sockaddr_in recv_addr;
 	if((err = uv_udp_init(loop, &netaddr->recv_socket)))
 	{
-		fprintf(stderr, "%s\n", uv_err_name(err));
+		fprintf(stderr, "uv_udp_init: %s\n", uv_err_name(err));
 		return -1;
 	}
 	if((err = uv_ip4_addr(host, port, &recv_addr)))
 	{
-		fprintf(stderr, "%s\n", uv_err_name(err));
+		fprintf(stderr, "uv_ip4_addr: %s\n", uv_err_name(err));
 		return -1;
 	}
 	if((err = uv_udp_bind(&netaddr->recv_socket, (const struct sockaddr *)&recv_addr, 0)))
 	{
-		fprintf(stderr, "%s\n", uv_err_name(err));
+		fprintf(stderr, "uv_udp_bind: %s\n", uv_err_name(err));
 		return -1;
 	}
 	if((err = uv_udp_recv_start(&netaddr->recv_socket, _udp_alloc, _udp_recv_cb)))
 	{
-		fprintf(stderr, "%s\n", uv_err_name(err));
+		fprintf(stderr, "uv_udp_recv_start: %s\n", uv_err_name(err));
 		return -1;
 	}
 
@@ -103,7 +103,9 @@ netaddr_udp_responder_init(NetAddr_UDP_Responder *netaddr, uv_loop_t *loop, cons
 void
 netaddr_udp_responder_deinit(NetAddr_UDP_Responder *netaddr)
 {
-	uv_udp_recv_stop(&netaddr->recv_socket);
+	int err;
+	if((err =	uv_udp_recv_stop(&netaddr->recv_socket)))
+		fprintf(stderr, "uv_udp_recv_stop: %s\n", uv_err_name(err));
 }
 
 int
@@ -145,7 +147,7 @@ netaddr_udp_sender_init(NetAddr_UDP_Sender *netaddr, uv_loop_t *loop, const char
 	hints.ai_socktype = SOCK_DGRAM;
 	if(getaddrinfo(host, colon+1, &hints, &ai))
 	{
-		fprintf(stderr, "address could not be resolved\n");
+		fprintf(stderr, "getaddrinfo: address could not be resolved\n");
 		return -1;
 	}
 	char remote [17] = {'\0'};
@@ -155,17 +157,17 @@ netaddr_udp_sender_init(NetAddr_UDP_Sender *netaddr, uv_loop_t *loop, const char
 	int err;
 	if((err = uv_ip4_name((struct sockaddr_in *)ai->ai_addr, remote, 16)))
 	{
-		fprintf(stderr, "%s\n", uv_err_name(err));
+		fprintf(stderr, "up_ip4_name: %s\n", uv_err_name(err));
 		return -1;
 	}
 	if((err = uv_udp_init(loop, &netaddr->send_socket)))
 	{
-		fprintf(stderr, "%s\n", uv_err_name(err));
+		fprintf(stderr, "uv_udp_init: %s\n", uv_err_name(err));
 		return -1;
 	}
 	if((err = uv_ip4_addr(remote, port, &netaddr->send_addr)))
 	{
-		fprintf(stderr, "%s\n", uv_err_name(err));
+		fprintf(stderr, "uv_ip4_addr: %s\n", uv_err_name(err));
 		return -1;
 	}
 
@@ -184,23 +186,20 @@ _udp_send_cb(uv_udp_send_t *req, int status)
 	uv_udp_t *handle = req->handle;
 	NetAddr_UDP_Sender *netaddr = handle->data;
 
-	if(status)
-		fprintf(stderr, "%s\n", uv_err_name(status));
-
-	netaddr->cb(netaddr->len, netaddr->dat);
+	if(!status)
+		netaddr->cb(netaddr->len, netaddr->dat);
+	else
+		fprintf(stderr, "_udp_send_cb: %s\n", uv_err_name(status));
 }
 
 void
-netaddr_udp_sender_send(NetAddr_UDP_Sender *netaddr, uv_buf_t *bufs, int nbufs, NetAddr_Send_Cb cb, void *dat)
+netaddr_udp_sender_send(NetAddr_UDP_Sender *netaddr, uv_buf_t *bufs, int nbufs, size_t len, NetAddr_Send_Cb cb, void *dat)
 {
 	netaddr->cb = cb;
 	netaddr->dat = dat;
-	netaddr->len = 0;
-	int i;
-	for(i=1; i<nbufs; i++) // skip bundle header
-		netaddr->len += bufs[i].len;
+	netaddr->len = len; // message size without TCP preable and OSC bundle header
 
 	int err;
 	if((err = uv_udp_send(&netaddr->req, &netaddr->send_socket, bufs, nbufs, (const struct sockaddr *)&netaddr->send_addr, _udp_send_cb)))
-		fprintf(stderr, "%s", uv_err_name(err)); //FIXME use tjost_message_push
+		fprintf(stderr, "uv_udp_send: %s", uv_err_name(err));
 }

@@ -63,7 +63,9 @@ _shutdown(void *arg)
 {
 	Tjost_Host *host = arg;
 
-	uv_async_send(&host->quit);
+	int err;
+	if((err = uv_async_send(&host->quit)))
+		fprintf(stderr, "_shutdown: %s\n", uv_err_name(err));
 }
 
 static void *
@@ -150,7 +152,9 @@ tjost_host_message_push(Tjost_Host *host, const char *fmt, ...)
 		jack_ringbuffer_write(host->rb_msg, str, size);
 	}
 
-	uv_async_send(&host->msg);
+	int err;
+	if((err = uv_async_send(&host->msg)))
+		; //FIXME report error
 }
 
 int
@@ -311,7 +315,9 @@ _process_indirect(jack_nframes_t nframes, void *arg)
 		module->process(nframes, module);
 
 	// write uplink events to rinbbuffer
-	uv_async_send(&host->uplink_tx); //TODO check if there are any
+	int err;
+	if((err = uv_async_send(&host->uplink_tx))) //TODO check if there are any
+		fprintf(stderr, "process_indirect: %s\n", uv_err_name(err));
 
 	// run garbage collection step
 	lua_gc(host->L, LUA_GCSTEP, 0);
@@ -358,7 +364,9 @@ _process_direct(jack_nframes_t nframes, void *arg)
 		module->process(nframes, module);
 
 	// write uplink events to rinbbuffer
-	uv_async_send(&host->uplink_tx);
+	int err;
+	if((err = uv_async_send(&host->uplink_tx)))
+		fprintf(stderr, "process_direct: %s\n", uv_err_name(err));
 	
 	return 0;
 }
@@ -502,25 +510,36 @@ main(int argc, const char **argv)
 	uv_loop_t *loop = uv_default_loop();
 
 	// init libev
-	uv_signal_init(loop, &host.sigterm);
-	uv_signal_start(&host.sigterm, _sig, SIGTERM);
+	int err;
+	if((err = uv_signal_init(loop, &host.sigterm)))
+		fprintf(stderr, "main: %s\n", uv_err_name(err));
+	if((err = uv_signal_start(&host.sigterm, _sig, SIGTERM)))
+		fprintf(stderr, "main: %s\n", uv_err_name(err));
 
-	uv_signal_init(loop, &host.sigquit);
-	uv_signal_start(&host.sigquit, _sig, SIGQUIT);
+	if((err = uv_signal_init(loop, &host.sigquit)))
+		fprintf(stderr, "main: %s\n", uv_err_name(err));
+	if((err = uv_signal_start(&host.sigquit, _sig, SIGQUIT)))
+		fprintf(stderr, "main: %s\n", uv_err_name(err));
 
-	uv_signal_init(loop, &host.sigint);
-	uv_signal_start(&host.sigint, _sig, SIGINT);
+	if((err = uv_signal_init(loop, &host.sigint)))
+		fprintf(stderr, "main: %s\n", uv_err_name(err));
+	if((err = uv_signal_start(&host.sigint, _sig, SIGINT)))
+		fprintf(stderr, "main: %s\n", uv_err_name(err));
 
-	uv_async_init(loop, &host.quit, _quit);
+	if((err = uv_async_init(loop, &host.quit, _quit)))
+		fprintf(stderr, "main: %s\n", uv_err_name(err));
 
 	host.msg.data = &host;
-	uv_async_init(loop, &host.msg, _msg);
+	if((err = uv_async_init(loop, &host.msg, _msg)))
+		fprintf(stderr, "main: %s\n", uv_err_name(err));
 
 	host.uplink_tx.data = &host;
-	uv_async_init(loop, &host.uplink_tx, tjost_uplink_tx_drain);
+	if((err = uv_async_init(loop, &host.uplink_tx, tjost_uplink_tx_drain)))
+		fprintf(stderr, "main: %s\n", uv_err_name(err));
 
 	host.rtmem.data = &host;
-	uv_async_init(loop, &host.rtmem, tjost_request_memory);
+	if((err = uv_async_init(loop, &host.rtmem, tjost_request_memory)))
+		fprintf(stderr, "main: %s\n", uv_err_name(err));
 
 	// activate JACK
 	if(jack_activate(host.client))
@@ -538,9 +557,12 @@ cleanup:
 	uv_close((uv_handle_t *)&host.msg, NULL);
 	uv_close((uv_handle_t *)&host.quit, NULL);
 
-	uv_signal_stop(&host.sigterm);
-	uv_signal_stop(&host.sigquit);
-	uv_signal_stop(&host.sigint);
+	if((err = uv_signal_stop(&host.sigterm)))
+		fprintf(stderr, "main: %s\n", uv_err_name(err));
+	if((err = uv_signal_stop(&host.sigquit)))
+		fprintf(stderr, "main: %s\n", uv_err_name(err));
+	if((err = uv_signal_stop(&host.sigint)))
+		fprintf(stderr, "main: %s\n", uv_err_name(err));
 	
 	if(host.client)
 		jack_deactivate(host.client);

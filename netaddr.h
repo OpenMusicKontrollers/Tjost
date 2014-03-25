@@ -82,6 +82,7 @@ struct _NetAddr_TCP_Responder {
 
 	void *dat;
 	uint8_t buf [TJOST_BUF_SIZE];
+	size_t nchunk;
 };
 
 int netaddr_udp_responder_init(NetAddr_UDP_Responder *netaddr, uv_loop_t *loop, const char *addr, NetAddr_Recv_Cb cb, void *dat);
@@ -89,16 +90,18 @@ void netaddr_udp_responder_deinit(NetAddr_UDP_Responder *netaddr);
 
 int netaddr_udp_sender_init(NetAddr_UDP_Sender *netaddr, uv_loop_t *loop, const char *addr);
 void netaddr_udp_sender_deinit(NetAddr_UDP_Sender *netaddr);
-void netaddr_udp_sender_send(NetAddr_UDP_Sender *netaddr, uv_buf_t *bufs, int nbufs, NetAddr_Send_Cb cb, void *dat);
+void netaddr_udp_sender_send(NetAddr_UDP_Sender *netaddr, uv_buf_t *bufs, int nbufs, size_t len, NetAddr_Send_Cb cb, void *dat);
 
 int netaddr_tcp_responder_init(NetAddr_TCP_Responder *netaddr, uv_loop_t *loop, const char *addr, NetAddr_Recv_Cb cb, void *dat);
 void netaddr_tcp_responder_deinit(NetAddr_TCP_Responder *netaddr);
 
 int netaddr_tcp_sender_init(NetAddr_TCP_Sender *netaddr, uv_loop_t *loop, const char *addr);
 void netaddr_tcp_sender_deinit(NetAddr_TCP_Sender *netaddr);
-void netaddr_tcp_sender_send(NetAddr_TCP_Sender *netaddr, uv_buf_t *bufs, int nbufs, NetAddr_Send_Cb cb, void *dat);
+void netaddr_tcp_sender_send(NetAddr_TCP_Sender *netaddr, uv_buf_t *bufs, int nbufs, size_t len, NetAddr_Send_Cb cb, void *dat);
 
+#if 0
 size_t slip_encode(uint8_t *buf, uv_buf_t *bufs, int nbufs);
 size_t slip_decode(uint8_t *buf, size_t len, size_t *size);
+#endif
 
 #endif // _NETADDR_H

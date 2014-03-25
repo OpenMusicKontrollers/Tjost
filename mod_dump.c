@@ -202,7 +202,11 @@ process(jack_nframes_t nframes, void *arg)
 	}
 
 	if(count > 0)
-		uv_async_send(&dat->asio);
+	{
+		int err;
+		if((err = uv_async_send(&dat->asio)))
+			tjost_host_message_push(host, "mod_dump: %s", uv_err_name(err));
+	}
 
 	return 0;
 }
@@ -218,7 +222,9 @@ add(Tjost_Module *module, int argc, const char **argv)
 	uv_loop_t *loop = uv_default_loop();
 
 	dat->asio.data = module;
-	uv_async_init(loop, &dat->asio, _asio);
+	int err;
+	if((err = uv_async_init(loop, &dat->asio, _asio)))
+		fprintf(stderr, "mod_dump: %s\n", uv_err_name(err));
 
 	module->dat = dat;
 	module->type = TJOST_MODULE_OUTPUT;

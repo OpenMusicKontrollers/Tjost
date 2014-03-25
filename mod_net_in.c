@@ -276,16 +276,21 @@ add(Tjost_Module *module, int argc, const char **argv)
 {
 	Data *dat = tjost_alloc(module->host, sizeof(Data));
 
-	dat->loop = uv_loop_new();
+	if(!(dat->loop = uv_loop_new()))
+		fprintf(stderr, "mod_net_in: uv_loop_new failed\n");
 
 	if(!(dat->rb = jack_ringbuffer_create(TJOST_RINGBUF_SIZE)))
-		fprintf(stderr, "could not initialize ringbuffer\n");
+		fprintf(stderr, "mod_net_in: could not initialize ringbuffer\n");
 
-	uv_async_init(dat->loop, &dat->quit, _quit);
+	int err;
+	if((err = uv_async_init(dat->loop, &dat->quit, _quit)))
+		fprintf(stderr, "mod_net_in: %s\n", uv_err_name(err));
 
 	dat->sync.data = module;
-	uv_timer_init(dat->loop, &dat->sync);
-	uv_timer_start(&dat->sync, _sync, 0, 1000); // ms
+	if((err = uv_timer_init(dat->loop, &dat->sync)))
+		fprintf(stderr, "mod_net_in: %s\n", uv_err_name(err));
+	if((err = uv_timer_start(&dat->sync, _sync, 0, 1000))) // ms
+		fprintf(stderr, "mod_net_in: %s\n", uv_err_name(err));
 
 	if(!strncmp(argv[0], "osc.udp://", 10))
 		dat->type = SOCKET_UDP;
@@ -306,7 +311,7 @@ add(Tjost_Module *module, int argc, const char **argv)
 			break;
 	}
 
-	if(argv[1])
+	if(argc > 1)
 #ifndef _WIN32 // POSIX only
 		dat->schedp.sched_priority = atoi(argv[1]);
 #else
@@ -316,7 +321,8 @@ add(Tjost_Module *module, int argc, const char **argv)
 	module->dat = dat;
 	module->type = TJOST_MODULE_INPUT;
 
-	uv_thread_create(&dat->thread, _thread, dat);
+	if((err = uv_thread_create(&dat->thread, _thread, dat)))
+		fprintf(stderr, "mod_net_in: %s\n", uv_err_name(err));
 }
 
 void
@@ -324,8 +330,11 @@ del(Tjost_Module *module)
 {
 	Data *dat = module->dat;
 
-	uv_async_send(&dat->quit);
-	uv_thread_join(&dat->thread);
+	int err;
+	if((err = uv_async_send(&dat->quit)))
+		fprintf(stderr, "mod_net_in: %s\n", uv_err_name(err));
+	if((err = uv_thread_join(&dat->thread)))
+		fprintf(stderr, "mod_net_in: %s\n", uv_err_name(err));
 
 	switch(dat->type)
 	{
@@ -337,7 +346,8 @@ del(Tjost_Module *module)
 			break;
 	}
 
-	uv_timer_stop(&dat->sync);
+	if((err = uv_timer_stop(&dat->sync)))
+		fprintf(stderr, "mod_net_in: %s\n", uv_err_name(err));
 	uv_close((uv_handle_t *)&dat->quit, NULL);
 
 	uv_loop_delete(dat->loop);

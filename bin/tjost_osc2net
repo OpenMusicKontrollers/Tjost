@@ -24,9 +24,10 @@
 --]]
 
 host = argv[4]
+offset = argv[5] or 0.001 -- 1ms
 
 if host then
-	udp = plugin('net_out', host)
+	udp = plugin('net_out', host, offset)
 
 	osc = plugin('osc_in', host)
 else
