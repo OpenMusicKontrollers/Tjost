@@ -311,7 +311,7 @@ add(Tjost_Module *module, int argc, const char **argv)
 			break;
 	}
 
-	if(argc > 1)
+	if( (argc > 1) && argv[1])
 #ifndef _WIN32 // POSIX only
 		dat->schedp.sched_priority = atoi(argv[1]);
 #else

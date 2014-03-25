@@ -237,7 +237,7 @@ add(Tjost_Module *module, int argc, const char **argv)
 	else
 		; //FIXME error
 
-	if(argc > 1)
+	if( (argc > 1) && argv[1])
 	{
 		float del = atof(argv[1]);
 		dat->delay_sec = (uint32_t)del;
