@@ -59,9 +59,9 @@ _asio(uv_async_t *handle, int status)
 				uint8_t *ptr = buffer;
 				ptr = jack_osc_get_path(ptr, &path);
 				ptr = jack_osc_get_fmt(ptr, &fmt);
-				printf("%08"PRIX32" %4zu: %s %s", tev.time, tev.size, path, fmt);
+				printf("%08"PRIX32" %4zu: %s %s", tev.time, tev.size, path, fmt+1);
 				const char *type;
-				for(type=fmt; *type; type++)
+				for(type=fmt+1; *type; type++)
 					switch(*type)
 					{
 						case 'i':

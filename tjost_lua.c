@@ -150,7 +150,7 @@ tjost_lua_deserialize_unicast(Tjost_Event *tev)
 	ptr = jack_osc_get_path(ptr, &path);
 	ptr = jack_osc_get_fmt(ptr, &fmt);
 
-	int argc = 3 + strlen(fmt);
+	int argc = 3 + strlen(fmt+1);
 	
 	if(!lua_checkstack(L, argc + 32)) // ensure at least that many free slots on stack
 		tjost_host_message_push(host, "Lua: %s", "stack overflow");
@@ -160,10 +160,10 @@ tjost_lua_deserialize_unicast(Tjost_Event *tev)
 	{
 		lua_pushnumber(L, tev->time);
 		lua_pushstring(L, path);
-		lua_pushstring(L, fmt);
+		lua_pushstring(L, fmt+1);
 
 		const char *type;
-		for(type=fmt; *type!='\0'; type++)
+		for(type=fmt+1; *type!='\0'; type++)
 			ptr = _push(host, *type, ptr);
 
 		if(lua_pcall(L, argc, 0, 0))
@@ -194,13 +194,13 @@ tjost_lua_deserialize_broadcast(Tjost_Event *tev, Eina_Inlist *modules)
 		{
 			lua_pushnumber(L, tev->time);
 			lua_pushstring(L, path);
-			lua_pushstring(L, fmt);
+			lua_pushstring(L, fmt+1);
 
 			const char *type;
-			for(type=fmt; *type!='\0'; type++)
+			for(type=fmt+1; *type!='\0'; type++)
 				ptr = _push(host, *type, ptr);
 
-			if(lua_pcall(L, 3 + strlen(fmt), 0, 0))
+			if(lua_pcall(L, 3 + strlen(fmt+1), 0, 0))
 				tjost_host_message_push(host, "Lua: callback error '%s'", lua_tostring(L, -1));
 		}
 	}
@@ -219,8 +219,16 @@ _serialize(lua_State *L, Tjost_Module *module)
 
 	uint8_t *ptr = buffer;
 
-	ptr = jack_osc_set_path(ptr, path);
-	ptr = jack_osc_set_fmt(ptr, fmt);
+	if(!(ptr = jack_osc_set_path(ptr, path)))
+	{
+		tjost_host_message_push(host, "Lua: invalid OSC path %s", path);
+		return 0;
+	}
+	if(!(ptr = jack_osc_set_fmt(ptr, fmt)))
+	{
+		tjost_host_message_push(host, "Lua: invalid OSC format %s", fmt);
+		return 0;
+	}
 
 	int p = 5;
 	const char *type;

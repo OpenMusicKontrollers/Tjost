@@ -21,6 +21,8 @@
  *     distribution.
  */
 
+#include <ctype.h>
+
 #include <tjost.h>
 
 #include <netaddr.h>
@@ -55,33 +57,68 @@ _tty_recv_cb(uv_stream_t *stream, ssize_t nread, const uv_buf_t *buf)
 	{
 		char *s = buf->base;
 
-		//FIXME check arguments, size, etc.
 		uint8_t *ptr = buf2;
 		char *cur;
 		char *end;
+		char *path;
+		char *fmt;
 
 		cur = s;
-		end = strchr(cur, ' ');
-		*end = '\0';
-		char *path = cur;
-		ptr = jack_osc_set_path(ptr, path);
+		end = cur;
+		while(isprint(*end) && (*end != ' '))
+			end++;
+		*end++ = '\0';
+		path = cur;
+		if(!(ptr = jack_osc_set_path(ptr, path)))
+		{
+			fprintf(stderr, "invalid path: %s\n", path);
+			return;
+		}
 
-		cur = end + 1;
-		end = strchr(cur, ' ');
-		*end = '\0';
-		char *fmt = cur;
-		ptr = jack_osc_set_fmt(ptr, fmt);
+		// skip whitespace
+		while( (end < s+nread) && isspace(*end))
+			end++;
+	
+		if(end < s + nread)
+		{
+			cur = end;
+			end = cur;
+			while(isprint(*end) && (*end != ' '))
+				end++;
+			*end++ = '\0';
+			fmt = cur;
+		}
+		else
+			fmt = "";
+		if(!(ptr = jack_osc_set_fmt(ptr, fmt)))
+		{
+			fprintf(stderr, "invalid format: %s\n", fmt);
+			return;
+		}
+
+		// skip whitespace
+		while( (end < s+nread) && isspace(*end))
+			end++;
 
 		char *type;
 		for(type=fmt; *type; type++)
 		{
 			if( (*type!='T') && (*type!='F') && (*type!='N') && (*type!='I') )
 			{
-				cur = end + 1;
-				end = strchr(cur, ' ');
-				if(!end)
-					end = strchr(cur, '\n');
-				*end = '\0';
+				if(end < s + nread)
+				{
+					cur = end;
+					end = cur;
+					while(isprint(*end) && (*end != ' '))
+						end++;
+					*end++ = '\0';
+				}
+				else
+					fprintf(stderr, "argument '%c' missing\n", *type);
+
+				// skip whitespace
+				while( (end < s+nread) && isspace(*end))
+					end++;
 			}
 
 			switch(*type)
@@ -89,15 +126,19 @@ _tty_recv_cb(uv_stream_t *stream, ssize_t nread, const uv_buf_t *buf)
 				case 'i':
 				{
 					int32_t i;
-					sscanf(cur, "%"SCNi32, &i);
-					ptr = jack_osc_set_int32(ptr, i);
+					if(sscanf(cur, "%"SCNi32, &i))
+						ptr = jack_osc_set_int32(ptr, i);
+					else
+						fprintf(stderr, "type mismatch at '%c'\n", *type);
 					break;
 				}
 				case 'f':
 				{
 					float f;
-					sscanf(cur, "%f", &f);
-					ptr = jack_osc_set_float(ptr, f);
+					if(sscanf(cur, "%f", &f))
+						ptr = jack_osc_set_float(ptr, f);
+					else
+						fprintf(stderr, "type mismatch at '%c'\n", *type);
 					break;
 				}
 				case 's':
@@ -112,7 +153,8 @@ _tty_recv_cb(uv_stream_t *stream, ssize_t nread, const uv_buf_t *buf)
 					uint8_t *payload = calloc(size, sizeof(uint8_t));
 					int i;
 					for(i=0; i<size; i++)
-						sscanf(cur+i*2, "%02"SCNx8, payload+i);
+						if(!sscanf(cur+i*2, "%02"SCNx8, payload+i))
+							fprintf(stderr, "type mismatch at '%c'\n", *type);
 					ptr = jack_osc_set_blob(ptr, size, payload);
 					free(payload);
 					break;
@@ -127,26 +169,32 @@ _tty_recv_cb(uv_stream_t *stream, ssize_t nread, const uv_buf_t *buf)
 				case 'h':
 				{
 					int64_t h;
-					sscanf(cur, "%"SCNi64, &h);
-					ptr = jack_osc_set_int64(ptr, h);
+					if(sscanf(cur, "%"SCNi64, &h))
+						ptr = jack_osc_set_int64(ptr, h);
+					else
+						fprintf(stderr, "type mismatch at '%c'\n", *type);
 					break;
 				}
 				case 'd':
 				{
 					double d;
-					sscanf(cur, "%lf", &d);
-					ptr = jack_osc_set_double(ptr, d);
+					if(sscanf(cur, "%lf", &d))
+						ptr = jack_osc_set_double(ptr, d);
+					else
+						fprintf(stderr, "type mismatch at '%c'\n", *type);
 					break;
 				}
 				case 't':
 				{
 					uint64_t t;
 					uint32_t sec, frac;
-					sscanf(cur, "%"SCNx32".%"SCNx32, &sec, &frac);
-					while(!(frac & 0xf0000000))
-						frac <<= 4;
-					t = (((uint64_t)sec<<32)) | frac;
-					ptr = jack_osc_set_timetag(ptr, t);
+					if(sscanf(cur, "%"SCNx32".%"SCNx32, &sec, &frac))
+					{
+						t = (((uint64_t)sec<<32)) | frac;
+						ptr = jack_osc_set_timetag(ptr, t);
+					}
+					else
+						fprintf(stderr, "type mismatch at '%c'\n", *type);
 					break;
 				}
 
@@ -165,8 +213,10 @@ _tty_recv_cb(uv_stream_t *stream, ssize_t nread, const uv_buf_t *buf)
 				case 'm':
 				{
 					uint8_t m [4];
-					sscanf(cur, "%02"SCNx8"%02"SCNx8"%02"SCNx8"%02"SCNx8, m, m+1, m+2, m+3);
-					ptr = jack_osc_set_midi(ptr, m);
+					if(sscanf(cur, "%02"SCNx8"%02"SCNx8"%02"SCNx8"%02"SCNx8, m, m+1, m+2, m+3))
+						ptr = jack_osc_set_midi(ptr, m);
+					else
+						fprintf(stderr, "type mismatch at '%c'\n", *type);
 					break;
 				}
 

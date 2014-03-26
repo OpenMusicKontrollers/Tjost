@@ -23,8 +23,61 @@
 
 #include <string.h>
 #include <stdarg.h>
+#include <ctype.h>
 
 #include <jack_osc.h>
+
+// characters not allowed in OSC path string
+static const char invalid_path_chars [] = {
+	' ', '#', '*', ',', '?', '[', ']', '{', '}',
+	'\0'
+};
+
+// allowed characters in OSC format string
+static const char valid_format_chars [] = {
+	'i', 'f', 's', 'b',
+	'T', 'F', 'N', 'I',
+	'h', 'd', 't',
+	'S', 'c', 'm',
+	'\0'
+};
+
+// check for valid path string
+static int
+is_valid_path(const char *path)
+{
+	const char *ptr;
+
+	if(path[0] != '/')
+		return 0;
+
+	for(ptr=path+1; *ptr!='\0'; ptr++)
+		if(!isprint(*ptr))
+			return 0;
+
+	for(ptr=invalid_path_chars; *ptr!='\0'; ptr++)
+		if(strchr(path+1, *ptr) != NULL)
+			return 0;
+
+	return 1;
+}
+
+// check for valid format string 
+static int
+is_valid_format(const char *format, int offset)
+{
+	const char *ptr;
+
+	if(offset)
+		if(format[0] != ',')
+			return 0;
+
+	for(ptr=format+offset; *ptr!='\0'; ptr++)
+		if(strchr(valid_format_chars, *ptr) == NULL)
+			return 0;
+
+	return 1;
+}
 
 int
 jack_osc_method_match(Jack_OSC_Method *methods, const char *path, const char *fmt)
@@ -50,8 +103,8 @@ jack_osc_method_dispatch(jack_nframes_t time, uint8_t *buf, size_t size, Jack_OS
 
 	Jack_OSC_Method *meth;
 	for(meth=methods; meth->cb; meth++)
-		if( (!meth->path || !strcmp(meth->path, path)) && (!meth->fmt || !strcmp(meth->fmt, fmt)) )
-			if(meth->cb(time, path, fmt, ptr, dat))
+		if( (!meth->path || !strcmp(meth->path, path)) && (!meth->fmt || !strcmp(meth->fmt, fmt+1)) )
+			if(meth->cb(time, path, fmt+1, ptr, dat))
 				break;
 }
 
@@ -65,15 +118,15 @@ jack_osc_message_check(uint8_t *buf, size_t size)
 	const char *fmt;
 
 	ptr = jack_osc_get_path(ptr, &path);
-	if( (path[0] != '/') || (ptr > end) )
+	if( (ptr > end) || !is_valid_path(path) )
 		return 0;
 
 	ptr = jack_osc_get_fmt(ptr, &fmt);
-	if( (fmt[-1] != ',') || (ptr > end) )
+	if( (ptr > end) || !is_valid_format(fmt, 1) )
 		return 0;
 
 	const char *type;
-	for(type=fmt; (*type!='\0') && (ptr <= end); type++)
+	for(type=fmt+1; (*type!='\0') && (ptr <= end); type++)
 	{
 		switch(*type)
 		{
@@ -182,8 +235,8 @@ jack_osc_get_path(uint8_t *buf, const char **path)
 inline uint8_t *
 jack_osc_get_fmt(uint8_t *buf, const char **fmt)
 {
-	*fmt = (const char *)(buf+1); // skip ','
-	return buf + jack_osc_strlen(*fmt-1);
+	*fmt = (const char *)buf;
+	return buf + jack_osc_strlen(*fmt);
 }
 
 inline uint8_t *
@@ -310,6 +363,8 @@ jack_osc_get(char type, uint8_t *buf, Jack_OSC_Argument *arg)
 inline uint8_t *
 jack_osc_set_path(uint8_t *buf, const char *path)
 {
+	if(!is_valid_path(path))
+		return NULL; //TODO
 	size_t len = jack_osc_strlen(path);
 	strncpy((char *)buf, path, len);
 	return buf + len;
@@ -318,6 +373,8 @@ jack_osc_set_path(uint8_t *buf, const char *path)
 inline uint8_t *
 jack_osc_set_fmt(uint8_t *buf, const char *fmt)
 {
+	if(!is_valid_format(fmt, 0))
+		return NULL; //TODO
 	size_t len = jack_osc_fmtlen(fmt);
 	*buf++ = ',';
 	strncpy((char *)buf, fmt, len);
@@ -463,8 +520,10 @@ jack_osc_vararg_set(uint8_t *buf, const char *path, const char *fmt, ...)
 {
 	uint8_t *ptr = buf;
 
-	ptr = jack_osc_set_path(ptr, path);
-	ptr = jack_osc_set_fmt(ptr, fmt);
+	if(!(ptr = jack_osc_set_path(ptr, path)))
+		return 0;
+	if(!(ptr = jack_osc_set_fmt(ptr, fmt)))
+		return 0;
 
   va_list args;
   va_start (args, fmt);
