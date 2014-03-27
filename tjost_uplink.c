@@ -164,7 +164,8 @@ _connections(jack_nframes_t time, const char *path, const char *fmt, uint8_t *bu
 	{
 		uint8_t *ptr = buf_rx;
 		ptr = jack_osc_set_path(ptr, "/jack/connections");
-		ptr = jack_osc_set_fmt(ptr, "");
+		ptr = jack_osc_set_fmt(ptr, "s");
+		ptr = jack_osc_set_string(ptr, port_name);
 		tjost_uplink_rx_push(host, module, buf_rx, ptr-buf_rx);
 	}
 
@@ -287,7 +288,7 @@ tjost_port_connect(jack_port_id_t id_a, jack_port_id_t id_b, int state, void *ar
 	if(state)
 		len = jack_osc_vararg_set(buf_rx, "/jack/port/connect", "ssT", name_a, name_b);
 	else
-		len = jack_osc_vararg_set(buf_rx, "/jack/port/connect", "ssT", name_a, name_b);
+		len = jack_osc_vararg_set(buf_rx, "/jack/port/connect", "ssF", name_a, name_b);
 	tjost_uplink_rx_push(host, TJOST_MODULE_BROADCAST, buf_rx, len);
 }
 

@@ -77,6 +77,10 @@ methods = {
 
 	['/jack/port/connect'] = function(time, fmt, name_a, name_b, state)
 		graph[name_a][name_b] = state
+
+		if not state then
+			update_plumbing()
+		end
 	end,
 
 	['/jack/port/rename'] = function(time, fmt, name_old, name_new)
@@ -89,8 +93,6 @@ methods = {
 				v[name_old] = nil
 			end
 		end
-
-		update_plumbing()
 	end,
 
 	['/jack/graph/order'] = function(time)
