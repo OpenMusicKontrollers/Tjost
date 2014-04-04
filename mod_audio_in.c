@@ -32,7 +32,7 @@ static const char *audio_fmt = "iib";
 static Sample_Type sample_type = SAMPLE_TYPE_FLOAT; //TODO make this configurable
 
 int
-process(jack_nframes_t nframes, void *arg)
+process_in(jack_nframes_t nframes, void *arg)
 {
 	Tjost_Module *module = arg;
 	Tjost_Host *host = module->host;

@@ -293,15 +293,13 @@ tjost_port_connect(jack_port_id_t id_a, jack_port_id_t id_b, int state, void *ar
 }
 
 // non real time
-int
+void
 tjost_port_rename(jack_port_id_t port, const char *old_name, const char *new_name, void *arg)
 {
 	Tjost_Host *host = arg;
 
 	size_t len = jack_osc_vararg_set(buf_rx, "/jack/graph/rename", "iss", port, old_name, new_name);
 	tjost_uplink_rx_push(host, TJOST_MODULE_BROADCAST, buf_rx, len);
-
-	return 0;
 }
 
 // non real time
@@ -314,4 +312,21 @@ tjost_graph_order(void *arg)
 	tjost_uplink_rx_push(host, TJOST_MODULE_BROADCAST, buf_rx, len);
 
 	return 0;
+}
+
+// non real time
+void
+tjost_property_change(jack_uuid_t uuid, const char *key, jack_property_change_t change, void *arg)
+{
+	Tjost_Host *host = arg;
+
+	if( (change == PropertyDeleted) && !strcmp(key, JACK_METADATA_EVENT_KEY))
+	{
+		fprintf(stderr, "WARNING: metadata for event port type '%s' has been deleted\n", key);
+		/* FIXME check whether this is one of our ports and reset event port type
+		if(jack_set_property(host->client, uuid, JACK_METADATA_EVENT_KEY, JACK_METADATA_EVENT_TYPE_OSC, NULL))
+			fprintf(stderr, "could not set event type\n");
+		*/
+	}
+
 }

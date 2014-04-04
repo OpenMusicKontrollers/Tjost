@@ -70,7 +70,7 @@ static Jack_OSC_Method methods [] = {
 };
 
 int
-process(jack_nframes_t nframes, void *arg)
+process_out(jack_nframes_t nframes, void *arg)
 {
 	static Data data;
 

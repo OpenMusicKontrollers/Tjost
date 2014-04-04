@@ -29,7 +29,7 @@
 
 // characters not allowed in OSC path string
 static const char invalid_path_chars [] = {
-	' ', '#', '*', ',', '?', '[', ']', '{', '}',
+	' ', '#',
 	'\0'
 };
 
@@ -52,11 +52,7 @@ is_valid_path(const char *path)
 		return 0;
 
 	for(ptr=path+1; *ptr!='\0'; ptr++)
-		if(!isprint(*ptr))
-			return 0;
-
-	for(ptr=invalid_path_chars; *ptr!='\0'; ptr++)
-		if(strchr(path+1, *ptr) != NULL)
+		if( (isprint(*ptr) == 0) || (strchr(invalid_path_chars, *ptr) != NULL) )
 			return 0;
 
 	return 1;
@@ -84,7 +80,7 @@ jack_osc_method_match(Jack_OSC_Method *methods, const char *path, const char *fm
 {
 	Jack_OSC_Method *meth;
 	for(meth=methods; meth->cb; meth++)
-		if( (!meth->path || !strcmp(meth->path, path)) && (!meth->fmt || !strcmp(meth->fmt, fmt)) )
+		if( (!meth->path || !strcmp(meth->path, path)) && (!meth->fmt || !strcmp(meth->fmt, fmt+1)) )
 			return 1;
 	return 0;
 }

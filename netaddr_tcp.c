@@ -21,8 +21,6 @@
  *     distribution.
  */
 
-#include <netdb.h>
-
 #include <netaddr.h>
 
 #if 0
@@ -110,39 +108,39 @@ slip_decode(uint8_t *buf, size_t len, size_t *size)
 static void
 _tcp_alloc(uv_handle_t *handle, size_t suggested_size, uv_buf_t *buf)
 {
-	NetAddr_TCP_Responder *netaddr = handle->data;
+	NetAddr_TCP_Endpoint *netaddr = handle->data;
 
-	buf->base = (char *)netaddr->buf;
-	buf->len = netaddr->nchunk < TJOST_BUF_SIZE ? netaddr->nchunk : TJOST_BUF_SIZE;
+	buf->base = (char *)netaddr->recv.buf;
+	buf->len = netaddr->recv.nchunk < TJOST_BUF_SIZE ? netaddr->recv.nchunk : TJOST_BUF_SIZE;
 }
 
 static void
 _tcp_recv_cb(uv_stream_t *stream, ssize_t nread, const uv_buf_t *buf)
 {
-	NetAddr_TCP_Responder *netaddr = stream->data;
+	NetAddr_TCP_Endpoint *netaddr = stream->data;
 
 	if(nread > 0)
 	{
 		if(nread == sizeof(int32_t))
-			netaddr->nchunk = ntohl(*(int32_t *)buf->base);
-		else if(nread == netaddr->nchunk)
+			netaddr->recv.nchunk = ntohl(*(int32_t *)buf->base);
+		else if(nread == netaddr->recv.nchunk)
 		{
-			netaddr->cb((uint8_t *)buf->base, nread, netaddr->dat);
-			netaddr->nchunk = sizeof(int32_t);
+			netaddr->recv.cb((uint8_t *)buf->base, nread, netaddr->recv.dat);
+			netaddr->recv.nchunk = sizeof(int32_t);
 		}
 		else // nread != sizeof(int32_t) && nread != nchunk
 		{
-			//FIXME should we do here?
-			netaddr->nchunk = sizeof(int32_t);
+			//FIXME what should we do here?
+			netaddr->recv.nchunk = sizeof(int32_t);
 			fprintf(stderr, "_tcp_recv_cb: TCP packet size not matching\n");
 		}
 	}
 	else if (nread < 0)
 	{
 		int err;
-		if((err = uv_read_stop((uv_stream_t *)&netaddr->recv_client)))
+		if((err = uv_read_stop((uv_stream_t *)&netaddr->stream)))
 			fprintf(stderr, "uv_read_stop: %s\n", uv_err_name(err));
-		uv_close((uv_handle_t *)&netaddr->recv_client, NULL);
+		uv_close((uv_handle_t *)&netaddr->stream, NULL);
 		fprintf(stderr, "_tcp_recv_cb: %s\n", uv_err_name(nread));
 	}
 	else // nread == 0
@@ -150,48 +148,80 @@ _tcp_recv_cb(uv_stream_t *stream, ssize_t nread, const uv_buf_t *buf)
 }
 
 static void
-_server_connect(uv_stream_t *server, int status)
+_tcp_send_cb(uv_write_t *req, int status)
+{
+	uv_stream_t *stream = req->handle;
+	NetAddr_TCP_Endpoint *netaddr = stream->data;
+
+	if(!status)
+		netaddr->send.cb(netaddr->send.len, netaddr->send.dat);
+	else
+		fprintf(stderr, "_tcp_send_cb: %s\n", uv_err_name(status));
+}
+
+static void
+_responder_connect(uv_stream_t *responder, int status)
 {
 	if(status)
 	{
-		fprintf(stderr, "_server_connect: %s\n", uv_err_name(status));
+		fprintf(stderr, "_responder_connect: %s\n", uv_err_name(status));
 		return;
 	}
 
-	fprintf(stderr, "connect to client\n");
+	fprintf(stderr, "connect to sender\n");
 
-	NetAddr_TCP_Responder *netaddr = server->data;
+	NetAddr_TCP_Endpoint *netaddr = responder->data;
+
+	// only allow one connection for now
+	if(uv_is_active((uv_handle_t *)&netaddr->stream))
+	{
+		fprintf(stderr, "already connected to a sender\n");
+		return;
+	}
 
 	int err;
-	if((err = uv_tcp_init(server->loop, &netaddr->recv_client)))
+	if((err = uv_tcp_init(responder->loop, &netaddr->stream)))
 	{
 		fprintf(stderr, "uv_tcp_init: %s\n", uv_err_name(err));
 		return;
 	}
-	
-	if((err = uv_accept(server, (uv_stream_t *)&netaddr->recv_client)))
+	if((err = uv_tcp_nodelay(&netaddr->stream, 1))) // disable Nagle's algo
+	{
+		fprintf(stderr, "uv_tcp_nodelay: %s\n", uv_err_name(err));
+		return;
+	}
+	if((err = uv_tcp_keepalive(&netaddr->stream, 1, 5))) // keepalive after 5 seconds
+	{
+		fprintf(stderr, "uv_tcp_keepalive: %s\n", uv_err_name(err));
+		return;
+	}
+
+	if((err = uv_accept((uv_stream_t *)&netaddr->uni.socket, (uv_stream_t *)&netaddr->stream)))
 	{
 		fprintf(stderr, "uv_accept: %s\n", uv_err_name(err));
 		return;
 	}
 
-	netaddr->nchunk = sizeof(int32_t); // packet size as TCP preamble
-	if((err = uv_read_start((uv_stream_t *)&netaddr->recv_client, _tcp_alloc, _tcp_recv_cb)))
+	netaddr->recv.nchunk = sizeof(int32_t); // packet size as TCP preamble
+	if((err = uv_read_start((uv_stream_t *)&netaddr->stream, _tcp_alloc, _tcp_recv_cb)))
 	{
 		fprintf(stderr, "uv_read_start: %s\n", uv_err_name(err));
 		return;
 	}
 }
 
-int
-netaddr_tcp_responder_init(NetAddr_TCP_Responder *netaddr, uv_loop_t *loop, const char *addr, NetAddr_Recv_Cb cb, void *dat)
+static int
+_netaddr_tcp_responder_init(NetAddr_TCP_Endpoint *netaddr, uv_loop_t *loop, const char *addr, NetAddr_Recv_Cb cb, void *dat)
 {
 	// Server: "osc.tcp://:3333"
 
-	netaddr->cb = cb;
-	netaddr->dat = dat;
-	netaddr->recv_socket.data = netaddr;
-	netaddr->recv_client.data = netaddr;
+	netaddr->type = NETADDR_TCP_RESPONDER;
+	
+	netaddr->uni.socket.data = netaddr;
+	netaddr->stream.data = netaddr;
+
+	netaddr->recv.cb = cb;
+	netaddr->recv.dat = dat;
 
 	if(strncmp(addr, "osc.tcp://", 10))
 	{
@@ -212,19 +242,9 @@ netaddr_tcp_responder_init(NetAddr_TCP_Responder *netaddr, uv_loop_t *loop, cons
 
 	int err;
 	struct sockaddr_in recv_addr;
-	if((err = uv_tcp_init(loop, &netaddr->recv_socket)))
+	if((err = uv_tcp_init(loop, &netaddr->uni.socket)))
 	{
 		fprintf(stderr, "uv_tcp_init: %s\n", uv_err_name(err));
-		return -1;
-	}
-	if((err = uv_tcp_nodelay(&netaddr->recv_socket, 1))) // disable Nagle's algo
-	{
-		fprintf(stderr, "uv_tcp_nodelay: %s\n", uv_err_name(err));
-		return -1;
-	}
-	if((err = uv_tcp_keepalive(&netaddr->recv_socket, 1, 5))) // keepalive after 5 seconds
-	{
-		fprintf(stderr, "uv_tcp_keepalive: %s\n", uv_err_name(err));
 		return -1;
 	}
 	if((err = uv_ip4_addr(host, port, &recv_addr)))
@@ -232,12 +252,12 @@ netaddr_tcp_responder_init(NetAddr_TCP_Responder *netaddr, uv_loop_t *loop, cons
 		fprintf(stderr, "uv_ip4_addr: %s\n", uv_err_name(err));
 		return -1;
 	}
-	if((err = uv_tcp_bind(&netaddr->recv_socket, (const struct sockaddr *)&recv_addr, 0)))
+	if((err = uv_tcp_bind(&netaddr->uni.socket, (const struct sockaddr *)&recv_addr, 0)))
 	{
 		fprintf(stderr, "uv_tcp_bind: %s\n", uv_err_name(err));
 		return -1;
 	}
-	if((err = uv_listen((uv_stream_t *)&netaddr->recv_socket, 128, _server_connect)))
+	if((err = uv_listen((uv_stream_t *)&netaddr->uni.socket, 128, _responder_connect)))
 	{
 		fprintf(stderr, "uv_listen: %s\n", uv_err_name(err));
 		return -1;
@@ -246,37 +266,41 @@ netaddr_tcp_responder_init(NetAddr_TCP_Responder *netaddr, uv_loop_t *loop, cons
 	return 0;
 }
 
-void
-netaddr_tcp_responder_deinit(NetAddr_TCP_Responder *netaddr)
-{
-	int err;
-	if((err = uv_read_stop((uv_stream_t *)&netaddr->recv_client)))
-		fprintf(stderr, "uv_read_stop: %s\n", uv_err_name(err));
-	uv_close((uv_handle_t *)&netaddr->recv_client, NULL);
-	uv_close((uv_handle_t *)&netaddr->recv_socket, NULL);
-}
-
 static void
-_client_connect(uv_connect_t *server, int status)
+_sender_connect(uv_connect_t *conn, int status)
 {
-	NetAddr_TCP_Sender *netaddr = server->data;
+	NetAddr_TCP_Endpoint *netaddr = conn->data;
+	uv_stream_t *stream = conn->handle;
 
 	if(status)
 	{
-		fprintf(stderr, "_client_connect %s\n", uv_err_name(status));
+		fprintf(stderr, "_sender_connect %s\n", uv_err_name(status));
 		return; //TODO
 	}
+	
+	fprintf(stderr, "connect to responder\n");
 
-	//TODO do something
+	int err;
+	netaddr->recv.nchunk = sizeof(int32_t); // packet size as TCP preamble
+	if((err = uv_read_start((uv_stream_t *)&netaddr->stream, _tcp_alloc, _tcp_recv_cb)))
+	{
+		fprintf(stderr, "uv_read_start: %s\n", uv_err_name(err));
+		return;
+	}
 }
 
-int
-netaddr_tcp_sender_init(NetAddr_TCP_Sender *netaddr, uv_loop_t *loop, const char *addr)
+static int
+_netaddr_tcp_sender_init(NetAddr_TCP_Endpoint *netaddr, uv_loop_t *loop, const char *addr, NetAddr_Recv_Cb cb, void *dat)
 {
 	// Client: "osc.tcp://name.local:4444"
 
-	netaddr->send_socket.data = netaddr;
-	netaddr->send_remote.data = netaddr; // FIXME eina_mempool
+	netaddr->type = NETADDR_TCP_SENDER;
+
+	netaddr->uni.conn.data = netaddr;
+	netaddr->stream.data = netaddr;
+
+	netaddr->recv.cb = cb;
+	netaddr->recv.dat = dat;
 
 	if(strncmp(addr, "osc.tcp://", 10))
 	{
@@ -323,17 +347,28 @@ netaddr_tcp_sender_init(NetAddr_TCP_Sender *netaddr, uv_loop_t *loop, const char
 		fprintf(stderr, "up_ip4_name: %s\n", uv_err_name(err));
 		return -1;
 	}
-	if((err = uv_tcp_init(loop, &netaddr->send_socket)))
+	if((err = uv_tcp_init(loop, &netaddr->stream)))
 	{
 		fprintf(stderr, "uv_tcp_init: %s\n", uv_err_name(err));
 		return -1;
 	}
-	if((err = uv_ip4_addr(remote, port, &netaddr->send_addr)))
+	if((err = uv_tcp_nodelay(&netaddr->stream, 1))) // disable Nagle's algo
+	{
+		fprintf(stderr, "uv_tcp_nodelay: %s\n", uv_err_name(err));
+		return -1;
+	}
+	if((err = uv_tcp_keepalive(&netaddr->stream, 1, 5))) // keepalive after 5 seconds
+	{
+		fprintf(stderr, "uv_tcp_keepalive: %s\n", uv_err_name(err));
+		return -1;
+	}
+	struct sockaddr_in send_addr;
+	if((err = uv_ip4_addr(remote, port, &send_addr)))
 	{
 		fprintf(stderr, "uv_ip4_addr: %s\n", uv_err_name(err));
 		return -1;
 	}
-	if((err = uv_tcp_connect(&netaddr->send_remote, &netaddr->send_socket, (const struct sockaddr *)&netaddr->send_addr, _client_connect)))
+	if((err = uv_tcp_connect(&netaddr->uni.conn, &netaddr->stream, (const struct sockaddr *)&send_addr, _sender_connect)))
 	{
 		fprintf(stderr, "uv_tcp_connect: %s\n", uv_err_name(err));
 		return -1;
@@ -342,33 +377,62 @@ netaddr_tcp_sender_init(NetAddr_TCP_Sender *netaddr, uv_loop_t *loop, const char
 	return 0;
 }
 
-void
-netaddr_tcp_sender_deinit(NetAddr_TCP_Sender *netaddr)
+int
+netaddr_tcp_endpoint_init(NetAddr_TCP_Endpoint *netaddr, NetAddr_TCP_Type type, uv_loop_t *loop, const char *addr, NetAddr_Recv_Cb cb, void *dat)
 {
-	//TODO
+	switch(type)
+	{
+		case NETADDR_TCP_RESPONDER:
+			return _netaddr_tcp_responder_init(netaddr, loop, addr, cb, dat);
+			break;
+		case NETADDR_TCP_SENDER:
+			return _netaddr_tcp_sender_init(netaddr, loop, addr, cb, dat);
+			break;
+	}
 }
 
 static void
-_tcp_send_cb(uv_write_t *req, int status)
+_netaddr_tcp_responder_deinit(NetAddr_TCP_Endpoint *netaddr)
 {
-	uv_stream_t *stream = req->handle;
-	NetAddr_TCP_Sender *netaddr = stream->data;
+	int err;
+	if((err = uv_read_stop((uv_stream_t *)&netaddr->stream)))
+		fprintf(stderr, "uv_read_stop: %s\n", uv_err_name(err));
+	uv_close((uv_handle_t *)&netaddr->stream, NULL);
+	uv_close((uv_handle_t *)&netaddr->uni.socket, NULL);
+}
 
-	if(!status)
-		netaddr->cb(netaddr->len, netaddr->dat);
-	else
-		fprintf(stderr, "_tcp_send_cb: %s\n", uv_err_name(status));
-
+static void
+_netaddr_tcp_sender_deinit(NetAddr_TCP_Endpoint *netaddr)
+{
+	int err;
+	if((err = uv_read_stop((uv_stream_t *)&netaddr->stream)))
+		fprintf(stderr, "uv_read_stop: %s\n", uv_err_name(err));
+	uv_close((uv_handle_t *)&netaddr->stream, NULL);
+	//TODO close conn?
 }
 
 void
-netaddr_tcp_sender_send(NetAddr_TCP_Sender *netaddr, uv_buf_t *bufs, int nbufs, size_t len, NetAddr_Send_Cb cb, void *dat)
+netaddr_tcp_endpoint_deinit(NetAddr_TCP_Endpoint *netaddr)
 {
-	netaddr->cb = cb;
-	netaddr->dat = dat;
-	netaddr->len = len;
+	switch(netaddr->type)
+	{
+		case NETADDR_TCP_RESPONDER:
+			_netaddr_tcp_responder_deinit(netaddr);
+			break;
+		case NETADDR_TCP_SENDER:
+			_netaddr_tcp_sender_deinit(netaddr);
+			break;
+	}
+}
+
+void
+netaddr_tcp_endpoint_send(NetAddr_TCP_Endpoint *netaddr, uv_buf_t *bufs, int nbufs, size_t len, NetAddr_Send_Cb cb, void *dat)
+{
+	netaddr->send.cb = cb;
+	netaddr->send.dat = dat;
+	netaddr->send.len = len;
 
 	int err;
-	if((err =	uv_write(&netaddr->req, (uv_stream_t *)&netaddr->send_socket, bufs, nbufs, _tcp_send_cb)))
+	if((err =	uv_write(&netaddr->send.req, (uv_stream_t *)&netaddr->stream, bufs, nbufs, _tcp_send_cb)))
 		fprintf(stderr, "uv_write: %s", uv_err_name(err));
 }

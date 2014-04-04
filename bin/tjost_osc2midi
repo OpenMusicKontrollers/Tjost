@@ -25,4 +25,4 @@
 
 midi = plugin('midi_out', 'midi')
 
-osc = plugin('osc_in', 'osc.jack://midi')
+osc = plugin('osc_in', 'osc.midi')

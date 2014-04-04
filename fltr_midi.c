@@ -44,13 +44,11 @@ struct _Midi_Blob {
 	uint8_t key;
 };
 
-//static uint8_t buffer [TJOST_BUF_SIZE] __attribute__((aligned (8)));
-static Midi_Client midi;
-static Midi_Client *midi_client = &midi;
-
 static int
 _on(jack_nframes_t time, const char *path, const char *fmt, lua_State *L)
 {
+	Midi_Client *midi_client = lua_touserdata(L, lua_upvalueindex(2));
+
 	int i;
 	uint32_t sid = luaL_checkint(L, 4);
 	uint16_t uid = luaL_checkint(L, 5);
@@ -128,6 +126,8 @@ _on(jack_nframes_t time, const char *path, const char *fmt, lua_State *L)
 static int
 _off(jack_nframes_t time, const char *path, const char *fmt, lua_State *L)
 {
+	Midi_Client *midi_client = lua_touserdata(L, lua_upvalueindex(2));
+
 	int i;
 	uint32_t sid = luaL_checkint(L, 4);
 	uint16_t uid = luaL_checkint(L, 5);
@@ -169,6 +169,8 @@ _off(jack_nframes_t time, const char *path, const char *fmt, lua_State *L)
 static int
 _set(jack_nframes_t time, const char *path, const char *fmt, lua_State *L)
 {
+	Midi_Client *midi_client = lua_touserdata(L, lua_upvalueindex(2));
+
 	int i;
 	uint32_t sid = luaL_checkint(L, 4);
 	uint16_t uid = luaL_checkint(L, 5);
@@ -237,6 +239,7 @@ _set(jack_nframes_t time, const char *path, const char *fmt, lua_State *L)
 static int
 _idle(jack_nframes_t time, const char *path, const char *fmt, lua_State *L)
 {
+	Midi_Client *midi_client = lua_touserdata(L, lua_upvalueindex(2));
 	//TODO
 
 	return 0;
@@ -245,6 +248,8 @@ _idle(jack_nframes_t time, const char *path, const char *fmt, lua_State *L)
 static int
 _bottom(jack_nframes_t time, const char *path, const char *fmt, lua_State *L)
 {
+	Midi_Client *midi_client = lua_touserdata(L, lua_upvalueindex(2));
+
 	midi_client->bot = luaL_checknumber(L, 4);
 
 	return 0;
@@ -253,6 +258,8 @@ _bottom(jack_nframes_t time, const char *path, const char *fmt, lua_State *L)
 static int
 _range(jack_nframes_t time, const char *path, const char *fmt, lua_State *L)
 {
+	Midi_Client *midi_client = lua_touserdata(L, lua_upvalueindex(2));
+
 	midi_client->range = luaL_checknumber(L, 4);
 
 	return 0;
@@ -261,6 +268,8 @@ _range(jack_nframes_t time, const char *path, const char *fmt, lua_State *L)
 static int
 _effect(jack_nframes_t time, const char *path, const char *fmt, lua_State *L)
 {
+	Midi_Client *midi_client = lua_touserdata(L, lua_upvalueindex(2));
+
 	midi_client->effect = luaL_checkint(L, 4); // TODO check range
 
 	return 0;
@@ -269,6 +278,8 @@ _effect(jack_nframes_t time, const char *path, const char *fmt, lua_State *L)
 static int
 _double_precision(jack_nframes_t time, const char *path, const char *fmt, lua_State *L)
 {
+	Midi_Client *midi_client = lua_touserdata(L, lua_upvalueindex(2));
+
 	midi_client->double_precision = lua_toboolean(L, 4);
 
 	return 0;
@@ -312,13 +323,19 @@ static int
 _new(lua_State *L)
 {
 	uint8_t n = 128;
-	midi_client->effect = 0x07;
-	midi_client->double_precision = 1;
-	midi_client->bot = 2*12 - 0.5 - ( (n % 18) / 6.f);
-	midi_client->range = n/3.f;
 
 	if(lua_isfunction(L, 1) || lua_isuserdata(L, 1))
-		lua_pushcclosure(L, _func, 1);
+	{
+		Midi_Client *midi_client = calloc(1, sizeof(Midi_Client)); //FIXME tjost_alloc
+		midi_client->effect = 0x07;
+		midi_client->double_precision = 1;
+		midi_client->bot = 2*12 - 0.5 - ( (n % 18) / 6.f);
+		midi_client->range = n/3.f;
+		midi_client->pool = eina_mempool_add("chained_mempool", "blobs", NULL, sizeof(Midi_Blob), 32); //FIXME free
+		lua_pushlightuserdata(L, midi_client);
+
+		lua_pushcclosure(L, _func, 2);
+	}
 	else
 		lua_pushnil(L);
 	return 1;
@@ -327,7 +344,6 @@ _new(lua_State *L)
 int
 luaopen_midi(lua_State *L)
 {
-	midi_client->pool = eina_mempool_add("chained_mempool", "blobs", NULL, sizeof(Midi_Blob), 32); //TODO free
 	lua_pushcclosure(L, _new, 0);
 	return 1;
 }

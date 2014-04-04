@@ -1,4 +1,4 @@
-#!/usr/local/bin/tjost -d
+#!/usr/local/bin/tjost -i
 
 --[[
 -- Copyright (c) 2014 Hanspeter Portner (dev@open-music-kontrollers.ch)
@@ -23,6 +23,22 @@
 --     distribution.
 --]]
 
-osc = plugin('osc_out', 'osc.midi')
+resp_out = plugin('osc_out', 'responder.tx')
 
-midi = plugin('midi_in', 'midi')
+tcp_in = plugin('net_in', 'osc.tcp://:3333', '60', function(...)
+	resp_out(...)
+end)
+
+resp_in = plugin('osc_in', 'responder.rx', function(...)
+	tcp_in(...)
+end)
+
+send_out = plugin('osc_out', 'sender.tx')
+
+tcp_out = plugin('net_out', 'osc.tcp://localhost:3333', '0.1', function(...)
+	send_out(...)
+end)
+
+send_in = plugin('osc_in', 'sender.rx', function(...)
+	tcp_out(...)
+end)

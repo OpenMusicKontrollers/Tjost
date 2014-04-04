@@ -23,6 +23,6 @@
 --     distribution.
 --]]
 
-osc = plugin('osc_out', 'osc.jack://send')
+osc = plugin('osc_out', 'osc.send')
 
 send = plugin('send')

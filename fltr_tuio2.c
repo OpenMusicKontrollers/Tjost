@@ -54,13 +54,11 @@ struct _Tuio2_Blob {
 	int is_new;
 };
 
-//static uint8_t buffer [TJOST_BUF_SIZE] __attribute__((aligned (8)));
-static Tuio2_Client tuio2;
-static Tuio2_Client *tuio2_client = &tuio2;
-
 static int
 _frm(jack_nframes_t time, const char *path, const char *fmt, lua_State *L)
 {
+	Tuio2_Client *tuio2_client = lua_touserdata(L, lua_upvalueindex(2));
+
 	uint32_t fid = luaL_checkint(L, 4);
 	uint64_t timestamp = luaL_checknumber(L, 5);
 
@@ -104,6 +102,8 @@ _frm(jack_nframes_t time, const char *path, const char *fmt, lua_State *L)
 static int
 _tok(jack_nframes_t time, const char *path, const char *fmt, lua_State *L)
 {
+	Tuio2_Client *tuio2_client = lua_touserdata(L, lua_upvalueindex(2));
+
 	if(tuio2_client->ignore)
 		return 0;
 
@@ -148,6 +148,8 @@ _tok(jack_nframes_t time, const char *path, const char *fmt, lua_State *L)
 static int
 _alv(jack_nframes_t time, const char *path, const char *fmt, lua_State *L)
 {
+	Tuio2_Client *tuio2_client = lua_touserdata(L, lua_upvalueindex(2));
+
 	if(tuio2_client->ignore)
 		return 0;
 
@@ -272,7 +274,13 @@ static int
 _new(lua_State *L)
 {
 	if(lua_isfunction(L, 1) || lua_isuserdata(L, 1))
-		lua_pushcclosure(L, _func, 1);
+	{
+		Tuio2_Client *tuio2_client = calloc(1, sizeof(Tuio2_Client)); //FIXME tjost_alloc
+		tuio2_client->pool = eina_mempool_add("chained_mempool", "blobs", NULL, sizeof(Tuio2_Blob), 32); //FIXME free
+		lua_pushlightuserdata(L, tuio2_client);
+
+		lua_pushcclosure(L, _func, 2);
+	}
 	else
 		lua_pushnil(L);
 	return 1;
@@ -281,7 +289,6 @@ _new(lua_State *L)
 int
 luaopen_tuio2(lua_State *L)
 {
-	tuio2_client->pool = eina_mempool_add("chained_mempool", "blobs", NULL, sizeof(Tuio2_Blob), 32); //TODO free
 	lua_pushcclosure(L, _new, 0);
 	return 1;
 }

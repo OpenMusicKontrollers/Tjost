@@ -25,8 +25,6 @@
 
 #include <tjost.h>
 
-#include <netaddr.h>
-
 typedef struct _Data Data;
 
 struct _Data {
@@ -256,7 +254,7 @@ _tty_recv_cb(uv_stream_t *stream, ssize_t nread, const uv_buf_t *buf)
 }
 
 int
-process(jack_nframes_t nframes, void *arg)
+process_in(jack_nframes_t nframes, void *arg)
 {
 	Tjost_Module *module = arg;
 	Tjost_Host *host = module->host;
@@ -301,7 +299,7 @@ add(Tjost_Module *module, int argc, const char **argv)
 		fprintf(stderr, "send: %s\n", uv_err_name(err));
 
 	module->dat = dat;
-	module->type = TJOST_MODULE_OUTPUT;
+	module->type = TJOST_MODULE_INPUT;
 }
 
 void

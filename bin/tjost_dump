@@ -25,4 +25,4 @@
 
 dump = plugin('dump')
 
-osc = plugin('osc_in', 'osc.jack://dump')
+osc = plugin('osc_in', 'osc.dump')

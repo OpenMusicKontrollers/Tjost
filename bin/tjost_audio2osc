@@ -23,6 +23,6 @@
 --     distribution.
 --]]
 
-osc = plugin('osc_out', 'osc.jack://audio')
+osc = plugin('osc_out', 'osc.audio')
 
 audio = plugin('audio_in', 'audio')

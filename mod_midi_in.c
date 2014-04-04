@@ -27,7 +27,7 @@ static uint8_t buffer [TJOST_BUF_SIZE] __attribute__((aligned (8)));
 static const char *midi_path = "/midi";
 
 int
-process(jack_nframes_t nframes, void *arg)
+process_in(jack_nframes_t nframes, void *arg)
 {
 	Tjost_Module *module = arg;
 	Tjost_Host *host = module->host;

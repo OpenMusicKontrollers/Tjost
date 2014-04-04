@@ -21,8 +21,6 @@
  *     distribution.
  */
 
-#include <netdb.h>
-
 #include <netaddr.h>
 
 static void
@@ -197,7 +195,7 @@ netaddr_udp_sender_send(NetAddr_UDP_Sender *netaddr, uv_buf_t *bufs, int nbufs, 
 {
 	netaddr->cb = cb;
 	netaddr->dat = dat;
-	netaddr->len = len; // message size without TCP preable and OSC bundle header
+	netaddr->len = len; // message size without TCP preamble and OSC bundle header
 
 	int err;
 	if((err = uv_udp_send(&netaddr->req, &netaddr->send_socket, bufs, nbufs, (const struct sockaddr *)&netaddr->send_addr, _udp_send_cb)))

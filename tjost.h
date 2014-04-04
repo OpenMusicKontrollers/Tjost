@@ -21,8 +21,8 @@
  *     distribution.
  */
 
-#ifndef __TJOST_H
-#define __TJOST_H
+#ifndef _TJOST_H_
+#define _TJOST_H_
 
 #ifdef __cplusplus
 extern "C" {
@@ -43,7 +43,6 @@ extern "C" {
 // JACKified OpenSoundControl
 #include <jack_osc.h>
 
-typedef struct _Tjost_Time Tjost_Time;
 typedef struct _Tjost_Event Tjost_Event;
 typedef struct _Tjost_Module Tjost_Module;
 typedef struct _Tjost_Host Tjost_Host;
@@ -52,16 +51,11 @@ typedef void (*Tjost_Module_Add_Cb)(Tjost_Module *module, int argc, const char *
 typedef void (*Tjost_Module_Del_Cb)(Tjost_Module *module);
 
 typedef enum _Tjost_Module_Type {
-	TJOST_MODULE_INPUT, TJOST_MODULE_OUTPUT, TJOST_MODULE_UPLINK
+	TJOST_MODULE_INPUT		= 0b001,
+	TJOST_MODULE_OUTPUT		= 0b010,
+	TJOST_MODULE_IN_OUT		= 0b011,
+	TJOST_MODULE_UPLINK		= 0b100
 } Tjost_Module_Type;
-
-struct _Tjost_Time {
-	jack_nframes_t current_frames;
-	jack_nframes_t nframes;
-	jack_time_t current_usecs;
-	jack_time_t next_usecs;
-	float periods_usecs;
-};
 
 struct _Tjost_Event {
 	EINA_INLIST;
@@ -78,13 +72,14 @@ struct _Tjost_Module {
 
 	Tjost_Module_Add_Cb add;
 	Tjost_Module_Del_Cb del;
-	JackProcessCallback process;
+	JackProcessCallback process_in;
+	JackProcessCallback process_out;
 
 	Tjost_Module_Type type;
 	Tjost_Host *host;
 	void *dat;
 
-	Eina_Inlist *queue; // module event queue
+	Eina_Inlist *queue; // module output event queue
 };
 
 #define TJOST_MODULE_BROADCAST NULL
@@ -114,8 +109,7 @@ struct _Tjost_Host {
 
 	Eina_Array *arr; // modules
 
-	Eina_Inlist *inputs; // input module instances
-	Eina_Inlist *outputs; // outputs module instances
+	Eina_Inlist *modules; // input module instances
 	Eina_Inlist *uplinks; // uplink module instances
 
 	Eina_Inlist *queue; // host event queue
@@ -141,6 +135,7 @@ void tjost_lua_deserialize_unicast(Tjost_Event *tev);
 void tjost_lua_deserialize_broadcast(Tjost_Event *tev, Eina_Inlist *modules);
 extern const luaL_Reg tjost_input_mt [];
 extern const luaL_Reg tjost_output_mt [];
+extern const luaL_Reg tjost_in_out_mt [];
 extern const luaL_Reg tjost_uplink_mt [];
 extern const luaL_Reg tjost_globals [];
 
@@ -152,11 +147,12 @@ void tjost_uplink_rx_drain(Tjost_Host *host, int ignore);
 void tjost_client_registration(const char *name, int state, void *arg);
 void tjost_port_registration(jack_port_id_t id, int state, void *arg);
 void tjost_port_connect(jack_port_id_t id_a, jack_port_id_t id_b, int state, void *arg);
-int tjost_port_rename(jack_port_id_t port, const char *old_name, const char *new_name, void *arg);
+void tjost_port_rename(jack_port_id_t port, const char *old_name, const char *new_name, void *arg);
 int tjost_graph_order(void *arg);
+void tjost_property_change(jack_uuid_t uuid, const char *key, jack_property_change_t change, void *arg);
 
 #ifdef __cplusplus
 }
 #endif
 
-#endif /* __TJOST_H */
+#endif

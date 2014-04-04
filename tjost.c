@@ -277,8 +277,9 @@ _process_indirect(jack_nframes_t nframes, void *arg)
 	tjost_uplink_rx_drain(host, 0);
 
 	// receive on all inputs
-	EINA_INLIST_FOREACH(host->inputs, module)
-		module->process(nframes, module);
+	EINA_INLIST_FOREACH(host->modules, module)
+		if(module->type & TJOST_MODULE_INPUT)
+			module->process_in(nframes, module);
 
 	// handle main queue events
 	Eina_Inlist *l;
@@ -307,12 +308,13 @@ _process_indirect(jack_nframes_t nframes, void *arg)
 	}
 
 	// send on all outputs
-	EINA_INLIST_FOREACH(host->outputs, module)
-		module->process(nframes, module);
+	EINA_INLIST_FOREACH(host->modules, module)
+		if(module->type & TJOST_MODULE_OUTPUT)
+			module->process_out(nframes, module);
 
 	// send on all uplinks
 	EINA_INLIST_FOREACH(host->uplinks, module)
-		module->process(nframes, module);
+		module->process_out(nframes, module);
 
 	// write uplink events to rinbbuffer
 	int err;
@@ -340,28 +342,43 @@ _process_direct(jack_nframes_t nframes, void *arg)
 	tjost_uplink_rx_drain(host, 1);
 
 	// receive on all inputs
-	EINA_INLIST_FOREACH(host->inputs, module)
-		module->process(nframes, module);
+	EINA_INLIST_FOREACH(host->modules, module)
+		if(module->type & TJOST_MODULE_INPUT)
+			module->process_in(nframes, module);
 
 	// handle main queue events
 	Eina_Inlist *l;
 	Tjost_Event *tev;
 	EINA_INLIST_FOREACH_SAFE(host->queue, l, tev)
 	{
-		EINA_INLIST_FOREACH(host->outputs, module)
-			tjost_module_schedule(module, tev->time, tev->size, tev->buf);
+		if(tev->time >= last + nframes)
+			break;
+
+		if(tev->time == 0) // immediate execution
+			tev->time = last;
+
+		if(tev->time >= last)
+		{
+			EINA_INLIST_FOREACH(host->modules, module)
+				if(module->type & TJOST_MODULE_OUTPUT)
+					tjost_module_schedule(module, tev->time, tev->size, tev->buf);
+		}
+		else
+			tjost_host_message_push(host, "main loop: ignoring out-of-order event %u %u",
+				last, tev->time);
 
 		host->queue = eina_inlist_remove(host->queue, EINA_INLIST_GET(tev));
 		tjost_free(host, tev);
 	}
 
 	// send on all outputs
-	EINA_INLIST_FOREACH(host->outputs, module)
-		module->process(nframes, module);
+	EINA_INLIST_FOREACH(host->modules, module)
+		if(module->type & TJOST_MODULE_OUTPUT)
+			module->process_out(nframes, module);
 
 	// send on all uplinks
 	EINA_INLIST_FOREACH(host->uplinks, module)
-		module->process(nframes, module);
+		module->process_out(nframes, module);
 
 	// write uplink events to rinbbuffer
 	int err;
@@ -427,10 +444,14 @@ main(int argc, const char **argv)
 		FAIL("could not set port_registration callback\n");
 	if(jack_set_port_connect_callback(host.client, tjost_port_connect, &host))
 		FAIL("could not set port_connect callback\n");
+	/*
 	if(jack_set_port_rename_callback(host.client, tjost_port_rename, &host))
 		FAIL("could not set port_rename callback\n");
+	*/
 	if(jack_set_graph_order_callback(host.client, tjost_graph_order, &host))
 		FAIL("could not set graph_order callback\n");
+	if(jack_set_property_change_callback(host.client, tjost_property_change, &host))
+		FAIL("could not set property_change callback\n");
 
 	// init message ringbuffer
 	if(!(host.rb_msg = jack_ringbuffer_create(TJOST_RINGBUF_SIZE)))
@@ -476,6 +497,12 @@ main(int argc, const char **argv)
 
 	luaL_newmetatable(host.L, "Tjost_Output"); // mt
 	luaL_register(host.L, NULL, tjost_output_mt);
+	lua_pushvalue(host.L, -1);
+	lua_setfield(host.L, -2, "__index");
+	lua_pop(host.L, 1); // mt
+
+	luaL_newmetatable(host.L, "Tjost_In_Out"); // mt
+	luaL_register(host.L, NULL, tjost_in_out_mt);
 	lua_pushvalue(host.L, -1);
 	lua_setfield(host.L, -2, "__index");
 	lua_pop(host.L, 1); // mt

@@ -21,8 +21,8 @@
  *     distribution.
  */
 
-#ifndef __JACK_OSC_H
-#define __JACK_OSC_H
+#ifndef _JACK_OSC_H_
+#define _JACK_OSC_H_
 
 #ifdef __cplusplus
 extern "C" {
@@ -36,6 +36,11 @@ extern "C" {
 #include <jack/ringbuffer.h>
 #include <jack/weakmacros.h>
 #include <jack/midiport.h>
+#include <jack/metadata.h>
+#include <jack/uuid.h>
+
+#define JACK_METADATA_EVENT_KEY "http://jackaudio.org/event/type"
+#define JACK_METADATA_EVENT_TYPE_OSC "Open Sound Control"
 
 #define JACK_DEFAULT_OSC_TYPE JACK_DEFAULT_MIDI_TYPE
 #define JACK_DEFAULT_OSC_BUFFER_SIZE 0
@@ -199,4 +204,4 @@ size_t jack_osc_vararg_set(uint8_t *buf, const char *path, const char *fmt, ...)
 }
 #endif
 
-#endif /* __JACK_OSC_H */
+#endif

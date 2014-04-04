@@ -328,6 +328,13 @@ _call_output(lua_State *L)
 }
 
 static int
+_call_in_out(lua_State *L)
+{
+	Tjost_Module *module = luaL_checkudata(L, 1, "Tjost_In_Out");
+	return _serialize(L, module);
+}
+
+static int
 _call_uplink(lua_State *L)
 {
 	Tjost_Module *module = luaL_checkudata(L, 1, "Tjost_Uplink");
@@ -363,7 +370,7 @@ _gc_input(lua_State *L)
 	lua_rawset(L, LUA_REGISTRYINDEX);
 
 	module->del(module);
-	host->inputs = eina_inlist_remove(host->inputs, EINA_INLIST_GET(module));
+	host->modules = eina_inlist_remove(host->modules, EINA_INLIST_GET(module));
 
 	return 0;
 }
@@ -382,7 +389,26 @@ _gc_output(lua_State *L)
 
 	module->del(module);
 	_clear(module);
-	host->outputs = eina_inlist_remove(host->outputs, EINA_INLIST_GET(module));
+	host->modules = eina_inlist_remove(host->modules, EINA_INLIST_GET(module));
+
+	return 0;
+}
+
+static int
+_gc_in_out(lua_State *L)
+{
+	printf("_gc_in_out\n");
+	Tjost_Module *module = luaL_checkudata(L, 1, "Tjost_In_Out");
+	Tjost_Host *host = module->host;
+
+	// clear responder function from registry
+	lua_pushlightuserdata(L, module);
+	lua_pushnil(L);
+	lua_rawset(L, LUA_REGISTRYINDEX);
+
+	module->del(module);
+	_clear(module);
+	host->modules = eina_inlist_remove(host->modules, EINA_INLIST_GET(module));
 
 	return 0;
 }
@@ -415,6 +441,14 @@ _clear_output(lua_State *L)
 }
 
 static int
+_clear_in_out(lua_State *L)
+{
+	Tjost_Module *module = luaL_checkudata(L, 1, "Tjost_In_Out");
+	_clear(module);
+	return 0;
+}
+
+static int
 _clear_uplink(lua_State *L)
 {
 	Tjost_Module *module = luaL_checkudata(L, 1, "Tjost_Uplink");
@@ -431,6 +465,13 @@ const luaL_Reg tjost_output_mt [] = {
 	{"clear", _clear_output},
 	{"__call", _call_output},
 	{"__gc", _gc_output},
+	{NULL, NULL}
+};
+
+const luaL_Reg tjost_in_out_mt [] = {
+	{"clear", _clear_in_out},
+	{"__call", _call_in_out},
+	{"__gc", _gc_in_out},
 	{NULL, NULL}
 };
 
@@ -468,8 +509,8 @@ _plugin(lua_State *L)
 		fprintf(stderr, "could not get 'add' symbol\n");
 	if(!(module->del = eina_module_symbol_get(mod, "del")))
 		fprintf(stderr, "could not get 'del' symbol\n");
-	if(!(module->process = eina_module_symbol_get(mod, "process")))
-		fprintf(stderr, "could not get 'process' symbol\n");
+	module->process_in = NULL;
+	module->process_out = NULL;
 
 	module->host = host;
 
@@ -488,15 +529,32 @@ _plugin(lua_State *L)
 	switch(module->type)
 	{
 		case TJOST_MODULE_INPUT:
-			host->inputs = eina_inlist_append(host->inputs, EINA_INLIST_GET(module));
+			if(!(module->process_in = eina_module_symbol_get(mod, "process_in")))
+				fprintf(stderr, "could not get 'process_in' symbol\n");
+
+			host->modules = eina_inlist_append(host->modules, EINA_INLIST_GET(module));
 
 			luaL_getmetatable(L, "Tjost_Input");
 			lua_setmetatable(L, -2);
 			break;
 		case TJOST_MODULE_OUTPUT:
-			host->outputs = eina_inlist_append(host->outputs, EINA_INLIST_GET(module));
+			if(!(module->process_out = eina_module_symbol_get(mod, "process_out")))
+				fprintf(stderr, "could not get 'process_out' symbol\n");
+
+			host->modules = eina_inlist_append(host->modules, EINA_INLIST_GET(module));
 			
 			luaL_getmetatable(L, "Tjost_Output");
+			lua_setmetatable(L, -2);
+			break;
+		case TJOST_MODULE_IN_OUT:
+			if(!(module->process_in = eina_module_symbol_get(mod, "process_in")))
+				fprintf(stderr, "could not get 'process_in' symbol\n");
+			if(!(module->process_out = eina_module_symbol_get(mod, "process_out")))
+				fprintf(stderr, "could not get 'process_out' symbol\n");
+
+			host->modules = eina_inlist_append(host->modules, EINA_INLIST_GET(module));
+
+			luaL_getmetatable(L, "Tjost_In_Out");
 			lua_setmetatable(L, -2);
 			break;
 		case TJOST_MODULE_UPLINK:

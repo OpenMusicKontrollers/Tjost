@@ -23,8 +23,6 @@
 
 #include <tjost.h>
 
-#include <netaddr.h>
-
 typedef struct _Data Data;
 
 struct _Data {
@@ -39,9 +37,6 @@ _asio(uv_async_t *handle, int status)
 {
 	Tjost_Module *module = handle->data;
 	Data *dat = module->dat;
-
-	struct timespec now;
-	clock_gettime(CLOCK_REALTIME, &now);
 
 	Tjost_Event tev;
 	while(jack_ringbuffer_read_space(dat->rb) >= sizeof(Tjost_Event))
@@ -162,7 +157,7 @@ _asio(uv_async_t *handle, int status)
 }
 
 int
-process(jack_nframes_t nframes, void *arg)
+process_out(jack_nframes_t nframes, void *arg)
 {
 	Tjost_Module *module = arg;
 	Tjost_Host *host = module->host;

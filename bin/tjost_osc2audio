@@ -25,4 +25,4 @@
 
 audio = plugin('audio_out', 'audio')
 
-osc = plugin('osc_in', 'osc.jack://audio')
+osc = plugin('osc_in', 'osc.audio')

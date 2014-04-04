@@ -21,206 +21,28 @@
  *     distribution.
  */
 
-#include <assert.h>
-
 #include <tjost.h>
+#include <mod_net.h>
 
-#include <netaddr.h>
-
-typedef enum _Socket_Type {SOCKET_UDP, SOCKET_TCP} Socket_Type;
 typedef struct _Data Data;
 
 struct _Data {
-	jack_ringbuffer_t *rb;
-
-	Socket_Type type;
-	union {
-		NetAddr_UDP_Sender udp;
-		NetAddr_TCP_Sender tcp;
-	} snk;
-
-	uv_timer_t sync;
-	jack_time_t sync_jack;
-	struct timespec sync_osc;
-	uint32_t delay_sec;
-	uint32_t delay_nsec;
-	
-	uv_async_t asio;
+	Mod_Net net;
 };
 
-static const char *bundle_str = "#bundle";
-#define JAN_1970 (uint32_t)0x83aa7e80
-#define NSEC_PER_NTP_SLICE (1e-9 / 0x0.00000001p0)
-
-static void
-_sync(uv_timer_t *handle, int status)
-{
-	Tjost_Module *module = handle->data;
-	Data *dat = module->dat;
-
-	clock_gettime(CLOCK_REALTIME, &dat->sync_osc);
-	dat->sync_osc.tv_sec += JAN_1970;
-
-	dat->sync_jack = jack_get_time();
-}
-
-static void _next(Tjost_Module *module);
-
-static void
-_advance(size_t len, void *arg)
+// TCP is bidirectional
+int
+process_in(jack_nframes_t nframes, void *arg)
 {
 	Tjost_Module *module = arg;
-	Data *dat = module->dat;
-
-	jack_ringbuffer_read_advance(dat->rb, len);
-	_next(module);
-}
-
-static void
-_next(Tjost_Module *module)
-{
-	Data *dat = module->dat;
-
-	Tjost_Event tev;
-	if(jack_ringbuffer_read_space(dat->rb) >= sizeof(Tjost_Event))
-	{
-		jack_ringbuffer_peek(dat->rb, (char *)&tev, sizeof(Tjost_Event));
-		if(jack_ringbuffer_read_space(dat->rb) >= sizeof(Tjost_Event) + tev.size)
-		{
-			jack_ringbuffer_read_advance(dat->rb, sizeof(Tjost_Event));
-
-			jack_time_t usecs = jack_frames_to_time(module->host->client, tev.time) - dat->sync_jack;
-
-			uint32_t size = tev.size;
-			uint32_t sec;
-			uint32_t frac;
-			if(dat->delay_sec || dat->delay_nsec)
-			{
-				sec = dat->sync_osc.tv_sec + dat->delay_sec;
-				uint64_t nsec = dat->sync_osc.tv_nsec + usecs*1e3 + dat->delay_nsec;
-				while(nsec > 1e9)
-				{
-					sec += 1;
-					nsec -= 1e9;
-				}
-				frac = nsec * NSEC_PER_NTP_SLICE;
-			}
-			else
-			{
-				// immediate execution
-				sec = 0UL;
-				frac = 1UL;
-			}
-			sec = htonl(sec);
-			frac = htonl(frac);
-			uint32_t nsize = htonl(size);
-
-			static uint8_t header [20];
-			memcpy(header, bundle_str, 8);
-			memcpy(header+8, &sec, 4);
-			memcpy(header+12, &frac, 4);
-			memcpy(header+16, &nsize, 4);
-		
-			static int32_t psize;
-			psize = size + sizeof(header); // packet size for TCP preamble
-			psize = ntohl(psize);
-
-			uv_buf_t msg [4];
-			msg[0].base = (char *)&psize;
-			msg[0].len = sizeof(int32_t);
-
-			msg[1].base = (char *)header;
-			msg[1].len = sizeof(header);
-
-			jack_ringbuffer_data_t vec [2];
-			jack_ringbuffer_get_read_vector(dat->rb, vec);
-
-			if(size <= vec[0].len)
-			{
-				msg[2].base = vec[0].buf;
-				msg[2].len = size;
-
-				msg[3].len = 0;
-			}
-			else // size > vec[0].len
-			{
-				msg[2].base = vec[0].buf;
-				msg[2].len = vec[0].len;
-
-				assert(size = vec[0].len == vec[1].len);
-				msg[3].base = vec[1].buf;
-				msg[3].len = size - vec[0].len;
-			}
-
-			switch(dat->type)
-			{
-				case SOCKET_UDP:
-					netaddr_udp_sender_send(&dat->snk.udp, &msg[1], msg[3].len > 0 ? 3 : 2, size, _advance, module);
-					break;
-				case SOCKET_TCP:
-					netaddr_tcp_sender_send(&dat->snk.tcp, &msg[0], msg[3].len > 0 ? 4 : 3, size, _advance, module);
-					break;
-			}
-		}
-	}
-}
-
-static void
-_asio(uv_async_t *handle, int status)
-{
-	Tjost_Module *module = handle->data;
-
-	_next(module);
+	return mod_net_process_in(module, nframes);
 }
 
 int
-process(jack_nframes_t nframes, void *arg)
+process_out(jack_nframes_t nframes, void *arg)
 {
 	Tjost_Module *module = arg;
-	Tjost_Host *host = module->host;
-	Data *dat = module->dat;
-
-	jack_nframes_t last = jack_last_frame_time(host->client);
-
-	unsigned int count = eina_inlist_count(module->queue);
-
-	// handle events
-	Eina_Inlist *l;
-	Tjost_Event *tev;
-	EINA_INLIST_FOREACH_SAFE(module->queue, l, tev)
-	{
-		if(tev->time >= last + nframes)
-			break;
-
-		if(tev->time == 0) // immediate execution
-			tev->time = last;
-
-		if(tev->time >= last)
-		{
-			if(jack_ringbuffer_write_space(dat->rb) < sizeof(Tjost_Event) + tev->size)
-				tjost_host_message_push(host, "net_out: %s", "ringbuffer overflow");
-			else
-			{
-				//tev->time -= last; // time relative to current period
-				jack_ringbuffer_write(dat->rb, (const char *)tev, sizeof(Tjost_Event));
-				jack_ringbuffer_write(dat->rb, (const char *)tev->buf, tev->size);
-			}
-		}
-		else
-			tjost_host_message_push(host, "mod_net_out: %s", "ignoring out-of-order event");
-
-		module->queue = eina_inlist_remove(module->queue, EINA_INLIST_GET(tev));
-		tjost_free(host, tev);
-	}
-
-	if(count > 0)
-	{
-		int err;
-		if((err = uv_async_send(&dat->asio)))
-			fprintf(stderr, "mod_net_out: %s\n", uv_err_name(err));
-	}
-
-	return 0;
+	return mod_net_process_out(module, nframes);
 }
 
 void
@@ -231,51 +53,55 @@ add(Tjost_Module *module, int argc, const char **argv)
 	uv_loop_t *loop = uv_default_loop();
 
 	if(!strncmp(argv[0], "osc.udp://", 10))
-		dat->type = SOCKET_UDP;
+		dat->net.type = SOCKET_UDP;
 	else if(!strncmp(argv[0], "osc.tcp://", 10))
-		dat->type = SOCKET_TCP;
+		dat->net.type = SOCKET_TCP;
 	else
 		; //FIXME error
 
 	if( (argc > 1) && argv[1])
 	{
 		float del = atof(argv[1]);
-		dat->delay_sec = (uint32_t)del;
-		dat->delay_nsec = (del - dat->delay_sec) * 1e9;
+		dat->net.delay_sec = (uint32_t)del;
+		dat->net.delay_nsec = (del - dat->net.delay_sec) * 1e9;
 	}
 	else
 	{
-		dat->delay_sec = 0UL;
-		dat->delay_nsec = 0UL;
+		dat->net.delay_sec = 0UL;
+		dat->net.delay_nsec = 0UL;
 	}
-
-	switch(dat->type)
-	{
-		case SOCKET_UDP:
-			if(netaddr_udp_sender_init(&dat->snk.udp, loop, argv[0])) //TODO close?
-				fprintf(stderr, "could not initialize socket\n");
-			break;
-		case SOCKET_TCP:
-			if(netaddr_tcp_sender_init(&dat->snk.tcp, loop, argv[0])) //TODO close?
-				fprintf(stderr, "could not initialize socket\n");
-			break;
-	}
-	if(!(dat->rb = jack_ringbuffer_create(TJOST_RINGBUF_SIZE)))
-		fprintf(stderr, "could not initialize ringbuffer\n");
-
-	dat->asio.data = module;
-	int err;
-	if((err = uv_async_init(loop, &dat->asio, _asio)))
-		fprintf(stderr, "mod_net_out: %s\n", uv_err_name(err));
-
-	dat->sync.data = module;
-	if((err = uv_timer_init(loop, &dat->sync)))
-		fprintf(stderr, "mod_net_out: %s\n", uv_err_name(err));
-	if((err = uv_timer_start(&dat->sync, _sync, 0, 1000))) // ms
-		fprintf(stderr, "mod_net_out: %s\n", uv_err_name(err));
 
 	module->dat = dat;
-	module->type = TJOST_MODULE_OUTPUT;
+
+	switch(dat->net.type)
+	{
+		case SOCKET_UDP:
+			if(netaddr_udp_sender_init(&dat->net.handle.udp_tx, loop, argv[0])) //TODO close?
+				fprintf(stderr, "could not initialize socket\n");
+			module->type = TJOST_MODULE_OUTPUT;
+			break;
+		case SOCKET_TCP:
+			if(netaddr_tcp_endpoint_init(&dat->net.handle.tcp, NETADDR_TCP_SENDER, loop, argv[0], mod_net_recv_cb, module)) //TODO close?
+				fprintf(stderr, "could not initialize socket\n");
+			module->type = TJOST_MODULE_IN_OUT;
+			break;
+	}
+
+	if(!(dat->net.rb_out = jack_ringbuffer_create(TJOST_RINGBUF_SIZE)))
+		fprintf(stderr, "could not initialize ringbuffer\n");
+	if(!(dat->net.rb_in = jack_ringbuffer_create(TJOST_RINGBUF_SIZE)))
+		fprintf(stderr, "could not initialize ringbuffer\n");
+
+	int err;
+	dat->net.asio.data = module;
+	if((err = uv_async_init(loop, &dat->net.asio, mod_net_asio)))
+		fprintf(stderr, "mod_net_out: %s\n", uv_err_name(err));
+
+	dat->net.sync.data = module;
+	if((err = uv_timer_init(loop, &dat->net.sync)))
+		fprintf(stderr, "mod_net_out: %s\n", uv_err_name(err));
+	if((err = uv_timer_start(&dat->net.sync, mod_net_sync, 0, 1000))) // ms
+		fprintf(stderr, "mod_net_out: %s\n", uv_err_name(err));
 }
 
 void
@@ -284,20 +110,22 @@ del(Tjost_Module *module)
 	Data *dat = module->dat;
 
 	int err;
-	if((err = uv_timer_stop(&dat->sync)))
+	if((err = uv_timer_stop(&dat->net.sync)))
 		fprintf(stderr, "mod_net_out: %s\n", uv_err_name(err));
-	uv_close((uv_handle_t *)&dat->asio, NULL);
+	uv_close((uv_handle_t *)&dat->net.asio, NULL);
 	
-	if(dat->rb)
-		jack_ringbuffer_free(dat->rb);
+	if(dat->net.rb_out)
+		jack_ringbuffer_free(dat->net.rb_out);
+	if(dat->net.rb_in)
+		jack_ringbuffer_free(dat->net.rb_in);
 
-	switch(dat->type)
+	switch(dat->net.type)
 	{
 		case SOCKET_UDP:
-			netaddr_udp_sender_deinit(&dat->snk.udp);
+			netaddr_udp_sender_deinit(&dat->net.handle.udp_tx);
 			break;
 		case SOCKET_TCP:
-			netaddr_tcp_sender_deinit(&dat->snk.tcp);
+			netaddr_tcp_endpoint_deinit(&dat->net.handle.tcp);
 			break;
 	}
 
