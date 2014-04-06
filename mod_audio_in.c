@@ -24,11 +24,6 @@
 #include <tjost.h>
 #include <mod_audio.h>
 
-static uint8_t buffer [TJOST_BUF_SIZE] __attribute__((aligned (8)));
-static uint8_t payload [TJOST_BUF_SIZE] __attribute__((aligned (4)));
-static const char *audio_path = "/audio";
-static const char *audio_fmt = "iib";
-	
 static Sample_Type sample_type = SAMPLE_TYPE_FLOAT; //TODO make this configurable
 
 int
@@ -46,13 +41,67 @@ process_in(jack_nframes_t nframes, void *arg)
 	jack_default_audio_sample_t *port_buf = jack_port_get_buffer(port, nframes);
 
 	size_t size; 
+	switch(sample_type)
+	{
+		case SAMPLE_TYPE_UINT8:
+			size = nframes * sizeof(uint8_t);
+			break;
+		case SAMPLE_TYPE_INT8:
+			size = nframes * sizeof(int8_t);
+			break;
+		case SAMPLE_TYPE_UINT12:
+			size = nframes * sizeof(uint16_t);
+			break;
+		case SAMPLE_TYPE_INT12:
+			size = nframes * sizeof(int16_t);
+			break;
+		case SAMPLE_TYPE_UINT16:
+			size = nframes * sizeof(uint16_t);
+			break;
+		case SAMPLE_TYPE_INT16:
+			size = nframes * sizeof(int16_t);
+			break;
+		case SAMPLE_TYPE_UINT24:
+			size = nframes * sizeof(uint32_t);
+			break;
+		case SAMPLE_TYPE_INT24:
+			size = nframes * sizeof(int32_t);
+			break;
+		case SAMPLE_TYPE_UINT32:
+			size = nframes * sizeof(uint32_t);
+			break;
+		case SAMPLE_TYPE_INT32:
+			size = nframes * sizeof(int32_t);
+			break;
+		case SAMPLE_TYPE_FLOAT:
+			size = nframes * sizeof(float);
+			break;
+		case SAMPLE_TYPE_DOUBLE:
+			size = nframes * sizeof(double);
+			break;
+		default:
+			//TODO warn
+			break;
+	}
+
+	uint8_t *payload;
+
+	size_t len = jack_osc_strlen(AUDIO_PATH)
+						 + jack_osc_fmtlen(AUDIO_FMT)
+						 + 3 * sizeof(int32_t)
+						 + round_to_four_bytes(size);
+	uint8_t *ptr = tjost_host_schedule_inline(host, module, last, len);
+	ptr = jack_osc_set_path(ptr, AUDIO_PATH);
+	ptr = jack_osc_set_fmt(ptr, AUDIO_FMT);
+	ptr = jack_osc_set_int32(ptr, last);
+	ptr = jack_osc_set_int32(ptr, sample_type);
+	ptr = jack_osc_set_blob_inline(ptr, size, &payload);
 
 	switch(sample_type)
 	{
 		case SAMPLE_TYPE_UINT8:
 		{
 			uint8_t *load = (uint8_t *)payload;
-			size = nframes * sizeof(uint8_t);
 			jack_nframes_t i;
 			for(i=0; i<nframes; i++)
 				load[i] = port_buf[i] * 0xffU;
@@ -61,7 +110,6 @@ process_in(jack_nframes_t nframes, void *arg)
 		case SAMPLE_TYPE_INT8:
 		{
 			int8_t *load = (int8_t *)payload;
-			size = nframes * sizeof(int8_t);
 			jack_nframes_t i;
 			for(i=0; i<nframes; i++)
 				load[i] = port_buf[i] * 0x7f;
@@ -71,7 +119,6 @@ process_in(jack_nframes_t nframes, void *arg)
 		case SAMPLE_TYPE_UINT12:
 		{
 			uint16_t *load = (uint16_t *)payload;
-			size = nframes * sizeof(uint16_t);
 			jack_nframes_t i;
 			for(i=0; i<nframes; i++)
 			{
@@ -83,7 +130,6 @@ process_in(jack_nframes_t nframes, void *arg)
 		case SAMPLE_TYPE_INT12:
 		{
 			int16_t *load = (int16_t *)payload;
-			size = nframes * sizeof(int16_t);
 			jack_nframes_t i;
 			for(i=0; i<nframes; i++)
 			{
@@ -96,7 +142,6 @@ process_in(jack_nframes_t nframes, void *arg)
 		case SAMPLE_TYPE_UINT16:
 		{
 			uint16_t *load = (uint16_t *)payload;
-			size = nframes * sizeof(uint16_t);
 			jack_nframes_t i;
 			for(i=0; i<nframes; i++)
 			{
@@ -108,7 +153,6 @@ process_in(jack_nframes_t nframes, void *arg)
 		case SAMPLE_TYPE_INT16:
 		{
 			int16_t *load = (int16_t *)payload;
-			size = nframes * sizeof(int16_t);
 			jack_nframes_t i;
 			for(i=0; i<nframes; i++)
 			{
@@ -121,7 +165,6 @@ process_in(jack_nframes_t nframes, void *arg)
 		case SAMPLE_TYPE_UINT24:
 		{
 			uint32_t *load = (uint32_t *)payload;
-			size = nframes * sizeof(uint32_t);
 			jack_nframes_t i;
 			for(i=0; i<nframes; i++)
 			{
@@ -133,7 +176,6 @@ process_in(jack_nframes_t nframes, void *arg)
 		case SAMPLE_TYPE_INT24:
 		{
 			int32_t *load = (int32_t *)payload;
-			size = nframes * sizeof(int32_t);
 			jack_nframes_t i;
 			for(i=0; i<nframes; i++)
 			{
@@ -146,7 +188,6 @@ process_in(jack_nframes_t nframes, void *arg)
 		case SAMPLE_TYPE_UINT32:
 		{
 			uint32_t *load = (uint32_t *)payload;
-			size = nframes * sizeof(uint32_t);
 			jack_nframes_t i;
 			for(i=0; i<nframes; i++)
 			{
@@ -158,7 +199,6 @@ process_in(jack_nframes_t nframes, void *arg)
 		case SAMPLE_TYPE_INT32:
 		{
 			int32_t *load = (int32_t *)payload;
-			size = nframes * sizeof(int32_t);
 			jack_nframes_t i;
 			for(i=0; i<nframes; i++)
 			{
@@ -171,7 +211,6 @@ process_in(jack_nframes_t nframes, void *arg)
 		case SAMPLE_TYPE_FLOAT:
 		{
 			float *load = (float *)payload;
-			size = nframes * sizeof(float);
 			jack_nframes_t i;
 			for(i=0; i<nframes; i++)
 			{
@@ -184,7 +223,6 @@ process_in(jack_nframes_t nframes, void *arg)
 		case SAMPLE_TYPE_DOUBLE:
 		{
 			double *load = (double *)payload;
-			size = nframes * sizeof(double);
 			jack_nframes_t i;
 			for(i=0; i<nframes; i++)
 			{
@@ -197,16 +235,6 @@ process_in(jack_nframes_t nframes, void *arg)
 		default:
 			break; //TODO warn
 	}
-
-	uint8_t *ptr = buffer;
-	ptr = jack_osc_set_path(ptr, audio_path);
-	ptr = jack_osc_set_fmt(ptr, audio_fmt),
-	ptr = jack_osc_set_int32(ptr, last);
-	ptr = jack_osc_set_int32(ptr, sample_type);
-	ptr = jack_osc_set_blob(ptr, size, (uint8_t *)payload);
-	
-	size_t len = ptr - buffer;
-	tjost_host_schedule(module->host, module, last, len, buffer);
 
 	return 0;
 }

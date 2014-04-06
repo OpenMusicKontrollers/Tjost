@@ -83,8 +83,8 @@ struct _Tjost_Module {
 };
 
 #define TJOST_MODULE_BROADCAST NULL
-#define TJOST_BUF_SIZE 0x2000
-#define TJOST_RINGBUF_SIZE 0x8000
+#define TJOST_BUF_SIZE 0x4000
+#define TJOST_RINGBUF_SIZE 0x10000
 
 struct _Tjost_Host {
 	jack_client_t *client;
@@ -138,6 +138,7 @@ extern const luaL_Reg tjost_output_mt [];
 extern const luaL_Reg tjost_in_out_mt [];
 extern const luaL_Reg tjost_uplink_mt [];
 extern const luaL_Reg tjost_globals [];
+extern const luaL_Reg tjost_blob_mt [];
 
 // in tjost_uplink.c
 void tjost_uplink_tx_drain(uv_async_t *handle, int status);

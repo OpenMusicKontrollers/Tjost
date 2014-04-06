@@ -165,6 +165,7 @@ uint8_t *jack_osc_set_int32(uint8_t *buf, int32_t i);
 uint8_t *jack_osc_set_float(uint8_t *buf, float f);
 uint8_t *jack_osc_set_string(uint8_t *buf, const char *s);
 uint8_t *jack_osc_set_blob(uint8_t *buf, int32_t size, uint8_t *payload);
+uint8_t *jack_osc_set_blob_inline(uint8_t *buf, int32_t size, uint8_t **payload);
 
 uint8_t *jack_osc_set_int64(uint8_t *buf, int64_t h);
 uint8_t *jack_osc_set_double(uint8_t *buf, double d);

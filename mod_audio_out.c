@@ -190,7 +190,7 @@ _audio(jack_nframes_t time, const char *path, const char *fmt, uint8_t *buf, voi
 }
 
 static Jack_OSC_Method methods [] = {
-	{NULL, "iib", _audio},
+	{AUDIO_PATH, AUDIO_FMT, _audio},
 	{NULL, NULL, NULL}
 };
 

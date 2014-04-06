@@ -513,6 +513,10 @@ main(int argc, const char **argv)
 	lua_setfield(host.L, -2, "__index");
 	lua_pop(host.L, 1); // mt
 
+	luaL_newmetatable(host.L, "Tjost_Blob"); // mt
+	luaL_register(host.L, NULL, tjost_blob_mt);
+	lua_pop(host.L, 1); // mt
+
 	lua_getglobal(host.L, "package");
 	lua_getfield(host.L, -1, "cpath");
 	lua_pushstring(host.L, ";/usr/local/lib/tjost/lua/?.so");

@@ -26,6 +26,9 @@
 
 #include <tjost.h>
 
+#define AUDIO_PATH "/audio"
+#define AUDIO_FMT "iib"
+
 typedef enum _Sample_Type Sample_Type;
 
 enum _Sample_Type {

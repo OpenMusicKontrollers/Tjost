@@ -417,6 +417,20 @@ jack_osc_set_blob(uint8_t *buf, int32_t size, uint8_t *payload)
 }
 
 inline uint8_t *
+jack_osc_set_blob_inline(uint8_t *buf, int32_t size, uint8_t **payload)
+{
+	size_t len = round_to_four_bytes(size);
+	swap32 s = {.i = size};
+	s.u = htonl(s.u);
+	*(int32_t *)buf = s.i;
+	buf += 4;
+	*payload = buf;
+	buf += size;
+	memset(buf+size, '\0', len-size); // zero padding
+	return buf + len;
+}
+
+inline uint8_t *
 jack_osc_set_int64(uint8_t *buf, int64_t h)
 {
 	swap64 s = {.h = h};

@@ -23,6 +23,13 @@
 
 #include <tjost.h>
 
+typedef struct _Tjost_Blob Tjost_Blob;
+
+struct _Tjost_Blob {
+	int32_t size;
+	uint8_t buf[0];
+};
+
 static uint8_t buffer [TJOST_BUF_SIZE] __attribute__((aligned (8)));
 
 static uint8_t *
@@ -57,13 +64,13 @@ _push(Tjost_Host *host, char type, uint8_t *ptr)
 		{
 			Jack_OSC_Blob b;
 			ptr = jack_osc_get_blob(ptr, &b);
-			lua_createtable(L, b.size, 0);
-			int i;
-			for(i=0; i<b.size; i++)
-			{
-				lua_pushnumber(L, b.payload[i]);
-				lua_rawseti(L, -2, i+1);
-			}
+
+			Tjost_Blob *tb = lua_newuserdata(L, sizeof(Tjost_Blob) + b.size);
+			luaL_getmetatable(L, "Tjost_Blob");
+			lua_setmetatable(L, -2);
+
+			tb->size = b.size;
+			memcpy(tb->buf, b.payload, b.size);
 			return ptr;
 		}
 
@@ -245,26 +252,10 @@ _serialize(lua_State *L, Tjost_Module *module)
 				ptr = jack_osc_set_string(ptr, luaL_checkstring(L, p));
 				break;
 			case 'b':
-				if(lua_istable(L, p))
 				{
-					// is more efficient than jack_osc_set_blob...
-					size_t size = lua_objlen(L, p);
-					size_t len = round_to_four_bytes(size);
-					*(int32_t *)ptr = htonl(size);
-					ptr += 4;
-
-					int i;
-					for(i=0; i<size; i++)
-					{
-						lua_rawgeti(L, p, i+1);
-						ptr[i] = luaL_checkinteger(L, -1);
-						lua_pop(L, 1);
-					}
-					memset(ptr+size, '\0', len-size); // zero padding
-					ptr += len;
+					Tjost_Blob *tb = luaL_checkudata(L, p, "Tjost_Blob");
+					ptr = jack_osc_set_blob(ptr, tb->size, tb->buf);
 				}
-				else
-					tjost_host_message_push(host, "Lua: table expected at argument position %i", p);
 				break;
 
 			case 'h':
@@ -456,6 +447,52 @@ _clear_uplink(lua_State *L)
 	return 0;
 }
 
+static int
+_index_blob(lua_State *L)
+{
+	Tjost_Blob *tb = luaL_checkudata(L, 1, "Tjost_Blob");
+	int typ = lua_type(L, 2);
+	if(typ == LUA_TNUMBER)
+	{
+		int index = luaL_checkint(L, 2);
+		if( (index >= 0) && (index < tb->size) )
+			lua_pushnumber(L, tb->buf[index]);
+		else
+			lua_pushnil(L);
+	}
+	else if( (typ == LUA_TSTRING) && !strcmp(lua_tostring(L, 2), "raw") )
+		lua_pushlightuserdata(L, tb->buf);
+	else
+		lua_pushnil(L);
+	return 1;
+}
+
+static int
+_newindex_blob(lua_State *L)
+{
+	Tjost_Blob *tb = luaL_checkudata(L, 1, "Tjost_Blob");
+	int index = luaL_checkint(L, 2);
+	if( (index >= 0) && (index < tb->size) )
+		tb->buf[index] = luaL_checkint(L, 3);
+	return 0;
+}
+
+static int
+_len_blob(lua_State *L)
+{
+	Tjost_Blob *tb = luaL_checkudata(L, 1, "Tjost_Blob");
+	lua_pushnumber(L, tb->size);
+	return 1;
+}
+
+static int
+_buf_blob(lua_State *L)
+{
+	Tjost_Blob *tb = luaL_checkudata(L, 1, "Tjost_Blob");
+	lua_pushlightuserdata(L, tb->buf);
+	return 1;
+}
+
 const luaL_Reg tjost_input_mt [] = {
 	{"__gc", _gc_input},
 	{NULL, NULL}
@@ -479,6 +516,13 @@ const luaL_Reg tjost_uplink_mt [] = {
 	{"clear", _clear_uplink},
 	{"__call", _call_uplink},
 	{"__gc", _gc_uplink},
+	{NULL, NULL}
+};
+
+const luaL_Reg tjost_blob_mt [] = {
+	{"__index", _index_blob},
+	{"__newindex", _newindex_blob},
+	{"__len", _len_blob},
 	{NULL, NULL}
 };
 
@@ -568,7 +612,21 @@ _plugin(lua_State *L)
 	return 1;
 }
 
+static int
+_blob(lua_State *L)
+{
+	int size = luaL_checkint(L, 1);
+
+	Tjost_Blob *tb = lua_newuserdata(L, sizeof(Tjost_Blob) + size);
+	tb->size = size;
+	luaL_getmetatable(L, "Tjost_Blob");
+	lua_setmetatable(L, -2);
+
+	return 1;
+}
+
 const luaL_Reg tjost_globals [] = {
 	{"plugin", _plugin},
+	{"blob", _blob},
 	{NULL, NULL}
 };
