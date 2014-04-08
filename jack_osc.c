@@ -35,10 +35,10 @@ static const char invalid_path_chars [] = {
 
 // allowed characters in OSC format string
 static const char valid_format_chars [] = {
-	'i', 'f', 's', 'b',
-	'T', 'F', 'N', 'I',
-	'h', 'd', 't',
-	'S', 'c', 'm',
+	JACK_OSC_INT32, JACK_OSC_FLOAT, JACK_OSC_STRING, JACK_OSC_BLOB,
+	JACK_OSC_TRUE, JACK_OSC_FALSE, JACK_OSC_NIL, JACK_OSC_BANG,
+	JACK_OSC_INT64, JACK_OSC_DOUBLE, JACK_OSC_TIMETAG,
+	JACK_OSC_SYMBOL, JACK_OSC_CHAR, JACK_OSC_MIDI,
 	'\0'
 };
 
@@ -126,32 +126,32 @@ jack_osc_message_check(uint8_t *buf, size_t size)
 	{
 		switch(*type)
 		{
-			case 'i':
-			case 'f':
-			case 'm':
-			case 'c':
+			case JACK_OSC_INT32:
+			case JACK_OSC_FLOAT:
+			case JACK_OSC_MIDI:
+			case JACK_OSC_CHAR:
 				ptr += 4;
 				break;
 
-			case 's':
-			case 'S':
+			case JACK_OSC_STRING:
+			case JACK_OSC_SYMBOL:
 				ptr += jack_osc_strlen((const char *)ptr);
 				break;
 
-			case 'b':
+			case JACK_OSC_BLOB:
 				ptr += jack_osc_bloblen(ptr);
 				break;
 
-			case 'h':
-			case 'd':
-			case 't':
+			case JACK_OSC_INT64:
+			case JACK_OSC_DOUBLE:
+			case JACK_OSC_TIMETAG:
 				ptr += 8;
 				break;
 
-			case 'T':
-			case 'F':
-			case 'I':
-			case 'N':
+			case JACK_OSC_TRUE:
+			case JACK_OSC_FALSE:
+			case JACK_OSC_NIL:
+			case JACK_OSC_BANG:
 				break;
 		}
 	}
@@ -159,61 +159,195 @@ jack_osc_message_check(uint8_t *buf, size_t size)
 	return ptr == end;
 }
 
-inline size_t
+#if __BYTE_ORDER == __LITTLE_ENDIAN
+int
+jack_osc_message_ntoh(uint8_t *buf, size_t size)
+{
+	uint8_t *ptr = buf;
+	uint8_t *end = buf + size;
+
+	const char *path;
+	const char *fmt;
+
+	ptr = jack_osc_get_path(ptr, &path);
+	if( (ptr > end) || !is_valid_path(path) )
+		return 0;
+
+	ptr = jack_osc_get_fmt(ptr, &fmt);
+	if( (ptr > end) || !is_valid_format(fmt, 1) )
+		return 0;
+
+	const char *type;
+	for(type=fmt+1; (*type!='\0') && (ptr <= end); type++)
+	{
+		switch(*type)
+		{
+			case JACK_OSC_INT32:
+			case JACK_OSC_FLOAT:
+			case JACK_OSC_MIDI:
+			case JACK_OSC_CHAR:
+			{
+				uint32_t *u = (uint32_t *)ptr;
+				*u = ntohl(*u);
+				ptr += 4;
+				break;
+			}
+
+			case JACK_OSC_STRING:
+			case JACK_OSC_SYMBOL:
+				ptr += jack_osc_strlen((const char *)ptr);
+				break;
+
+			case JACK_OSC_BLOB:
+			{
+				uint32_t *u = (uint32_t *)ptr;
+				*u = ntohl(*u);
+				ptr += jack_osc_bloblen(ptr);
+				break;
+			}
+
+			case JACK_OSC_INT64:
+			case JACK_OSC_DOUBLE:
+			case JACK_OSC_TIMETAG:
+			{
+				uint64_t *u = (uint64_t *)ptr;
+				*u = ntohll(*u);
+				ptr += 8;
+				break;
+			}
+
+			case JACK_OSC_TRUE:
+			case JACK_OSC_FALSE:
+			case JACK_OSC_NIL:
+			case JACK_OSC_BANG:
+				break;
+		}
+	}
+
+	return ptr == end;
+}
+
+int
+jack_osc_message_hton(uint8_t *buf, size_t size)
+{
+	uint8_t *ptr = buf;
+	uint8_t *end = buf + size;
+
+	const char *path;
+	const char *fmt;
+
+	ptr = jack_osc_get_path(ptr, &path);
+	if( (ptr > end) || !is_valid_path(path) )
+		return 0;
+
+	ptr = jack_osc_get_fmt(ptr, &fmt);
+	if( (ptr > end) || !is_valid_format(fmt, 1) )
+		return 0;
+
+	const char *type;
+	for(type=fmt+1; (*type!='\0') && (ptr <= end); type++)
+	{
+		switch(*type)
+		{
+			case JACK_OSC_INT32:
+			case JACK_OSC_FLOAT:
+			case JACK_OSC_MIDI:
+			case JACK_OSC_CHAR:
+			{
+				uint32_t *u = (uint32_t *)ptr;
+				*u = htonl(*u);
+				ptr += 4;
+				break;
+			}
+
+			case JACK_OSC_STRING:
+			case JACK_OSC_SYMBOL:
+				ptr += jack_osc_strlen((const char *)ptr);
+				break;
+
+			case JACK_OSC_BLOB:
+			{
+				uint32_t *u = (uint32_t *)ptr;
+				ptr += jack_osc_bloblen(ptr);
+				*u = htonl(*u);
+				break;
+			}
+
+			case JACK_OSC_INT64:
+			case JACK_OSC_DOUBLE:
+			case JACK_OSC_TIMETAG:
+			{
+				uint64_t *u = (uint64_t *)ptr;
+				*u = htonll(*u);
+				ptr += 8;
+				break;
+			}
+
+			case JACK_OSC_TRUE:
+			case JACK_OSC_FALSE:
+			case JACK_OSC_NIL:
+			case JACK_OSC_BANG:
+				break;
+		}
+	}
+
+	return ptr == end;
+}
+#endif
+
+size_t
 jack_osc_strlen(const char *buf)
 {
 	return round_to_four_bytes(strlen(buf) + 1);
 }
 
-inline size_t
+size_t
 jack_osc_fmtlen(const char *buf)
 {
 	return round_to_four_bytes(strlen(buf) + 2) - 1;
 }
 
-inline size_t
+size_t
 jack_osc_bloblen(uint8_t *buf)
 {
-	swap32 s = {.i = *(int32_t *)buf};
-	s.u = ntohl(s.u);
-	return 4 + round_to_four_bytes(s.i);
+	int32_t i = *(int32_t *)buf;
+	return 4 + round_to_four_bytes(i);
 }
 
-inline size_t
+size_t
 jack_osc_blobsize(uint8_t *buf)
 {
-	swap32 s = {.i = *(int32_t *)buf};
-	s.u = ntohl(s.u);
-	return s.i;
+	int32_t i = *(int32_t *)buf;
+	return i;
 }
 
-inline uint8_t *
-jack_osc_skip(char type, uint8_t *buf)
+uint8_t *
+jack_osc_skip(Jack_OSC_Type type, uint8_t *buf)
 {
 	switch(type)
 	{
-		case 'i':
-		case 'f':
-		case 'm':
-		case 'c':
+		case JACK_OSC_INT32:
+		case JACK_OSC_FLOAT:
+		case JACK_OSC_MIDI:
+		case JACK_OSC_CHAR:
 			return buf + 4;
 
-		case 's':
-		case 'S':
+		case JACK_OSC_STRING:
+		case JACK_OSC_SYMBOL:
 			return buf + jack_osc_strlen((const char *)buf);
 
-		case 'b':
+		case JACK_OSC_BLOB:
 			return buf + jack_osc_bloblen(buf);
 
-		case 'h':
-		case 'd':
-		case 't':
+		case JACK_OSC_INT64:
+		case JACK_OSC_DOUBLE:
+		case JACK_OSC_TIMETAG:
 			return buf + 8;
 
-		case 'T':
-		case 'F':
-		case 'N':
-		case 'I':
+		case JACK_OSC_TRUE:
+		case JACK_OSC_FALSE:
+		case JACK_OSC_NIL:
+		case JACK_OSC_BANG:
 			return buf;
 
 		default:
@@ -221,46 +355,42 @@ jack_osc_skip(char type, uint8_t *buf)
 	}
 }
 
-inline uint8_t *
+uint8_t *
 jack_osc_get_path(uint8_t *buf, const char **path)
 {
 	*path = (const char *)buf;
 	return buf + jack_osc_strlen(*path);
 }
 
-inline uint8_t *
+uint8_t *
 jack_osc_get_fmt(uint8_t *buf, const char **fmt)
 {
 	*fmt = (const char *)buf;
 	return buf + jack_osc_strlen(*fmt);
 }
 
-inline uint8_t *
+uint8_t *
 jack_osc_get_int32(uint8_t *buf, int32_t *i)
 {
-	swap32 s = {.i = *(int32_t *)buf};
-	s.u = ntohl(s.u);
-	*i = s.i;
+	*i = *(int32_t *)buf;
 	return buf + 4;
 }
 
-inline uint8_t *
+uint8_t *
 jack_osc_get_float(uint8_t *buf, float *f)
 {
-	swap32 s = {.f = *(float *)buf};
-	s.u = ntohl(s.u);
-	*f = s.f;
+	*f = *(float *)buf;
 	return buf + 4;
 }
 
-inline uint8_t *
+uint8_t *
 jack_osc_get_string(uint8_t *buf, const char **s)
 {
 	*s = (const char *)buf;
 	return buf + jack_osc_strlen(*s);
 }
 
-inline uint8_t *
+uint8_t *
 jack_osc_get_blob(uint8_t *buf, Jack_OSC_Blob *b)
 {
 	b->size = jack_osc_blobsize(buf);
@@ -268,86 +398,80 @@ jack_osc_get_blob(uint8_t *buf, Jack_OSC_Blob *b)
 	return buf + round_to_four_bytes(b->size) + 4;
 }
 
-inline uint8_t *
+uint8_t *
 jack_osc_get_int64(uint8_t *buf, int64_t *h)
 {
-	swap64 s = {.h = *(int64_t *)buf};
-	s.u = ntohll(s.u);
-	*h = s.h;
+	*h = *(int64_t *)buf;
 	return buf + 8;
 }
 
-inline uint8_t *
+uint8_t *
 jack_osc_get_double(uint8_t *buf, double *d)
 {
-	swap64 s = {.d = *(double *)buf};
-	s.u = ntohll(s.u);
-	*d = s.d;
+	*d = *(double *)buf;
 	return buf + 8;
 }
 
-inline uint8_t *
+uint8_t *
 jack_osc_get_timetag(uint8_t *buf, uint64_t *t)
 {
-	swap64 s = {.t = *(uint64_t *)buf};
-	s.u = ntohll(s.u);
-	*t = s.t;
+	*t = *(uint64_t *)buf;
 	return buf + 8;
 }
 
-inline uint8_t *
+uint8_t *
 jack_osc_get_symbol(uint8_t *buf, const char **S)
 {
 	*S = (const char *)buf;
 	return buf + jack_osc_strlen(*S);
 }
 
-inline uint8_t *
+uint8_t *
 jack_osc_get_char(uint8_t *buf, char *c)
 {
-	*c = buf[3];
+	*c = *(int32_t *)buf;
 	return buf + 4;
 }
 
-inline uint8_t *
+uint8_t *
 jack_osc_get_midi(uint8_t *buf, uint8_t **m)
 {
 	*m = buf;
 	return buf + 4;
 }
 
-inline uint8_t *
-jack_osc_get(char type, uint8_t *buf, Jack_OSC_Argument *arg)
+uint8_t *
+jack_osc_get(Jack_OSC_Type type, uint8_t *buf, Jack_OSC_Argument *arg)
 {
 	switch(type)
 	{
-		case 'i':
+		case JACK_OSC_INT32:
 			return jack_osc_get_int32(buf, &arg->i);
-		case 'f':
+		case JACK_OSC_FLOAT:
 			return jack_osc_get_float(buf, &arg->f);
-		case 's':
+		case JACK_OSC_STRING:
 			return jack_osc_get_string(buf, &arg->s);
-		case 'b':
+		case JACK_OSC_BLOB:
 			return jack_osc_get_blob(buf, &arg->b);
 
-		case 'h':
+		case JACK_OSC_INT64:
 			return jack_osc_get_int64(buf, &arg->h);
-		case 'd':
+		case JACK_OSC_DOUBLE:
 			return jack_osc_get_double(buf, &arg->d);
-		case 't':
+		case JACK_OSC_TIMETAG:
 			return jack_osc_get_timetag(buf, &arg->t);
 
-		case 'T':
-		case 'F':
-		case 'N':
-		case 'I':
+		case JACK_OSC_TRUE:
+		case JACK_OSC_FALSE:
+		case JACK_OSC_NIL:
+		case JACK_OSC_BANG:
 			return buf;
 
-		case 'S':
+		case JACK_OSC_SYMBOL:
 			return jack_osc_get_symbol(buf, &arg->S);
-		case 'c':
+		case JACK_OSC_CHAR:
 			return jack_osc_get_char(buf, &arg->c);
-		case 'm':
+		case JACK_OSC_MIDI:
 			return jack_osc_get_midi(buf, &arg->m);
 
 		default:
@@ -356,7 +480,7 @@ jack_osc_get(char type, uint8_t *buf, Jack_OSC_Argument *arg)
 	}
 }
 
-inline uint8_t *
+uint8_t *
 jack_osc_set_path(uint8_t *buf, const char *path)
 {
 	if(!is_valid_path(path))
@@ -366,7 +490,7 @@ jack_osc_set_path(uint8_t *buf, const char *path)
 	return buf + len;
 }
 
-inline uint8_t *
+uint8_t *
 jack_osc_set_fmt(uint8_t *buf, const char *fmt)
 {
 	if(!is_valid_format(fmt, 0))
@@ -377,25 +501,21 @@ jack_osc_set_fmt(uint8_t *buf, const char *fmt)
 	return buf + len;
 }
 
-inline uint8_t *
+uint8_t *
 jack_osc_set_int32(uint8_t *buf, int32_t i)
 {
-	swap32 s = {.i = i};
-	s.u = htonl(s.u);
-	*(int32_t *)buf = s.i;
+	*(int32_t *)buf = i;
 	return buf + 4;
 }
 
-inline uint8_t *
+uint8_t *
 jack_osc_set_float(uint8_t *buf, float f)
 {
-	swap32 s = {.f = f};
-	s.u = htonl(s.u);
-	*(float *)buf = s.f;
+	*(float *)buf = f;
 	return buf + 4;
 }
 
-inline uint8_t *
+uint8_t *
 jack_osc_set_string(uint8_t *buf, const char *s)
 {
 	size_t len = jack_osc_strlen(s);
@@ -403,26 +523,22 @@ jack_osc_set_string(uint8_t *buf, const char *s)
 	return buf + len;
 }
 
-inline uint8_t *
+uint8_t *
 jack_osc_set_blob(uint8_t *buf, int32_t size, uint8_t *payload)
 {
 	size_t len = round_to_four_bytes(size);
-	swap32 s = {.i = size};
-	s.u = htonl(s.u);
-	*(int32_t *)buf = s.i;
+	*(int32_t *)buf = size;
 	buf += 4;
 	memcpy(buf, payload, size);
 	memset(buf+size, '\0', len-size); // zero padding
 	return buf + len;
 }
 
-inline uint8_t *
+uint8_t *
 jack_osc_set_blob_inline(uint8_t *buf, int32_t size, uint8_t **payload)
 {
 	size_t len = round_to_four_bytes(size);
-	swap32 s = {.i = size};
-	s.u = htonl(s.u);
-	*(int32_t *)buf = s.i;
+	*(int32_t *)buf = size;
 	buf += 4;
 	*payload = buf;
 	buf += size;
@@ -430,34 +546,28 @@ jack_osc_set_blob_inline(uint8_t *buf, int32_t size, uint8_t **payload)
 	return buf + len;
 }
 
-inline uint8_t *
+uint8_t *
 jack_osc_set_int64(uint8_t *buf, int64_t h)
 {
-	swap64 s = {.h = h};
-	s.u = htonll(s.u);
-	*(int64_t *)buf = s.h;
+	*(int64_t *)buf = h;
 	return buf + 8;
 }
 
-inline uint8_t *
+uint8_t *
 jack_osc_set_double(uint8_t *buf, double d)
 {
-	swap64 s = {.d = d};
-	s.u = htonll(s.u);
-	*(double *)buf = s.d;
+	*(double *)buf = d;
 	return buf + 8;
 }
 
-inline uint8_t *
+uint8_t *
 jack_osc_set_timetag(uint8_t *buf, uint64_t t)
 {
-	swap64 s = {.t = t};
-	s.u = htonll(s.u);
-	*(uint64_t *)buf = s.t;
+	*(uint64_t *)buf = t;
 	return buf + 8;
 }
 
-inline uint8_t *
+uint8_t *
 jack_osc_set_symbol(uint8_t *buf, const char *S)
 {
 	size_t len = jack_osc_strlen(S);
@@ -465,17 +575,14 @@ jack_osc_set_symbol(uint8_t *buf, const char *S)
 	return buf + len;
 }
 
-inline uint8_t *
+uint8_t *
 jack_osc_set_char(uint8_t *buf, char c)
 {
-	buf[0] = '\0';
-	buf[1] = '\0';
-	buf[2] = '\0';
-	buf[3] = c;
+	*(int32_t *)buf = c;
 	return buf + 4;
 }
 
-inline uint8_t *
+uint8_t *
 jack_osc_set_midi(uint8_t *buf, uint8_t *m)
 {
 	buf[0] = m[0];
@@ -485,38 +592,38 @@ jack_osc_set_midi(uint8_t *buf, uint8_t *m)
 	return buf + 4;
 }
 
-inline uint8_t *
-jack_osc_set(char type, uint8_t *buf, Jack_OSC_Argument *arg)
+uint8_t *
+jack_osc_set(Jack_OSC_Type type, uint8_t *buf, Jack_OSC_Argument *arg)
 {
 	switch(type)
 	{
-		case 'i':
+		case JACK_OSC_INT32:
 			return jack_osc_set_int32(buf, arg->i);
-		case 'f':
+		case JACK_OSC_FLOAT:
 			return jack_osc_set_float(buf, arg->f);
-		case 's':
+		case JACK_OSC_STRING:
 			return jack_osc_set_string(buf, arg->s);
-		case 'b':
+		case JACK_OSC_BLOB:
 			return jack_osc_set_blob(buf, arg->b.size, arg->b.payload);
 
-		case 'h':
+		case JACK_OSC_INT64:
 			return jack_osc_set_int64(buf, arg->h);
-		case 'd':
+		case JACK_OSC_DOUBLE:
 			return jack_osc_set_double(buf, arg->d);
-		case 't':
+		case JACK_OSC_TIMETAG:
 			return jack_osc_set_timetag(buf, arg->t);
 
-		case 'T':
-		case 'F':
-		case 'N':
-		case 'I':
+		case JACK_OSC_TRUE:
+		case JACK_OSC_FALSE:
+		case JACK_OSC_NIL:
+		case JACK_OSC_BANG:
 			return buf;
 
-		case 'S':
+		case JACK_OSC_SYMBOL:
 			return jack_osc_set_symbol(buf, arg->S);
-		case 'c':
+		case JACK_OSC_CHAR:
 			return jack_osc_set_char(buf, arg->c);
-		case 'm':
+		case JACK_OSC_MIDI:
 			return jack_osc_set_midi(buf, arg->m);
 
 		default:
@@ -542,42 +649,42 @@ jack_osc_vararg_set(uint8_t *buf, const char *path, const char *fmt, ...)
   for(type=fmt; *type != '\0'; type++)
 		switch(*type)
 		{
-			case 'i':
+			case JACK_OSC_INT32:
 				ptr = jack_osc_set_int32(ptr, va_arg(args, int32_t));
 				break;
-			case 'f':
+			case JACK_OSC_FLOAT:
 				ptr = jack_osc_set_float(ptr, (float)va_arg(args, double));
 				break;
-			case 's':
+			case JACK_OSC_STRING:
 				ptr = jack_osc_set_string(ptr, va_arg(args, char *));
 				break;
-			case 'b':
+			case JACK_OSC_BLOB:
 				ptr = jack_osc_set_blob(ptr, va_arg(args, int32_t), va_arg(args, uint8_t *));
 				break;
 
-			case 'h':
+			case JACK_OSC_INT64:
 				ptr = jack_osc_set_int64(ptr, va_arg(args, int64_t));
 				break;
-			case 'd':
+			case JACK_OSC_DOUBLE:
 				ptr = jack_osc_set_double(ptr, va_arg(args, double));
 				break;
-			case 't':
+			case JACK_OSC_TIMETAG:
 				ptr = jack_osc_set_timetag(ptr, va_arg(args, uint64_t));
 				break;
 
-			case 'T':
-			case 'F':
-			case 'N':
-			case 'I':
+			case JACK_OSC_TRUE:
+			case JACK_OSC_FALSE:
+			case JACK_OSC_NIL:
+			case JACK_OSC_BANG:
 				break;
 
-			case 'S':
+			case JACK_OSC_SYMBOL:
 				ptr = jack_osc_set_symbol(ptr, va_arg(args, char *));
 				break;
-			case 'c':
+			case JACK_OSC_CHAR:
 				ptr = jack_osc_set_char(ptr, (char)va_arg(args, int));
 				break;
-			case 'm':
+			case JACK_OSC_MIDI:
 				ptr = jack_osc_set_midi(ptr, va_arg(args, uint8_t *));
 				break;
 

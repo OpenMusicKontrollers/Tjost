@@ -61,6 +61,28 @@ typedef struct _Jack_OSC_Method Jack_OSC_Method;
 typedef struct _Jack_OSC_Blob Jack_OSC_Blob;
 typedef union _Jack_OSC_Argument Jack_OSC_Argument;
 
+typedef enum _Jack_OSC_Type {
+	JACK_OSC_INT32		=	'i',
+	JACK_OSC_FLOAT		=	'f',
+	JACK_OSC_STRING		=	's',
+	JACK_OSC_BLOB			=	'b',
+	
+	JACK_OSC_TRUE			=	'T',
+	JACK_OSC_FALSE		=	'F',
+	JACK_OSC_NIL			=	'N',
+	JACK_OSC_BANG			=	'I',
+	
+	JACK_OSC_INT64		=	'h',
+	JACK_OSC_DOUBLE		=	'd',
+	JACK_OSC_TIMETAG	=	't',
+	
+	JACK_OSC_SYMBOL		=	'S',
+	JACK_OSC_CHAR			=	'c',
+	JACK_OSC_MIDI			=	'm'
+
+} Jack_OSC_Type;
+
+
 struct _Jack_OSC_Method {
 	const char *path;
 	const char *fmt;
@@ -90,6 +112,15 @@ union _Jack_OSC_Argument {
 int jack_osc_method_match(Jack_OSC_Method *methods, const char *path, const char *fmt);
 void jack_osc_method_dispatch(jack_nframes_t time, uint8_t *buf, size_t size, Jack_OSC_Method *methods, void *dat);
 int jack_osc_message_check(uint8_t *buf, size_t size);
+#if __BYTE_ORDER == __BIG_ENDIAN
+#	define jack_osc_message_ntoh jack_osc_message_check
+#	define jack_osc_message_hton jack_osc_message_check
+#else
+# if __BYTE_ORDER == __LITTLE_ENDIAN
+int jack_osc_message_ntoh(uint8_t *buf, size_t size);
+int jack_osc_message_hton(uint8_t *buf, size_t size);
+# endif
+#endif
 
 // OSC object lengths
 size_t jack_osc_strlen(const char *buf);
@@ -101,49 +132,9 @@ size_t jack_osc_blobsize(uint8_t *buf);
 uint8_t *jack_osc_get_path(uint8_t *buf, const char **path);
 uint8_t *jack_osc_get_fmt(uint8_t *buf, const char **fmt);
 
-typedef union _swap32 {
-	uint32_t u;
-
-	int32_t i;
-	float f;
-} swap32;
-
-typedef union _swap64 {
-	uint64_t u;
-
-	int64_t h;
-	double d;
-	uint64_t t;
-} swap64;
-
 uint8_t *jack_osc_get_int32(uint8_t *buf, int32_t *i);
-//#define jack_osc_get_int32(_buf, _i) \
-//({ \
-//	uint8_t *buf = (uint8_t *)(_buf); \
-//	int32_t *i = (int32_t *)(_i); \
-//	swap32 s = {.i = *(int32_t *)buf}; \
-//	s.u = ntohl(s.u); \
-//	*i = s.i; \
-//	(uint8_t *)(buf + 4); \
-//})
 uint8_t *jack_osc_get_float(uint8_t *buf, float *f);
-//#define jack_osc_get_float(_buf, _f) \
-//({ \
-//	uint8_t *buf = (uint8_t *)(_buf); \
-//	float *f = (float *)(_f); \
-//	swap32 s = {.i = *(int32_t *)buf}; \
-//	s.u = ntohl(s.u); \
-//	*f = s.f; \
-//	(uint8_t *)(buf + 4); \
-//})
 uint8_t *jack_osc_get_string(uint8_t *buf, const char **s);
-//#define jack_osc_get_string(_buf, _s) \
-//({ \
-//	uint8_t *buf = (uint8_t *)(_buf); \
-//	const char **s = (const char **)(_s); \
-//	*s = (const char *)buf; \
-//	(uint8_t *)(buf + jack_osc_strlen(*s)); \
-//})
 uint8_t *jack_osc_get_blob(uint8_t *buf, Jack_OSC_Blob *b);
 
 uint8_t *jack_osc_get_int64(uint8_t *buf, int64_t *h);
@@ -154,8 +145,8 @@ uint8_t *jack_osc_get_symbol(uint8_t *buf, const char **S);
 uint8_t *jack_osc_get_char(uint8_t *buf, char *c);
 uint8_t *jack_osc_get_midi(uint8_t *buf, uint8_t **m);
 
-uint8_t *jack_osc_skip(char type, uint8_t *buf);
-uint8_t *jack_osc_get(char type, uint8_t *buf, Jack_OSC_Argument *arg);
+uint8_t *jack_osc_skip(Jack_OSC_Type type, uint8_t *buf);
+uint8_t *jack_osc_get(Jack_OSC_Type type, uint8_t *buf, Jack_OSC_Argument *arg);
 
 // write OSC argument to raw buffer
 uint8_t *jack_osc_set_path(uint8_t *buf, const char *path);
@@ -175,7 +166,7 @@ uint8_t *jack_osc_set_symbol(uint8_t *buf, const char *S);
 uint8_t *jack_osc_set_char(uint8_t *buf, char c);
 uint8_t *jack_osc_set_midi(uint8_t *buf, uint8_t *m);
 
-uint8_t *jack_osc_set(char type, uint8_t *buf, Jack_OSC_Argument *arg);
+uint8_t *jack_osc_set(Jack_OSC_Type type, uint8_t *buf, Jack_OSC_Argument *arg);
 size_t jack_osc_vararg_set(uint8_t *buf, const char *path, const char *fmt, ...);
 
 #define round_to_four_bytes(size) \

@@ -26,7 +26,7 @@
 #include <mod_net.h>
 
 void
-mod_net_sync(uv_timer_t *handle, int status)
+mod_net_sync(uv_timer_t *handle)
 {
 	Tjost_Module *module = handle->data;
 	Mod_Net *net = module->dat;
@@ -63,7 +63,7 @@ _handle_message(Tjost_Module *module, jack_nframes_t tstamp, uint8_t *buf, size_
 {
 	Mod_Net *net = module->dat;
 
-	if(jack_osc_message_check(buf, len))
+	if(jack_osc_message_ntoh(buf, len))
 	{
 		Tjost_Event tev;
 		tev.module = module;
@@ -261,7 +261,7 @@ _next(Tjost_Module *module)
 }
 
 void
-mod_net_asio(uv_async_t *handle, int status)
+mod_net_asio(uv_async_t *handle)
 {
 	Tjost_Module *module = handle->data;
 
@@ -323,6 +323,7 @@ mod_net_process_out(Tjost_Module *module, jack_nframes_t nframes)
 			else
 			{
 				jack_ringbuffer_write(net->rb_out, (const char *)tev, sizeof(Tjost_Event));
+				jack_osc_message_hton(tev->buf, tev->size); // TODO check return argument
 				jack_ringbuffer_write(net->rb_out, (const char *)tev->buf, tev->size);
 			}
 		}

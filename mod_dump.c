@@ -33,7 +33,7 @@ struct _Data {
 static uint8_t buffer [TJOST_BUF_SIZE] __attribute__((aligned (8)));
 
 static void
-_asio(uv_async_t *handle, int status)
+_asio(uv_async_t *handle)
 {
 	Tjost_Module *module = handle->data;
 	Data *dat = module->dat;

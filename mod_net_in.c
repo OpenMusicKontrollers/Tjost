@@ -38,7 +38,7 @@ typedef struct _Data Data;
 struct _Data {
 	Mod_Net net;
 
-	uv_loop_t *loop;
+	uv_loop_t loop;
 	uv_thread_t thread;
 	uv_async_t quit;
 
@@ -65,7 +65,7 @@ process_out(jack_nframes_t nframes, void *arg)
 }
 
 static void
-_quit(uv_async_t *handle, int status)
+_quit(uv_async_t *handle)
 {
 	uv_stop(handle->loop);
 }
@@ -105,7 +105,7 @@ _thread(void *arg)
 	*/
 #endif
 
-	uv_run(dat->loop, UV_RUN_DEFAULT);
+	uv_run(&dat->loop, UV_RUN_DEFAULT);
 }
 
 void
@@ -113,24 +113,24 @@ add(Tjost_Module *module, int argc, const char **argv)
 {
 	Data *dat = tjost_alloc(module->host, sizeof(Data));
 
-	if(!(dat->loop = uv_loop_new()))
-		fprintf(stderr, "mod_net_in: uv_loop_new failed\n");
-
 	if(!(dat->net.rb_out = jack_ringbuffer_create(TJOST_RINGBUF_SIZE)))
 		fprintf(stderr, "mod_net_in: could not initialize ringbuffer\n");
 	if(!(dat->net.rb_in = jack_ringbuffer_create(TJOST_RINGBUF_SIZE)))
 		fprintf(stderr, "mod_net_in: could not initialize ringbuffer\n");
 
 	int err;
-	if((err = uv_async_init(dat->loop, &dat->quit, _quit)))
+	if((err = uv_loop_init(&dat->loop)))
+		fprintf(stderr, "mod_net_in: uv_loop_init failed\n");
+
+	if((err = uv_async_init(&dat->loop, &dat->quit, _quit)))
 		fprintf(stderr, "mod_net_in: %s\n", uv_err_name(err));
 
 	dat->net.asio.data = module;
-	if((err = uv_async_init(dat->loop, &dat->net.asio, mod_net_asio)))
+	if((err = uv_async_init(&dat->loop, &dat->net.asio, mod_net_asio)))
 		fprintf(stderr, "mod_net_out: %s\n", uv_err_name(err));
 
 	dat->net.sync.data = module;
-	if((err = uv_timer_init(dat->loop, &dat->net.sync)))
+	if((err = uv_timer_init(&dat->loop, &dat->net.sync)))
 		fprintf(stderr, "mod_net_in: %s\n", uv_err_name(err));
 	if((err = uv_timer_start(&dat->net.sync, mod_net_sync, 0, 1000))) // ms
 		fprintf(stderr, "mod_net_in: %s\n", uv_err_name(err));
@@ -147,12 +147,12 @@ add(Tjost_Module *module, int argc, const char **argv)
 	switch(dat->net.type)
 	{
 		case SOCKET_UDP:
-			if(netaddr_udp_responder_init(&dat->net.handle.udp_rx, dat->loop, argv[0], mod_net_recv_cb, module))
+			if(netaddr_udp_responder_init(&dat->net.handle.udp_rx, &dat->loop, argv[0], mod_net_recv_cb, module))
 				fprintf(stderr, "could not initialize socket\n");
 			module->type = TJOST_MODULE_INPUT;
 			break;
 		case SOCKET_TCP:
-			if(netaddr_tcp_endpoint_init(&dat->net.handle.tcp, NETADDR_TCP_RESPONDER, dat->loop, argv[0], mod_net_recv_cb, module))
+			if(netaddr_tcp_endpoint_init(&dat->net.handle.tcp, NETADDR_TCP_RESPONDER, &dat->loop, argv[0], mod_net_recv_cb, module))
 				fprintf(stderr, "could not initialize socket\n");
 			module->type = TJOST_MODULE_IN_OUT;
 			break;
@@ -195,7 +195,7 @@ del(Tjost_Module *module)
 	uv_close((uv_handle_t *)&dat->quit, NULL);
 	uv_close((uv_handle_t *)&dat->net.asio, NULL);
 
-	uv_loop_delete(dat->loop);
+	uv_loop_close(&dat->loop);
 
 	if(dat->net.rb_out)
 		jack_ringbuffer_free(dat->net.rb_out);

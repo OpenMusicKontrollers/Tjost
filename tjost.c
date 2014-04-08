@@ -42,13 +42,13 @@ _sig(uv_signal_t *handle, int signum)
 }
 
 static void
-_quit(uv_async_t *handle, int status)
+_quit(uv_async_t *handle)
 {
 	uv_stop(handle->loop);
 }
 
 static void
-_msg(uv_async_t *handle, int status)
+_msg(uv_async_t *handle)
 {
 	static char str [1024]; // TODO how big?
 
@@ -179,7 +179,7 @@ static const size_t area_size = 0x1000000UL; // 16MB
 //static const size_t area_size = 0x10000UL; // 64KB
 
 static void
-tjost_request_memory(uv_async_t *handle, int status)
+tjost_request_memory(uv_async_t *handle)
 {
 	Tjost_Host *host = handle->data;
 	void *area;

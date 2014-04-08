@@ -184,7 +184,7 @@ static Jack_OSC_Method methods [] = {
 
 // non real time
 void
-tjost_uplink_tx_drain(uv_async_t *handle, int status)
+tjost_uplink_tx_drain(uv_async_t *handle)
 {
 	Tjost_Host *host = handle->data;
 

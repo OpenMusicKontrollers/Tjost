@@ -39,7 +39,7 @@ end)
 success = function(time, uuid, path, ...)
 	local methods = {
 		['/sensors/number'] = function(time, n)
-			local bot = 3*12 - 0.5 - (n % 18 / 6);
+			local bot = 2*12 - 0.5 - (n % 18 / 6);
 			local range = n/3
 
 			midi_fltr(time, '/bottom', 'f', bot)
@@ -95,6 +95,6 @@ chim(0, '/sensors/group/reset', 'i', id())
 chim(0, '/sensors/group/attributes', 'iiiffi', id(), 0, 256, 0.0, 1.0, 0)
 chim(0, '/sensors/group/attributes', 'iiiffi', id(), 1, 128, 0.0, 1.0, 0)
 
-chim(0, '/engines/offset', 'if', id(), 2/rate + 1e-3)
+chim(0, '/engines/offset', 'if', id(), 0.002)
 chim(0, '/engines/reset', 'i', id())
 chim(0, '/engines/tuio2/enabled', 'ii', id(), 1)

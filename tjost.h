@@ -141,7 +141,7 @@ extern const luaL_Reg tjost_globals [];
 extern const luaL_Reg tjost_blob_mt [];
 
 // in tjost_uplink.c
-void tjost_uplink_tx_drain(uv_async_t *handle, int status);
+void tjost_uplink_tx_drain(uv_async_t *handle);
 void tjost_uplink_tx_push(Tjost_Host *host, Tjost_Event *tev);
 void tjost_uplink_rx_drain(Tjost_Host *host, int ignore);
 

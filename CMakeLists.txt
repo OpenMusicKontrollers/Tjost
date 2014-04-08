@@ -23,17 +23,16 @@ include_directories(${JACK_INCLUDE_DIRS})
 set(LIBS ${LIBS} ${JACK_LDFLAGS})
 
 # lua
-#option(USE_LUAJIT "use LuaJIT" OFF)
-#if(USE_LUAJIT)
-#	pkg_search_module(LUAJIT REQUIRED luajit)
-#	include_directories(${LUAJIT_INCLUDE_DIRS})
-#	set(LIBS ${LIBS} ${LUAJIT_LDFLAGS})
-#else(USE_LUAJIT)
-#	pkg_search_module(LUA REQUIRED lua)
-#	include_directories(${LUA_INCLUDE_DIRS})
-#	set(LIBS ${LIBS} ${LUA_LDFLAGS})
-#endif(USE_LUAJIT)
-include_directories(${CMAKE_SOURCE_DIR}/LuaJIT-2.0.2/src)
+option(USE_LUAJIT "use LuaJIT" ON)
+if(USE_LUAJIT)
+	pkg_search_module(LUAJIT REQUIRED luajit)
+	include_directories(${LUAJIT_INCLUDE_DIRS})
+	set(LIBS ${LIBS} ${LUAJIT_LDFLAGS})
+else(USE_LUAJIT)
+	pkg_search_module(LUA REQUIRED lua)
+	include_directories(${LUA_INCLUDE_DIRS})
+	set(LIBS ${LIBS} ${LUA_LDFLAGS})
+endif(USE_LUAJIT)
 
 # eina
 pkg_search_module(EINA REQUIRED eina)
@@ -50,7 +49,7 @@ install(FILES jack_osc.h DESTINATION include)
 
 # tjost
 add_executable(tjost tjost.c tjost_lua.c tjost_uplink.c tlsf/tlsf.c)
-target_link_libraries(tjost jack_osc ${LIBS} "${CMAKE_SOURCE_DIR}/LuaJIT-2.0.2/src/libluajit.a" "-ldl")
+target_link_libraries(tjost jack_osc ${LIBS})
 install(TARGETS tjost DESTINATION bin)
 
 # mod_uplink
