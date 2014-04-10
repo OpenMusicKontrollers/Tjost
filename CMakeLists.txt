@@ -10,7 +10,7 @@ set(LIBS "-lm")
 find_package(PkgConfig REQUIRED)
 
 include_directories("${PROJECT_SOURCE_DIR}")
-include_directories("${PROJECT_SOURCE_DIR}/tlsf")
+include_directories("${PROJECT_SOURCE_DIR}/tlsf-3.0")
 
 # libuv
 pkg_search_module(UV REQUIRED libuv)
@@ -48,7 +48,7 @@ install(TARGETS jack_osc DESTINATION lib)
 install(FILES jack_osc.h DESTINATION include)
 
 # tjost
-add_executable(tjost tjost.c tjost_lua.c tjost_uplink.c tlsf/tlsf.c)
+add_executable(tjost tjost.c tjost_lua.c tjost_uplink.c tlsf-3.0/tlsf.c)
 target_link_libraries(tjost jack_osc ${LIBS})
 install(TARGETS tjost DESTINATION bin)
 

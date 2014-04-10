@@ -40,11 +40,15 @@ extern "C" {
 // eina for module and list handling
 #include <Eina.h>
 
+// Two segregate fit real time memory allocator
+#include <tlsf.h>
+
 // JACKified OpenSoundControl
 #include <jack_osc.h>
 
 typedef struct _Tjost_Event Tjost_Event;
 typedef struct _Tjost_Module Tjost_Module;
+typedef struct _Tjost_Mem_Chunk Tjost_Mem_Chunk;
 typedef struct _Tjost_Host Tjost_Host;
 
 typedef void (*Tjost_Module_Add_Cb)(Tjost_Module *module, int argc, const char **argv);
@@ -86,6 +90,14 @@ struct _Tjost_Module {
 #define TJOST_BUF_SIZE 0x4000
 #define TJOST_RINGBUF_SIZE 0x10000
 
+struct _Tjost_Mem_Chunk {
+	EINA_INLIST;
+
+	size_t size;
+	uint8_t *area;
+	pool_t pool;
+};
+
 struct _Tjost_Host {
 	jack_client_t *client;
 
@@ -105,7 +117,10 @@ struct _Tjost_Host {
 
 	jack_ringbuffer_t *rb_rtmem;
 	uv_async_t rtmem;
+	Eina_Inlist *rtmem_chunks;
 	size_t rtmem_sum;
+	int rtmem_flag;
+	tlsf_t tlsf;
 
 	Eina_Array *arr; // modules
 
@@ -113,9 +128,6 @@ struct _Tjost_Host {
 	Eina_Inlist *uplinks; // uplink module instances
 
 	Eina_Inlist *queue; // host event queue
-
-	uint8_t *pool; // realtime memory pool
-	Eina_Mempool *mempool;
 };
 
 // in tjost.c

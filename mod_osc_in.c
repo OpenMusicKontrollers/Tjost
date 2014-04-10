@@ -72,7 +72,7 @@ del(Tjost_Module *module)
 	if(port)
 	{
 		jack_uuid_t uuid = jack_port_uuid(port);
-		jack_remove_properties (module->host->client, uuid);
+		jack_remove_property(module->host->client, uuid, JACK_METADATA_EVENT_KEY);
 		jack_port_unregister(module->host->client, port);
 	}
 }

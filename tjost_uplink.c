@@ -263,14 +263,17 @@ tjost_port_registration(jack_port_id_t id, int state, void *arg)
 	Tjost_Host *host = arg;
 
 	const jack_port_t *port = jack_port_by_id(host->client, id);
-	const char *name = jack_port_name(port);
+	if(port) //TODO can be (null), is this a bug in jack1?
+	{
+		const char *name = jack_port_name(port);
 
-	size_t len;
-	if(state)
-		len = jack_osc_vararg_set(buf_rx, "/jack/port/registration", "sT", name);
-	else
-		len = jack_osc_vararg_set(buf_rx, "/jack/port/registration", "sF", name);
-	tjost_uplink_rx_push(host, TJOST_MODULE_BROADCAST, buf_rx, len);
+		size_t len;
+		if(state)
+			len = jack_osc_vararg_set(buf_rx, "/jack/port/registration", "sT", name);
+		else
+			len = jack_osc_vararg_set(buf_rx, "/jack/port/registration", "sF", name);
+		tjost_uplink_rx_push(host, TJOST_MODULE_BROADCAST, buf_rx, len);
+	}
 }
 
 // non real time
@@ -322,8 +325,8 @@ tjost_property_change(jack_uuid_t uuid, const char *key, jack_property_change_t 
 
 	if( (change == PropertyDeleted) && !strcmp(key, JACK_METADATA_EVENT_KEY))
 	{
-		fprintf(stderr, "WARNING: metadata for event port type '%s' has been deleted\n", key);
 		/* FIXME check whether this is one of our ports and reset event port type
+		fprintf(stderr, "WARNING: metadata for event port type '%s' has been deleted\n", key);
 		if(jack_set_property(host->client, uuid, JACK_METADATA_EVENT_KEY, JACK_METADATA_EVENT_TYPE_OSC, NULL))
 			fprintf(stderr, "could not set event type\n");
 		*/

@@ -109,6 +109,9 @@ union _Jack_OSC_Argument {
 	uint8_t *m;
 };
 
+int jack_osc_check_path(const char *path);
+int jack_osc_check_fmt(const char *format, int offset);
+
 int jack_osc_method_match(Jack_OSC_Method *methods, const char *path, const char *fmt);
 void jack_osc_method_dispatch(jack_nframes_t time, uint8_t *buf, size_t size, Jack_OSC_Method *methods, void *dat);
 int jack_osc_message_check(uint8_t *buf, size_t size);
@@ -175,9 +178,8 @@ size_t jack_osc_vararg_set(uint8_t *buf, const char *path, const char *fmt, ...)
 	size_t rem; \
 	if( (rem = len % 4) ) \
 		len += 4 - rem; \
-	((size_t)len); \
+	( (size_t)len ); \
 })
-
 #ifndef htonll
 #	if __BYTE_ORDER == __BIG_ENDIAN
 #	 define htonll(x) (x)

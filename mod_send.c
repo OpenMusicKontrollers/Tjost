@@ -67,11 +67,12 @@ _tty_recv_cb(uv_stream_t *stream, ssize_t nread, const uv_buf_t *buf)
 			end++;
 		*end++ = '\0';
 		path = cur;
-		if(!(ptr = jack_osc_set_path(ptr, path)))
+		if(!jack_osc_check_path(path))
 		{
 			fprintf(stderr, "invalid path: %s\n", path);
 			return;
 		}
+		ptr = jack_osc_set_path(ptr, path);
 
 		// skip whitespace
 		while( (end < s+nread) && isspace(*end))
@@ -88,11 +89,12 @@ _tty_recv_cb(uv_stream_t *stream, ssize_t nread, const uv_buf_t *buf)
 		}
 		else
 			fmt = "";
-		if(!(ptr = jack_osc_set_fmt(ptr, fmt)))
+		if(!jack_osc_check_fmt(fmt, 0))
 		{
 			fprintf(stderr, "invalid format: %s\n", fmt);
 			return;
 		}
+		ptr = jack_osc_set_fmt(ptr, fmt);
 
 		// skip whitespace
 		while( (end < s+nread) && isspace(*end))

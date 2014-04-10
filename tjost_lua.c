@@ -226,16 +226,19 @@ _serialize(lua_State *L, Tjost_Module *module)
 
 	uint8_t *ptr = buffer;
 
-	if(!(ptr = jack_osc_set_path(ptr, path)))
+	if(!jack_osc_check_path(path))
 	{
 		tjost_host_message_push(host, "Lua: invalid OSC path %s", path);
 		return 0;
 	}
-	if(!(ptr = jack_osc_set_fmt(ptr, fmt)))
+	ptr = jack_osc_set_path(ptr, path);
+
+	if(!jack_osc_check_fmt(fmt, 0))
 	{
 		tjost_host_message_push(host, "Lua: invalid OSC format %s", fmt);
 		return 0;
 	}
+	ptr = jack_osc_set_fmt(ptr, fmt);
 
 	int p = 5;
 	const char *type;

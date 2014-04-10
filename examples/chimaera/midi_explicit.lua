@@ -47,8 +47,8 @@ local m = {
 local n = 128
 
 local midi = {
-	[0] = plugin('midi_out', 'base'),
-	[1] = plugin('midi_out', 'midi')
+	[0] = plugin('midi_out', 'midi.base'),
+	[1] = plugin('midi_out', 'midi.lead')
 }
 
 return {

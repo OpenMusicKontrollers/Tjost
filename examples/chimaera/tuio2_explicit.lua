@@ -39,7 +39,7 @@ end)
 success = function(time, uuid, path, ...)
 	local methods = {
 		['/sensors/number'] = function(time, n)
-			local bot = 3*12 - 0.5 - (n % 18 / 6);
+			local bot = 2*12 - 0.5 - (n % 18 / 6);
 			local range = n/3
 			midi.bot = bot
 			midi.range = range

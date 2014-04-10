@@ -25,18 +25,9 @@
 
 #include <tjost.h>
 
-typedef struct _Midi_Client Midi_Client;
+#define MAX_BLOB 16
 typedef struct _Midi_Blob Midi_Blob;
-
-struct _Midi_Client {
-	uint8_t effect;
-	uint8_t double_precision;
-	Eina_Mempool *pool;
-	Eina_Inlist *blobs;
-
-	float bot;
-	float range;
-};
+typedef struct _Midi_Client Midi_Client;
 
 struct _Midi_Blob {
 	EINA_INLIST;
@@ -44,10 +35,44 @@ struct _Midi_Blob {
 	uint8_t key;
 };
 
+struct _Midi_Client {
+	float bot;
+	float range;
+	uint8_t effect;
+	uint8_t double_precision;
+
+	Eina_Inlist *blobs;
+
+	int used [MAX_BLOB];
+	Midi_Blob pool [MAX_BLOB];
+};
+
+static Midi_Blob *
+blob_alloc(int *used, Midi_Blob *pool, size_t len)
+{
+	size_t i;
+	for(i=0; i<len; i++)
+		if(used[i] == 0)
+		{
+			used[i] = 1;
+			return &pool[i];
+		}
+	return NULL;
+}
+
+static void
+blob_free(int *used, Midi_Blob *pool, size_t len, Midi_Blob *blob)
+{
+	size_t i;
+	for(i=0; i<len; i++)
+		if(&pool[i] == blob)
+			used[i] = 0;
+}
+
 static int
 _on(jack_nframes_t time, const char *path, const char *fmt, lua_State *L)
 {
-	Midi_Client *midi_client = lua_touserdata(L, lua_upvalueindex(2));
+	Midi_Client *midi_client = luaL_checkudata(L, lua_upvalueindex(2), "Fltr_Midi");
 
 	int i;
 	uint32_t sid = luaL_checkint(L, 4);
@@ -115,7 +140,7 @@ _on(jack_nframes_t time, const char *path, const char *fmt, lua_State *L)
 			fprintf(stderr, "Midi_Client 'on' error: %s\n", lua_tostring(L, -1));
 	}
 
-	Midi_Blob *b = eina_mempool_malloc(midi_client->pool, sizeof(Midi_Blob));
+	Midi_Blob *b = blob_alloc(midi_client->used, midi_client->pool, MAX_BLOB);
 	b->sid = sid;
 	b->key = key;
 	midi_client->blobs = eina_inlist_append(midi_client->blobs, EINA_INLIST_GET(b));
@@ -126,7 +151,7 @@ _on(jack_nframes_t time, const char *path, const char *fmt, lua_State *L)
 static int
 _off(jack_nframes_t time, const char *path, const char *fmt, lua_State *L)
 {
-	Midi_Client *midi_client = lua_touserdata(L, lua_upvalueindex(2));
+	Midi_Client *midi_client = luaL_checkudata(L, lua_upvalueindex(2), "Fltr_Midi");
 
 	int i;
 	uint32_t sid = luaL_checkint(L, 4);
@@ -161,7 +186,7 @@ _off(jack_nframes_t time, const char *path, const char *fmt, lua_State *L)
 	}
 	
 	midi_client->blobs = eina_inlist_remove(midi_client->blobs, EINA_INLIST_GET(b));
-	eina_mempool_free(midi_client->pool, b);
+	blob_free(midi_client->used, midi_client->pool, MAX_BLOB, b);
 
 	return 0;
 }
@@ -169,7 +194,7 @@ _off(jack_nframes_t time, const char *path, const char *fmt, lua_State *L)
 static int
 _set(jack_nframes_t time, const char *path, const char *fmt, lua_State *L)
 {
-	Midi_Client *midi_client = lua_touserdata(L, lua_upvalueindex(2));
+	Midi_Client *midi_client = luaL_checkudata(L, lua_upvalueindex(2), "Fltr_Midi");
 
 	int i;
 	uint32_t sid = luaL_checkint(L, 4);
@@ -239,7 +264,7 @@ _set(jack_nframes_t time, const char *path, const char *fmt, lua_State *L)
 static int
 _idle(jack_nframes_t time, const char *path, const char *fmt, lua_State *L)
 {
-	Midi_Client *midi_client = lua_touserdata(L, lua_upvalueindex(2));
+	Midi_Client *midi_client = luaL_checkudata(L, lua_upvalueindex(2), "Fltr_Midi");
 	//TODO
 
 	return 0;
@@ -248,7 +273,7 @@ _idle(jack_nframes_t time, const char *path, const char *fmt, lua_State *L)
 static int
 _bottom(jack_nframes_t time, const char *path, const char *fmt, lua_State *L)
 {
-	Midi_Client *midi_client = lua_touserdata(L, lua_upvalueindex(2));
+	Midi_Client *midi_client = luaL_checkudata(L, lua_upvalueindex(2), "Fltr_Midi");
 
 	midi_client->bot = luaL_checknumber(L, 4);
 
@@ -258,7 +283,7 @@ _bottom(jack_nframes_t time, const char *path, const char *fmt, lua_State *L)
 static int
 _range(jack_nframes_t time, const char *path, const char *fmt, lua_State *L)
 {
-	Midi_Client *midi_client = lua_touserdata(L, lua_upvalueindex(2));
+	Midi_Client *midi_client = luaL_checkudata(L, lua_upvalueindex(2), "Fltr_Midi");
 
 	midi_client->range = luaL_checknumber(L, 4);
 
@@ -268,7 +293,7 @@ _range(jack_nframes_t time, const char *path, const char *fmt, lua_State *L)
 static int
 _effect(jack_nframes_t time, const char *path, const char *fmt, lua_State *L)
 {
-	Midi_Client *midi_client = lua_touserdata(L, lua_upvalueindex(2));
+	Midi_Client *midi_client = luaL_checkudata(L, lua_upvalueindex(2), "Fltr_Midi");
 
 	midi_client->effect = luaL_checkint(L, 4); // TODO check range
 
@@ -278,7 +303,7 @@ _effect(jack_nframes_t time, const char *path, const char *fmt, lua_State *L)
 static int
 _double_precision(jack_nframes_t time, const char *path, const char *fmt, lua_State *L)
 {
-	Midi_Client *midi_client = lua_touserdata(L, lua_upvalueindex(2));
+	Midi_Client *midi_client = luaL_checkudata(L, lua_upvalueindex(2), "Fltr_Midi");
 
 	midi_client->double_precision = lua_toboolean(L, 4);
 
@@ -326,13 +351,14 @@ _new(lua_State *L)
 
 	if(lua_isfunction(L, 1) || lua_isuserdata(L, 1))
 	{
-		Midi_Client *midi_client = calloc(1, sizeof(Midi_Client)); //FIXME tjost_alloc
+		Midi_Client *midi_client = lua_newuserdata(L, sizeof(Midi_Client));
+		luaL_getmetatable(L, "Fltr_Midi");
+		lua_setmetatable(L, -2);
+
 		midi_client->effect = 0x07;
 		midi_client->double_precision = 1;
 		midi_client->bot = 2*12 - 0.5 - ( (n % 18) / 6.f);
 		midi_client->range = n/3.f;
-		midi_client->pool = eina_mempool_add("chained_mempool", "blobs", NULL, sizeof(Midi_Blob), 32); //FIXME free
-		lua_pushlightuserdata(L, midi_client);
 
 		lua_pushcclosure(L, _func, 2);
 	}
@@ -341,9 +367,27 @@ _new(lua_State *L)
 	return 1;
 }
 
+static int
+_gc(lua_State *L)
+{
+	printf("_gc_fltr_midi\n");
+	Midi_Client *midi_client = luaL_checkudata(L, 1, "Fltr_Midi");
+
+	return 0;
+}
+
+static const luaL_Reg fltr_midi_mt [] = {
+	{"__gc", _gc},
+	{NULL, NULL}
+};
+
 int
 luaopen_midi(lua_State *L)
 {
+	luaL_newmetatable(L, "Fltr_Midi"); // mt
+	luaL_register(L, NULL, fltr_midi_mt);
+	lua_pop(L, 1); // mt
+
 	lua_pushcclosure(L, _new, 0);
 	return 1;
 }

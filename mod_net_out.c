@@ -57,7 +57,7 @@ add(Tjost_Module *module, int argc, const char **argv)
 	else if(!strncmp(argv[0], "osc.tcp://", 10))
 		dat->net.type = SOCKET_TCP;
 	else
-		; //FIXME error
+		fprintf(stderr, "mod_net_out: unknown protocol '%s'\n", argv[0]);
 
 	if( (argc > 1) && argv[1])
 	{

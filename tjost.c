@@ -31,8 +31,6 @@
 #include <malloc.h>
 #include <sys/mman.h>
 
-#include <tlsf.h>
-
 #include <tjost.h>
 
 static void
@@ -145,7 +143,7 @@ tjost_host_message_push(Tjost_Host *host, const char *fmt, ...)
 	size_t size = strlen(str) + 1;
 
 	if(jack_ringbuffer_write_space(host->rb_msg) < sizeof(size_t) + size)
-		; //FIXME
+		; //FIXME report error
 	else
 	{
 		jack_ringbuffer_write(host->rb_msg, (const char *)&size, sizeof(size_t));
@@ -175,43 +173,81 @@ tjost_host_message_pull(Tjost_Host *host, char *str)
 	return 0;
 }
 	
-static const size_t area_size = 0x1000000UL; // 16MB
-//static const size_t area_size = 0x10000UL; // 64KB
+//#define area_size 0x100000UL // 1MB
+#define area_size 0x1000000UL // 16MB
+
+static Tjost_Mem_Chunk *
+tjost_map_memory_chunk(size_t size)
+{
+	uint8_t *area = mmap(NULL, size, PROT_READ|PROT_WRITE, MAP_32BIT|MAP_PRIVATE|MAP_ANONYMOUS|MAP_LOCKED, -1, 0);
+
+	if(area)
+	{
+		Tjost_Mem_Chunk *chunk = calloc(1, sizeof(Tjost_Mem_Chunk));
+
+		chunk->size = size;
+		chunk->area = area;
+		return chunk;
+	}
+	else
+		return NULL;
+}
+
+static void
+tjost_unmap_memory_chunk(Tjost_Mem_Chunk *chunk)
+{
+	munmap(chunk->area, chunk->size);
+	free(chunk);
+}
 
 static void
 tjost_request_memory(uv_async_t *handle)
 {
 	Tjost_Host *host = handle->data;
-	void *area;
+	Tjost_Mem_Chunk *chunk;
 
-	printf("requesting new memory chunk\n");
-
-	//FIXME munmap, munlock
-  if(!(area = mmap(NULL, area_size, PROT_READ|PROT_WRITE, MAP_32BIT|MAP_PRIVATE|MAP_ANONYMOUS|MAP_LOCKED, -1, 0)))
-	{
+	if(!(chunk = tjost_map_memory_chunk(area_size)))
 		fprintf(stderr, "tjost_request_memory: could not allocate RT memory chunk\n");
-		host->rtmem_sum -= area_size;
-	}
 	else
 	{
-		mlock(area, area_size);
-
 		if(jack_ringbuffer_write_space(host->rb_rtmem) < sizeof(uintptr_t))
 			fprintf(stderr, "tjost_request_memory: ring buffer overflow");
 		else
-			jack_ringbuffer_write(host->rb_rtmem, (const char *)&area, sizeof(uintptr_t));
+			jack_ringbuffer_write(host->rb_rtmem, (const char *)&chunk, sizeof(uintptr_t));
 	}
 }
+
+static size_t used = 0;
 
 static void
 tjost_add_memory(Tjost_Host *host)
 {
-	void *area;
-
-	while(jack_ringbuffer_read_space(host->rb_rtmem) >= sizeof(uintptr_t))
+	if(jack_ringbuffer_read_space(host->rb_rtmem) >= sizeof(uintptr_t))
 	{
-		jack_ringbuffer_read(host->rb_rtmem, (char *)&area, sizeof(uintptr_t));
-		add_new_area(area, area_size, host->pool);
+		Tjost_Mem_Chunk *chunk;
+
+		jack_ringbuffer_read(host->rb_rtmem, (char *)&chunk, sizeof(uintptr_t));
+
+		chunk->pool = tlsf_add_pool(host->tlsf, chunk->area, chunk->size);
+		host->rtmem_chunks = eina_inlist_prepend(host->rtmem_chunks, EINA_INLIST_GET(chunk));
+		host->rtmem_sum += chunk->size;
+		host->rtmem_flag = 0;
+		
+		tjost_host_message_push(host, "Rt memory extended to: 0x%x bytes", host->rtmem_sum);
+	}
+}
+
+static void
+tjost_free_memory(Tjost_Host *host)
+{
+	Tjost_Mem_Chunk *chunk;
+
+	EINA_INLIST_FREE(host->rtmem_chunks, chunk)
+	{
+		tlsf_remove_pool(host->tlsf, chunk->pool);
+		host->rtmem_sum -= chunk->size;
+		host->rtmem_chunks = eina_inlist_remove(host->rtmem_chunks, EINA_INLIST_GET(chunk));
+		tjost_unmap_memory_chunk(chunk);
 	}
 }
 
@@ -220,20 +256,16 @@ tjost_alloc(Tjost_Host *host, size_t len)
 {
 	void *data = NULL;
 	
-	if(!(data = malloc_ex(len, host->pool)))
+	if(!(data = tlsf_malloc(host->tlsf, len)))
 		tjost_host_message_push(host, "tjost_alloc: out of memory");
 
-	size_t used = get_used_size(host->pool);
-	if(used > host->rtmem_sum/2) //TODO make this configurable
-	{
-		uv_async_send(&host->rtmem);
-		host->rtmem_sum += area_size;
-	}
+	used += tlsf_block_size(data);
 
-	/*
-	tjost_host_message_push(host, "tjost_alloc: used size: %f",
-		(float)used / host->rtmem_sum);
-	*/
+	if( (host->rtmem_flag == 0) && (used > host->rtmem_sum/2) ) //TODO make this configurable
+	{
+		host->rtmem_flag = 1;
+		uv_async_send(&host->rtmem);
+	}
 
 	return data;
 }
@@ -242,15 +274,18 @@ void *
 tjost_realloc(Tjost_Host *host, size_t len, void *buf)
 {
 	void *data = NULL;
+	
+	used -= tlsf_block_size(buf);
 
-	if(!(data =realloc_ex(buf, len, host->pool)))
+	if(!(data =tlsf_realloc(host->tlsf, buf, len)))
 		tjost_host_message_push(host, "tjost_realloc: out of memory");
+	
+	used += tlsf_block_size(data);
 
-	size_t used = get_used_size(host->pool);
-	if(used > host->rtmem_sum/2) //TODO make this configurable
+	if( (host->rtmem_flag == 0) && (used > host->rtmem_sum/2) ) //TODO make this configurable
 	{
+		host->rtmem_flag = 1;
 		uv_async_send(&host->rtmem);
-		host->rtmem_sum += area_size;
 	}
 
 	return data;
@@ -259,7 +294,8 @@ tjost_realloc(Tjost_Host *host, size_t len, void *buf)
 void
 tjost_free(Tjost_Host *host, void *buf)
 {
-	free_ex(buf, host->pool);
+	used -= tlsf_block_size(buf);
+	tlsf_free(host->tlsf, buf);
 }
 
 static int
@@ -413,13 +449,14 @@ main(int argc, const char **argv)
 	eina_init();
 
 	// init memory pool
-  if(!(host.pool = mmap(NULL, area_size, PROT_READ|PROT_WRITE, MAP_32BIT|MAP_PRIVATE|MAP_ANONYMOUS|MAP_LOCKED, -1, 0)))
+	Tjost_Mem_Chunk *chunk;
+	if(!(chunk = tjost_map_memory_chunk(area_size)))
 		FAIL("could not allocate RT memory chunk\n");
-	mlock(host.pool, area_size);
+	if(!(host.tlsf = tlsf_create_with_pool(chunk->area, chunk->size)))
+		FAIL("could not initialize TLSF memory pool\n");
+	chunk->pool = tlsf_get_pool(host.tlsf);
+	host.rtmem_chunks = eina_inlist_prepend(host.rtmem_chunks, EINA_INLIST_GET(chunk));
 	host.rtmem_sum = area_size;
-	
-	if(init_memory_pool(area_size, host.pool) == -1)
-		FAIL("could not initialize rt event memory pool\n");
 	
 	// init jack
 	jack_options_t options = server_name ? JackNullOption | JackServerName : JackNullOption;
@@ -464,7 +501,7 @@ main(int argc, const char **argv)
 		FAIL("could not initialize ringbuffer\n");
 
 	// init realtime memory ringbuffer
-	if(!(host.rb_rtmem = jack_ringbuffer_create(sizeof(uintptr_t)*4+1)))
+	if(!(host.rb_rtmem = jack_ringbuffer_create(sizeof(Tjost_Mem_Chunk)*2+1)))
 		FAIL("could not initialize ringbuffer\n");
 
 	host.srate = jack_get_sample_rate(host.client);
@@ -641,11 +678,10 @@ cleanup:
 		free(mod_path);
 
 	// deinit Rt memory pool
-	if(host.pool)
+	if(host.tlsf)
 	{
-		destroy_memory_pool(host.pool);
-		munlock(host.pool, area_size);
-		munmap(host.pool, area_size);
+		tjost_free_memory(&host);
+		tlsf_destroy(host.tlsf);
 	}
 
 	// deinit eina

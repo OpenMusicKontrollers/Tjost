@@ -25,24 +25,9 @@
 
 #define FIRST_FRAME 1U
 
-typedef struct _Tuio2_Client Tuio2_Client;
+#define MAX_BLOB 32
 typedef struct _Tuio2_Blob Tuio2_Blob;
-
-struct _Tuio2_Client {
-	uint32_t fid;
-	uint64_t timestamp;
-	/*
-	const char *app;
-	uint8_t addr;
-	uint32_t inst;
-	uint16_t w;
-	uint16_t h;
-	*/
-	Eina_Mempool *pool;
-	Eina_Inlist *blobs;
-	uint32_t missing;
-	uint8_t ignore;
-};
+typedef struct _Tuio2_Client Tuio2_Client;
 
 struct _Tuio2_Blob {
 	EINA_INLIST;
@@ -54,10 +39,51 @@ struct _Tuio2_Blob {
 	int is_new;
 };
 
+struct _Tuio2_Client {
+	uint32_t fid;
+	uint64_t timestamp;
+	/*
+	const char *app;
+	uint8_t addr;
+	uint32_t inst;
+	uint16_t w;
+	uint16_t h;
+	*/
+	uint32_t missing;
+	uint8_t ignore;
+	
+	Eina_Inlist *blobs;
+
+	int used [MAX_BLOB];
+	Tuio2_Blob pool [MAX_BLOB];
+};
+
+static Tuio2_Blob *
+blob_alloc(int *used, Tuio2_Blob *pool, size_t len)
+{
+	size_t i;
+	for(i=0; i<len; i++)
+		if(used[i] == 0)
+		{
+			used[i] = 1;
+			return &pool[i];
+		}
+	return NULL;
+}
+
+static void
+blob_free(int *used, Tuio2_Blob *pool, size_t len, Tuio2_Blob *blob)
+{
+	size_t i;
+	for(i=0; i<len; i++)
+		if(&pool[i] == blob)
+			used[i] = 0;
+}
+
 static int
 _frm(jack_nframes_t time, const char *path, const char *fmt, lua_State *L)
 {
-	Tuio2_Client *tuio2_client = lua_touserdata(L, lua_upvalueindex(2));
+	Tuio2_Client *tuio2_client = luaL_checkudata(L, lua_upvalueindex(2), "Fltr_Tuio2");
 
 	uint32_t fid = luaL_checkint(L, 4);
 	uint64_t timestamp = luaL_checknumber(L, 5);
@@ -68,7 +94,7 @@ _frm(jack_nframes_t time, const char *path, const char *fmt, lua_State *L)
 	{
 		Tuio2_Blob *b;
 		EINA_INLIST_FOREACH(tuio2_client->blobs, b)
-			eina_mempool_free(tuio2_client->pool, b);
+			blob_free(tuio2_client->used, tuio2_client->pool, MAX_BLOB, b);
 		tuio2_client->blobs = NULL;
 		tuio2_client->missing = 0;
 		tuio2_client->fid = FIRST_FRAME;
@@ -102,7 +128,7 @@ _frm(jack_nframes_t time, const char *path, const char *fmt, lua_State *L)
 static int
 _tok(jack_nframes_t time, const char *path, const char *fmt, lua_State *L)
 {
-	Tuio2_Client *tuio2_client = lua_touserdata(L, lua_upvalueindex(2));
+	Tuio2_Client *tuio2_client = luaL_checkudata(L, lua_upvalueindex(2), "Fltr_Tuio2");
 
 	if(tuio2_client->ignore)
 		return 0;
@@ -123,7 +149,7 @@ _tok(jack_nframes_t time, const char *path, const char *fmt, lua_State *L)
 	// if not existing create it in the first place
 	if(!exists)
 	{
-		ptr = eina_mempool_malloc(tuio2_client->pool, sizeof(Tuio2_Blob));
+		ptr = blob_alloc(tuio2_client->used, tuio2_client->pool, MAX_BLOB);
 		ptr->is_new = 1;
 		tuio2_client->blobs = eina_inlist_append(tuio2_client->blobs, EINA_INLIST_GET(ptr));
 	}
@@ -148,7 +174,7 @@ _tok(jack_nframes_t time, const char *path, const char *fmt, lua_State *L)
 static int
 _alv(jack_nframes_t time, const char *path, const char *fmt, lua_State *L)
 {
-	Tuio2_Client *tuio2_client = lua_touserdata(L, lua_upvalueindex(2));
+	Tuio2_Client *tuio2_client = luaL_checkudata(L, lua_upvalueindex(2), "Fltr_Tuio2");
 
 	if(tuio2_client->ignore)
 		return 0;
@@ -201,7 +227,7 @@ _alv(jack_nframes_t time, const char *path, const char *fmt, lua_State *L)
 			}
 
 			tuio2_client->blobs = eina_inlist_remove(tuio2_client->blobs, EINA_INLIST_GET(ptr));
-			eina_mempool_free(tuio2_client->pool, ptr);
+			blob_free(tuio2_client->used, tuio2_client->pool, MAX_BLOB, ptr);
 		}
 	}
 
@@ -275,9 +301,9 @@ _new(lua_State *L)
 {
 	if(lua_isfunction(L, 1) || lua_isuserdata(L, 1))
 	{
-		Tuio2_Client *tuio2_client = calloc(1, sizeof(Tuio2_Client)); //FIXME tjost_alloc
-		tuio2_client->pool = eina_mempool_add("chained_mempool", "blobs", NULL, sizeof(Tuio2_Blob), 32); //FIXME free
-		lua_pushlightuserdata(L, tuio2_client);
+		Tuio2_Client *tuio2_client = lua_newuserdata(L, sizeof(Tuio2_Client));
+		luaL_getmetatable(L, "Fltr_Tuio2");
+		lua_setmetatable(L, -2);
 
 		lua_pushcclosure(L, _func, 2);
 	}
@@ -286,57 +312,27 @@ _new(lua_State *L)
 	return 1;
 }
 
-int
-luaopen_tuio2(lua_State *L)
+static int
+_gc(lua_State *L)
 {
-	lua_pushcclosure(L, _new, 0);
-	return 1;
-}
-
-/*
-int
-filter(jack_nframes_t time, const char *path, const char *fmt, void *buf, void *arg)
-{
-	Tjost_Module *module = arg;
-	Tjost_Host *host = module->host;
-
-	//TODO
+	printf("_gc_fltr_tuio2\n");
+	Tuio2_Client *tuio2_client = luaL_checkudata(L, 1, "Fltr_Tuio2");
 
 	return 0;
 }
 
-void
-add(Tjost_Module *module, int argc, const char **argv)
+static const luaL_Reg fltr_tuio2_mt [] = {
+	{"__gc", _gc},
+	{NULL, NULL}
+};
+
+int
+luaopen_tuio2(lua_State *L)
 {
-	Tuio2_Client *tuio2_client = tjost_alloc(module->host, sizeof(Tuio2_Client));
-	tuio2_client->pool = eina_mempool_add("chained_mempool", "blobs", NULL, sizeof(Tuio2_Blob), 32);
+	luaL_newmetatable(L, "Fltr_Tuio2"); // mt
+	luaL_register(L, NULL, fltr_tuio2_mt);
+	lua_pop(L, 1); // mt
 
-	module->dat = tuio2_client;
-	module->type = TJOST_MODULE_FILTER;
-	//TODO
+	lua_pushcclosure(L, _new, 0);
+	return 1;
 }
-
-void
-del(Tjost_Module *module)
-{
-	Tuio2_Client *tuio2_client = module->dat;
-
-	eina_mempool_del(tuio2_client->pool);
-	tjost_free(module->host, tuio2_client);
-	//TODO
-}
-
-Eina_Bool
-init()
-{
-	return EINA_TRUE;
-}
-
-void
-deinit()
-{
-}
-
-EINA_MODULE_INIT(init);
-EINA_MODULE_SHUTDOWN(deinit);
-*/

@@ -43,8 +43,8 @@ static const char valid_format_chars [] = {
 };
 
 // check for valid path string
-static int
-is_valid_path(const char *path)
+int
+jack_osc_check_path(const char *path)
 {
 	const char *ptr;
 
@@ -59,8 +59,8 @@ is_valid_path(const char *path)
 }
 
 // check for valid format string 
-static int
-is_valid_format(const char *format, int offset)
+int
+jack_osc_check_fmt(const char *format, int offset)
 {
 	const char *ptr;
 
@@ -114,11 +114,11 @@ jack_osc_message_check(uint8_t *buf, size_t size)
 	const char *fmt;
 
 	ptr = jack_osc_get_path(ptr, &path);
-	if( (ptr > end) || !is_valid_path(path) )
+	if( (ptr > end) || !jack_osc_check_path(path) )
 		return 0;
 
 	ptr = jack_osc_get_fmt(ptr, &fmt);
-	if( (ptr > end) || !is_valid_format(fmt, 1) )
+	if( (ptr > end) || !jack_osc_check_fmt(fmt, 1) )
 		return 0;
 
 	const char *type;
@@ -170,11 +170,11 @@ jack_osc_message_ntoh(uint8_t *buf, size_t size)
 	const char *fmt;
 
 	ptr = jack_osc_get_path(ptr, &path);
-	if( (ptr > end) || !is_valid_path(path) )
+	if( (ptr > end) || !jack_osc_check_path(path) )
 		return 0;
 
 	ptr = jack_osc_get_fmt(ptr, &fmt);
-	if( (ptr > end) || !is_valid_format(fmt, 1) )
+	if( (ptr > end) || !jack_osc_check_fmt(fmt, 1) )
 		return 0;
 
 	const char *type;
@@ -237,11 +237,11 @@ jack_osc_message_hton(uint8_t *buf, size_t size)
 	const char *fmt;
 
 	ptr = jack_osc_get_path(ptr, &path);
-	if( (ptr > end) || !is_valid_path(path) )
+	if( (ptr > end) || !jack_osc_check_path(path) )
 		return 0;
 
 	ptr = jack_osc_get_fmt(ptr, &fmt);
-	if( (ptr > end) || !is_valid_format(fmt, 1) )
+	if( (ptr > end) || !jack_osc_check_fmt(fmt, 1) )
 		return 0;
 
 	const char *type;
@@ -483,8 +483,6 @@ jack_osc_get(Jack_OSC_Type type, uint8_t *buf, Jack_OSC_Argument *arg)
 uint8_t *
 jack_osc_set_path(uint8_t *buf, const char *path)
 {
-	if(!is_valid_path(path))
-		return NULL; //TODO
 	size_t len = jack_osc_strlen(path);
 	strncpy((char *)buf, path, len);
 	return buf + len;
@@ -493,8 +491,6 @@ jack_osc_set_path(uint8_t *buf, const char *path)
 uint8_t *
 jack_osc_set_fmt(uint8_t *buf, const char *fmt)
 {
-	if(!is_valid_format(fmt, 0))
-		return NULL; //TODO
 	size_t len = jack_osc_fmtlen(fmt);
 	*buf++ = ',';
 	strncpy((char *)buf, fmt, len);

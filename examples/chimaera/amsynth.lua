@@ -25,6 +25,11 @@ local bit32 = bit32 or bit -- compatibility with Lua5.2 and LuaJIT
 
 local PITCHBEND = 0xe0
 local CONTROLLER = 0xb0
+
+local MODULATION = 0x01
+local BREATH = 0x02
+local VOLUME = 0x07
+local SOUND_EFFECT_5 = 0x4a
 local ALL_NOTES_OFF = 0x7b
 
 local mpath = '/midi'
@@ -53,6 +58,10 @@ local lv2 = {
 return {
 	bot = 2*12 - 0.5 - (n % 18 / 6),
 	range = n/3,
+	--effect = VOLUME,
+	--double_precision = true,
+	effect = SOUND_EFFECT_5,
+	double_precision = false,
 
 	on = function(self, time, sid, gid, pid, x, y)
 		local key, base, bend, eff
@@ -73,7 +82,7 @@ return {
 
 		midi[gid](time, mpath, 'mm', m[1], m[2])
 		lv2[gid](time, lv2path, 'if', 14, y*2-0.5)
-		lv2[gid](time, lv2path, 'if', 17, math.sqrt(y)*0.5+0.5)
+		--lv2[gid](time, lv2path, 'if', 17, math.sqrt(y)*0.5+0.5)
 
 		bases[sid] = base
 	end,
@@ -107,10 +116,23 @@ return {
 
 		midi[gid](time, mpath, 'm', m[1])
 		lv2[gid](time, lv2path, 'if', 14, y*2-0.5)
-		lv2[gid](time, lv2path, 'if', 17, math.sqrt(y)*0.5+0.5)
+		--lv2[gid](time, lv2path, 'if', 17, math.sqrt(y)*0.5+0.5)
 	end,
 
 	idle = function(self, time)
-		-- do nothing
+		--[[
+		m[1][1] = 0
+		m[1][2] = CONTROLLER
+		m[1][3] = ALL_NOTES_OFF
+		m[1][4] = 0x0
+
+		m[2][1] = 1
+		m[2][2] = CONTROLLER
+		m[2][3] = ALL_NOTES_OFF
+		m[2][4] = 0x0
+		
+		midi[0](time, mpath, 'm', m[1])
+		midi[1](time, mpath, 'm', m[2])
+		--]]
 	end
 }
