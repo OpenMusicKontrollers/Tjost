@@ -66,7 +66,10 @@ blob_free(int *used, Midi_Blob *pool, size_t len, Midi_Blob *blob)
 	size_t i;
 	for(i=0; i<len; i++)
 		if(&pool[i] == blob)
+		{
 			used[i] = 0;
+			break;
+		}
 }
 
 static int
@@ -352,6 +355,7 @@ _new(lua_State *L)
 	if(lua_isfunction(L, 1) || lua_isuserdata(L, 1))
 	{
 		Midi_Client *midi_client = lua_newuserdata(L, sizeof(Midi_Client));
+		memset(midi_client, 0, sizeof(Midi_Client));
 		luaL_getmetatable(L, "Fltr_Midi");
 		lua_setmetatable(L, -2);
 

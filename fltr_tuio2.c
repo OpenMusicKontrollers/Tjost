@@ -302,6 +302,7 @@ _new(lua_State *L)
 	if(lua_isfunction(L, 1) || lua_isuserdata(L, 1))
 	{
 		Tuio2_Client *tuio2_client = lua_newuserdata(L, sizeof(Tuio2_Client));
+		memset(tuio2_client, 0, sizeof(Tuio2_Client));
 		luaL_getmetatable(L, "Fltr_Tuio2");
 		lua_setmetatable(L, -2);
 

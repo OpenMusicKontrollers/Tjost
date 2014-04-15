@@ -215,8 +215,8 @@ process_in(jack_nframes_t nframes, void *arg)
 			for(i=0; i<nframes; i++)
 			{
 				load[i] = (float)port_buf[i];
-				uint32_t *s = (uint32_t *)&load[i];
-				*s = htonl(*s); // in-place byte-swapping
+				//uint32_t *s = (uint32_t *)&load[i];
+				//*s = htonl(*s); // in-place byte-swapping
 			}
 			break;
 		}

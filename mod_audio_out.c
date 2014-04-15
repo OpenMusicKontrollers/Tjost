@@ -164,8 +164,8 @@ _audio(jack_nframes_t time, const char *path, const char *fmt, uint8_t *buf, voi
 			int i;
 			for(i=0; i<b.size/sizeof(float); i++)
 			{
-				uint32_t *s = (uint32_t *)&load[i];
-				*s = ntohl(*s); // in-place byte-swapping
+				//uint32_t *s = (uint32_t *)&load[i];
+				//*s = ntohl(*s); // in-place byte-swapping
 				port_buf_out[i] = (jack_default_audio_sample_t)load[i];
 			}
 			break;

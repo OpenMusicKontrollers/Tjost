@@ -560,7 +560,7 @@ _plugin(lua_State *L)
 	Tjost_Host *host = lua_touserdata(L, lua_upvalueindex(1));
 
 	Tjost_Module *module = lua_newuserdata(L, sizeof(Tjost_Module));
-	bzero(module, sizeof(Tjost_Module));
+	memset(module, 0, sizeof(Tjost_Module));
 
 	Eina_Module *mod;
 
@@ -654,6 +654,7 @@ _blob(lua_State *L)
 	int size = luaL_checkint(L, 1);
 
 	Tjost_Blob *tb = lua_newuserdata(L, sizeof(Tjost_Blob) + size);
+	memset(tb, 0, sizeof(Tjost_Blob) + size);
 	tb->size = size;
 	luaL_getmetatable(L, "Tjost_Blob");
 	lua_setmetatable(L, -2);
