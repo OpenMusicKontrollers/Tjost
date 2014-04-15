@@ -368,6 +368,7 @@ _process_direct(jack_nframes_t nframes, void *arg)
 {
 	Tjost_Host *host = arg;
 	Tjost_Module *module;
+	Tjost_Child *child;
 
 	jack_nframes_t last = jack_last_frame_time(host->client);
 
@@ -394,11 +395,8 @@ _process_direct(jack_nframes_t nframes, void *arg)
 			tev->time = last;
 
 		if(tev->time >= last)
-		{
-			EINA_INLIST_FOREACH(host->modules, module)
-				if(module->type & TJOST_MODULE_OUTPUT)
-					tjost_module_schedule(module, tev->time, tev->size, tev->buf);
-		}
+			EINA_INLIST_FOREACH(tev->module->children, child)
+				tjost_module_schedule(child->module, tev->time, tev->size, tev->buf);
 		else
 			tjost_host_message_push(host, "main loop: ignoring out-of-order event %u %u",
 				last, tev->time);
@@ -409,8 +407,14 @@ _process_direct(jack_nframes_t nframes, void *arg)
 
 	// send on all outputs
 	EINA_INLIST_FOREACH(host->modules, module)
-		if(module->type & TJOST_MODULE_OUTPUT)
-			module->process_out(nframes, module);
+	{
+		if(module->type & TJOST_MODULE_INPUT)
+		{
+			EINA_INLIST_FOREACH(module->children, child)
+				child->module->process_out(nframes, child->module);
+		}
+		//module->process_out(nframes, module);
+	}
 
 	// send on all uplinks
 	EINA_INLIST_FOREACH(host->uplinks, module)

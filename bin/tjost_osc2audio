@@ -23,6 +23,7 @@
 --     distribution.
 --]]
 
-audio = plugin('audio_out', 'audio')
+osc_in = plugin('osc_in', 'osc.audio')
+audio_out = plugin('audio_out', 'audio')
 
-osc = plugin('osc_in', 'osc.audio')
+chain(osc_in, audio_out)

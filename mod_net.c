@@ -242,7 +242,7 @@ _next(Tjost_Module *module)
 				msg[2].base = vec[0].buf;
 				msg[2].len = vec[0].len;
 
-				assert(size = vec[0].len == vec[1].len);
+				assert(size - vec[0].len <= vec[1].len);
 				msg[3].base = vec[1].buf;
 				msg[3].len = size - vec[0].len;
 			}

@@ -27,13 +27,16 @@ host = argv[4]
 rtprio = argv[5] or '60'
 
 if host then
+	net_io = plugin('net_in', host, rtprio)
 	osc_out = plugin('osc_out', host)
 
-	net = plugin('net_in', host, rtprio)
+	chain(net_io, osc_out)
 
 	if string.find(host, 'osc.tcp://') then
 		osc_in = plugin('osc_in', 'osc.net')
+
+		chain(osc_in, net_io)
 	end
 else
-	print('no address given (osc.udp://:3333)')
+	print('no address given (osc.tcp://:3333)')
 end

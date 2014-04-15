@@ -48,18 +48,17 @@ extern "C" {
 
 typedef struct _Tjost_Event Tjost_Event;
 typedef struct _Tjost_Module Tjost_Module;
+typedef struct _Tjost_Child Tjost_Child;
 typedef struct _Tjost_Mem_Chunk Tjost_Mem_Chunk;
 typedef struct _Tjost_Host Tjost_Host;
 
 typedef void (*Tjost_Module_Add_Cb)(Tjost_Module *module, int argc, const char **argv);
 typedef void (*Tjost_Module_Del_Cb)(Tjost_Module *module);
 
-typedef enum _Tjost_Module_Type {
-	TJOST_MODULE_INPUT		= 0b001,
-	TJOST_MODULE_OUTPUT		= 0b010,
-	TJOST_MODULE_IN_OUT		= 0b011,
-	TJOST_MODULE_UPLINK		= 0b100
-} Tjost_Module_Type;
+#define TJOST_MODULE_INPUT	0b001
+#define TJOST_MODULE_OUTPUT 0b010
+#define TJOST_MODULE_IN_OUT (TJOST_MODULE_INPUT | TJOST_MODULE_OUTPUT)
+#define TJOST_MODULE_UPLINK 0b100
 
 struct _Tjost_Event {
 	EINA_INLIST;
@@ -79,11 +78,18 @@ struct _Tjost_Module {
 	JackProcessCallback process_in;
 	JackProcessCallback process_out;
 
-	Tjost_Module_Type type;
+	int type;
 	Tjost_Host *host;
 	void *dat;
 
 	Eina_Inlist *queue; // module output event queue
+	Eina_Inlist *children; // child modules for direct mode
+};
+
+struct _Tjost_Child {
+	EINA_INLIST;
+
+	Tjost_Module *module;
 };
 
 #define TJOST_MODULE_BROADCAST NULL

@@ -172,14 +172,9 @@ uint8_t *jack_osc_set_midi(uint8_t *buf, uint8_t *m);
 uint8_t *jack_osc_set(Jack_OSC_Type type, uint8_t *buf, Jack_OSC_Argument *arg);
 size_t jack_osc_vararg_set(uint8_t *buf, const char *path, const char *fmt, ...);
 
-#define round_to_four_bytes(size) \
-({ \
-	size_t len = (size_t)(size); \
-	size_t rem; \
-	if( (rem = len % 4) ) \
-		len += 4 - rem; \
-	( (size_t)len ); \
-})
+#define quads(size) (((((size_t)size-1) & ~0x3) >> 2) + 1)
+#define round_to_four_bytes(size) (quads((size_t)size) << 2)
+
 #ifndef htonll
 #	if __BYTE_ORDER == __BIG_ENDIAN
 #	 define htonll(x) (x)

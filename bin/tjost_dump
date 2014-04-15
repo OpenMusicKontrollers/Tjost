@@ -23,6 +23,7 @@
 --     distribution.
 --]]
 
+osc_in = plugin('osc_in', 'osc.dump')
 dump = plugin('dump')
 
-osc = plugin('osc_in', 'osc.dump')
+chain(osc_in, dump)

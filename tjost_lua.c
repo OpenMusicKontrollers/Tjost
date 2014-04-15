@@ -366,6 +366,13 @@ _gc_input(lua_State *L)
 	module->del(module);
 	host->modules = eina_inlist_remove(host->modules, EINA_INLIST_GET(module));
 
+	Tjost_Child *child;
+	EINA_INLIST_FREE(module->children, child)
+	{
+		module->children = eina_inlist_remove(module->children, EINA_INLIST_GET(child));
+		tjost_free(host, child);
+	}
+
 	return 0;
 }
 
@@ -403,6 +410,13 @@ _gc_in_out(lua_State *L)
 	module->del(module);
 	_clear(module);
 	host->modules = eina_inlist_remove(host->modules, EINA_INLIST_GET(module));
+
+	Tjost_Child *child;
+	EINA_INLIST_FREE(module->children, child)
+	{
+		module->children = eina_inlist_remove(module->children, EINA_INLIST_GET(child));
+		tjost_free(host, child);
+	}
 
 	return 0;
 }
@@ -616,6 +630,25 @@ _plugin(lua_State *L)
 }
 
 static int
+_chain(lua_State *L)
+{
+	Tjost_Module *mod_in = lua_touserdata(L, 1);
+	Tjost_Module *mod_out = lua_touserdata(L, 2);
+	Tjost_Host *host = mod_in->host;
+
+	if( (mod_in->type & TJOST_MODULE_INPUT) && (mod_out->type & TJOST_MODULE_OUTPUT) )
+	{
+		Tjost_Child *child = tjost_alloc(host, sizeof(Tjost_Child)); //TODO free
+		child->module = mod_out;
+		mod_in->children = eina_inlist_append(mod_in->children, EINA_INLIST_GET(child)); //TODO free
+	}
+	else
+		fprintf(stderr, "could not setup module chain\n");
+
+	return 0;
+}
+
+static int
 _blob(lua_State *L)
 {
 	int size = luaL_checkint(L, 1);
@@ -630,6 +663,7 @@ _blob(lua_State *L)
 
 const luaL_Reg tjost_globals [] = {
 	{"plugin", _plugin},
+	{"chain", _chain},
 	{"blob", _blob},
 	{NULL, NULL}
 };

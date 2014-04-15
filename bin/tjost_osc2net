@@ -27,13 +27,16 @@ host = argv[4]
 offset = argv[5] or 0.001 -- 1ms
 
 if host then
-	net = plugin('net_out', host, offset)
-
+	net_io = plugin('net_out', host, offset)
 	osc_in = plugin('osc_in', host)
+
+	chain(osc_in, net_io)
 
 	if string.find(host, 'osc.tcp://') then
 		osc_out = plugin('osc_out', 'osc.net')
+
+		chain(net_io, osc_out)
 	end
 else
-	print('no address given (osc.udp://localhost:4444)')
+	print('no address given (osc.tcp://localhost:4444)')
 end

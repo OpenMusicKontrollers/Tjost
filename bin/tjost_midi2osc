@@ -23,6 +23,7 @@
 --     distribution.
 --]]
 
-osc = plugin('osc_out', 'osc.midi')
+midi_in = plugin('midi_in', 'midi')
+osc_out = plugin('osc_out', 'osc.midi')
 
-midi = plugin('midi_in', 'midi')
+chain(midi_in, osc_out)
