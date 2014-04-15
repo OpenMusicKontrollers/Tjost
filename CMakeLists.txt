@@ -47,6 +47,14 @@ install(TARGETS jack_osc DESTINATION lib)
 # lib header
 install(FILES jack_osc.h DESTINATION include)
 
+# pkg config file
+set(prefix ${CMAKE_INSTALL_PREFIX})
+set(exec_prefix ${CMAKE_INSTALL_PREFIX})
+set(libdir ${CMAKE_INSTALL_PREFIX}/lib)
+set(includedir ${CMAKE_INSTALL_PREFIX}/include)
+configure_file(${CMAKE_CURRENT_SOURCE_DIR}/jack_osc.pc.in ${CMAKE_CURRENT_BINARY_DIR}/jack_osc.pc @ONLY)
+install(FILES ${CMAKE_CURRENT_BINARY_DIR}/jack_osc.pc DESTINATION lib/pkgconfig)
+
 # tjost
 add_executable(tjost tjost.c tjost_lua.c tjost_uplink.c tlsf-3.0/tlsf.c)
 target_link_libraries(tjost jack_osc ${LIBS})
