@@ -308,7 +308,7 @@ _double_precision(jack_nframes_t time, const char *path, const char *fmt, lua_St
 {
 	Midi_Client *midi_client = luaL_checkudata(L, lua_upvalueindex(2), "Fltr_Midi");
 
-	midi_client->double_precision = lua_toboolean(L, 4);
+	midi_client->double_precision = luaL_checkint(L, 4) != 0 ? 1 : 0;
 
 	return 0;
 }

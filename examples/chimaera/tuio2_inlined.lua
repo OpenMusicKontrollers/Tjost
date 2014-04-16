@@ -27,7 +27,7 @@ message = plugin('dump')
 status = plugin('osc_out', 'osc.jack://status')
 --data = plugin('osc_out', 'osc.jack://data')
 chim = plugin('net_out', 'osc.udp://chimaera.local:4444')
-trig = plugin('osc_out', 'osc.jack://trig')
+--trig = plugin('osc_out', 'osc.jack://trig')
 
 midi = require('midi')
 tuio2 = require('tuio2')
