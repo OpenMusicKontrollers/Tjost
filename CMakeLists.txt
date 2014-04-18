@@ -22,6 +22,11 @@ pkg_search_module(JACK REQUIRED jack)
 include_directories(${JACK_INCLUDE_DIRS})
 set(LIBS ${LIBS} ${JACK_LDFLAGS})
 
+# alsa
+pkg_search_module(ALSA REQUIRED alsa)
+include_directories(${ALSA_INCLUDE_DIRS})
+#set(LIBS ${LIBS} ${ALSA_LDFLAGS})
+
 # lua
 option(USE_LUAJIT "use LuaJIT" ON)
 if(USE_LUAJIT)
@@ -99,6 +104,30 @@ install(TARGETS midi_in DESTINATION lib/tjost)
 add_library(midi_out MODULE mod_midi_out.c)
 set_target_properties(midi_out PROPERTIES PREFIX "")
 install(TARGETS midi_out DESTINATION lib/tjost)
+
+# mod_raw_in
+add_library(raw_in MODULE mod_raw_in.c)
+set_target_properties(raw_in PROPERTIES PREFIX "")
+target_link_libraries(raw_in ${ALSA_LDFLAGS})
+install(TARGETS raw_in DESTINATION lib/tjost)
+
+# mod_raw_out
+add_library(raw_out MODULE mod_raw_out.c)
+set_target_properties(raw_out PROPERTIES PREFIX "")
+target_link_libraries(raw_out ${ALSA_LDFLAGS})
+install(TARGETS raw_out DESTINATION lib/tjost)
+
+# mod_seq_in
+add_library(seq_in MODULE mod_seq_in.c)
+set_target_properties(seq_in PROPERTIES PREFIX "")
+target_link_libraries(seq_in ${ALSA_LDFLAGS})
+install(TARGETS seq_in DESTINATION lib/tjost)
+
+# mod_seq_out
+add_library(seq_out MODULE mod_seq_out.c)
+set_target_properties(seq_out PROPERTIES PREFIX "")
+target_link_libraries(seq_out ${ALSA_LDFLAGS})
+install(TARGETS seq_out DESTINATION lib/tjost)
 
 # mod_audio_in
 add_library(audio_in MODULE mod_audio_in.c)
