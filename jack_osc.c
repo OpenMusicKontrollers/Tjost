@@ -86,10 +86,10 @@ jack_osc_method_match(Jack_OSC_Method *methods, const char *path, const char *fm
 }
 
 void
-jack_osc_method_dispatch(jack_nframes_t time, uint8_t *buf, size_t size, Jack_OSC_Method *methods, void *dat)
+jack_osc_method_dispatch(jack_nframes_t time, jack_osc_data_t *buf, size_t size, Jack_OSC_Method *methods, void *dat)
 {
-	uint8_t *ptr = buf;
-	uint8_t *end = buf + size;
+	jack_osc_data_t *ptr = buf;
+	jack_osc_data_t *end = buf + size/sizeof(jack_osc_data_t);
 
 	const char *path;
 	const char *fmt;
@@ -105,10 +105,10 @@ jack_osc_method_dispatch(jack_nframes_t time, uint8_t *buf, size_t size, Jack_OS
 }
 
 int
-jack_osc_message_check(uint8_t *buf, size_t size)
+jack_osc_message_check(jack_osc_data_t *buf, size_t size)
 {
-	uint8_t *ptr = buf;
-	uint8_t *end = buf + size;
+	jack_osc_data_t *ptr = buf;
+	jack_osc_data_t *end = buf + size/sizeof(jack_osc_data_t);
 
 	const char *path;
 	const char *fmt;
@@ -130,22 +130,22 @@ jack_osc_message_check(uint8_t *buf, size_t size)
 			case JACK_OSC_FLOAT:
 			case JACK_OSC_MIDI:
 			case JACK_OSC_CHAR:
-				ptr += 4;
+				ptr += 1;
 				break;
 
 			case JACK_OSC_STRING:
 			case JACK_OSC_SYMBOL:
-				ptr += jack_osc_strlen((const char *)ptr);
+				ptr += jack_osc_strquads((const char *)ptr);
 				break;
 
 			case JACK_OSC_BLOB:
-				ptr += jack_osc_bloblen(ptr);
+				ptr += jack_osc_blobquads(ptr);
 				break;
 
 			case JACK_OSC_INT64:
 			case JACK_OSC_DOUBLE:
 			case JACK_OSC_TIMETAG:
-				ptr += 8;
+				ptr += 2;
 				break;
 
 			case JACK_OSC_TRUE:
@@ -161,10 +161,10 @@ jack_osc_message_check(uint8_t *buf, size_t size)
 
 #if __BYTE_ORDER == __LITTLE_ENDIAN
 int
-jack_osc_message_ntoh(uint8_t *buf, size_t size)
+jack_osc_message_ntoh(jack_osc_data_t *buf, size_t size)
 {
-	uint8_t *ptr = buf;
-	uint8_t *end = buf + size;
+	jack_osc_data_t *ptr = buf;
+	jack_osc_data_t *end = buf + size/sizeof(jack_osc_data_t);
 
 	const char *path;
 	const char *fmt;
@@ -189,20 +189,20 @@ jack_osc_message_ntoh(uint8_t *buf, size_t size)
 			{
 				uint32_t *u = (uint32_t *)ptr;
 				*u = ntohl(*u);
-				ptr += 4;
+				ptr += 1;
 				break;
 			}
 
 			case JACK_OSC_STRING:
 			case JACK_OSC_SYMBOL:
-				ptr += jack_osc_strlen((const char *)ptr);
+				ptr += jack_osc_strquads((const char *)ptr);
 				break;
 
 			case JACK_OSC_BLOB:
 			{
 				uint32_t *u = (uint32_t *)ptr;
 				*u = ntohl(*u);
-				ptr += jack_osc_bloblen(ptr);
+				ptr += jack_osc_blobquads(ptr);
 				break;
 			}
 
@@ -212,7 +212,7 @@ jack_osc_message_ntoh(uint8_t *buf, size_t size)
 			{
 				uint64_t *u = (uint64_t *)ptr;
 				*u = ntohll(*u);
-				ptr += 8;
+				ptr += 2;
 				break;
 			}
 
@@ -228,10 +228,10 @@ jack_osc_message_ntoh(uint8_t *buf, size_t size)
 }
 
 int
-jack_osc_message_hton(uint8_t *buf, size_t size)
+jack_osc_message_hton(jack_osc_data_t *buf, size_t size)
 {
-	uint8_t *ptr = buf;
-	uint8_t *end = buf + size;
+	jack_osc_data_t *ptr = buf;
+	jack_osc_data_t *end = buf + size/sizeof(jack_osc_data_t);
 
 	const char *path;
 	const char *fmt;
@@ -256,19 +256,19 @@ jack_osc_message_hton(uint8_t *buf, size_t size)
 			{
 				uint32_t *u = (uint32_t *)ptr;
 				*u = htonl(*u);
-				ptr += 4;
+				ptr += 1;
 				break;
 			}
 
 			case JACK_OSC_STRING:
 			case JACK_OSC_SYMBOL:
-				ptr += jack_osc_strlen((const char *)ptr);
+				ptr += jack_osc_strquads((const char *)ptr);
 				break;
 
 			case JACK_OSC_BLOB:
 			{
 				uint32_t *u = (uint32_t *)ptr;
-				ptr += jack_osc_bloblen(ptr);
+				ptr += jack_osc_blobquads(ptr);
 				*u = htonl(*u);
 				break;
 			}
@@ -279,7 +279,7 @@ jack_osc_message_hton(uint8_t *buf, size_t size)
 			{
 				uint64_t *u = (uint64_t *)ptr;
 				*u = htonll(*u);
-				ptr += 8;
+				ptr += 2;
 				break;
 			}
 
@@ -302,27 +302,40 @@ jack_osc_strlen(const char *buf)
 }
 
 size_t
+jack_osc_strquads(const char *buf)
+{
+	return quads(strlen(buf) + 1);
+}
+
+size_t
 jack_osc_fmtlen(const char *buf)
 {
 	return round_to_four_bytes(strlen(buf) + 2) - 1;
 }
 
 size_t
-jack_osc_bloblen(uint8_t *buf)
+jack_osc_bloblen(jack_osc_data_t *buf)
 {
 	int32_t i = *(int32_t *)buf;
 	return 4 + round_to_four_bytes(i);
 }
 
 size_t
-jack_osc_blobsize(uint8_t *buf)
+jack_osc_blobquads(jack_osc_data_t *buf)
+{
+	int32_t i = *(int32_t *)buf;
+	return 1 + quads(i);
+}
+
+size_t
+jack_osc_blobsize(jack_osc_data_t *buf)
 {
 	int32_t i = *(int32_t *)buf;
 	return i;
 }
 
-uint8_t *
-jack_osc_skip(Jack_OSC_Type type, uint8_t *buf)
+jack_osc_data_t *
+jack_osc_skip(Jack_OSC_Type type, jack_osc_data_t *buf)
 {
 	switch(type)
 	{
@@ -330,19 +343,19 @@ jack_osc_skip(Jack_OSC_Type type, uint8_t *buf)
 		case JACK_OSC_FLOAT:
 		case JACK_OSC_MIDI:
 		case JACK_OSC_CHAR:
-			return buf + 4;
+			return buf + 1;
 
 		case JACK_OSC_STRING:
 		case JACK_OSC_SYMBOL:
-			return buf + jack_osc_strlen((const char *)buf);
+			return buf + jack_osc_strquads((const char *)buf);
 
 		case JACK_OSC_BLOB:
-			return buf + jack_osc_bloblen(buf);
+			return buf + jack_osc_blobquads(buf);
 
 		case JACK_OSC_INT64:
 		case JACK_OSC_DOUBLE:
 		case JACK_OSC_TIMETAG:
-			return buf + 8;
+			return buf + 2;
 
 		case JACK_OSC_TRUE:
 		case JACK_OSC_FALSE:
@@ -355,93 +368,93 @@ jack_osc_skip(Jack_OSC_Type type, uint8_t *buf)
 	}
 }
 
-uint8_t *
-jack_osc_get_path(uint8_t *buf, const char **path)
+jack_osc_data_t *
+jack_osc_get_path(jack_osc_data_t *buf, const char **path)
 {
 	*path = (const char *)buf;
-	return buf + jack_osc_strlen(*path);
+	return buf + jack_osc_strquads(*path);
 }
 
-uint8_t *
-jack_osc_get_fmt(uint8_t *buf, const char **fmt)
+jack_osc_data_t *
+jack_osc_get_fmt(jack_osc_data_t *buf, const char **fmt)
 {
 	*fmt = (const char *)buf;
-	return buf + jack_osc_strlen(*fmt);
+	return buf + jack_osc_strquads(*fmt);
 }
 
-uint8_t *
-jack_osc_get_int32(uint8_t *buf, int32_t *i)
+jack_osc_data_t *
+jack_osc_get_int32(jack_osc_data_t *buf, int32_t *i)
 {
 	*i = *(int32_t *)buf;
-	return buf + 4;
+	return buf + 1;
 }
 
-uint8_t *
-jack_osc_get_float(uint8_t *buf, float *f)
+jack_osc_data_t *
+jack_osc_get_float(jack_osc_data_t *buf, float *f)
 {
 	*f = *(float *)buf;
-	return buf + 4;
+	return buf + 1;
 }
 
-uint8_t *
-jack_osc_get_string(uint8_t *buf, const char **s)
+jack_osc_data_t *
+jack_osc_get_string(jack_osc_data_t *buf, const char **s)
 {
 	*s = (const char *)buf;
-	return buf + jack_osc_strlen(*s);
+	return buf + jack_osc_strquads(*s);
 }
 
-uint8_t *
-jack_osc_get_blob(uint8_t *buf, Jack_OSC_Blob *b)
+jack_osc_data_t *
+jack_osc_get_blob(jack_osc_data_t *buf, Jack_OSC_Blob *b)
 {
 	b->size = jack_osc_blobsize(buf);
-	b->payload = buf + 4;
-	return buf + round_to_four_bytes(b->size) + 4;
+	b->payload = buf + 1;
+	return buf + 1 + quads(b->size);
 }
 
-uint8_t *
-jack_osc_get_int64(uint8_t *buf, int64_t *h)
+jack_osc_data_t *
+jack_osc_get_int64(jack_osc_data_t *buf, int64_t *h)
 {
 	*h = *(int64_t *)buf;
-	return buf + 8;
+	return buf + 2;
 }
 
-uint8_t *
-jack_osc_get_double(uint8_t *buf, double *d)
+jack_osc_data_t *
+jack_osc_get_double(jack_osc_data_t *buf, double *d)
 {
 	*d = *(double *)buf;
-	return buf + 8;
+	return buf + 2;
 }
 
-uint8_t *
-jack_osc_get_timetag(uint8_t *buf, uint64_t *t)
+jack_osc_data_t *
+jack_osc_get_timetag(jack_osc_data_t *buf, uint64_t *t)
 {
 	*t = *(uint64_t *)buf;
-	return buf + 8;
+	return buf + 2;
 }
 
-uint8_t *
-jack_osc_get_symbol(uint8_t *buf, const char **S)
+jack_osc_data_t *
+jack_osc_get_symbol(jack_osc_data_t *buf, const char **S)
 {
 	*S = (const char *)buf;
-	return buf + jack_osc_strlen(*S);
+	return buf + jack_osc_strquads(*S);
 }
 
-uint8_t *
-jack_osc_get_char(uint8_t *buf, char *c)
+jack_osc_data_t *
+jack_osc_get_char(jack_osc_data_t *buf, char *c)
 {
 	*c = *(int32_t *)buf;
-	return buf + 4;
+	return buf + 1;
 }
 
-uint8_t *
-jack_osc_get_midi(uint8_t *buf, uint8_t **m)
+jack_osc_data_t *
+jack_osc_get_midi(jack_osc_data_t *buf, uint8_t **m)
 {
-	*m = buf;
-	return buf + 4;
+	*m = (uint8_t *)buf;
+	return buf + 1;
 }
 
-uint8_t *
-jack_osc_get(Jack_OSC_Type type, uint8_t *buf, Jack_OSC_Argument *arg)
+jack_osc_data_t *
+jack_osc_get(Jack_OSC_Type type, jack_osc_data_t *buf, Jack_OSC_Argument *arg)
 {
 	switch(type)
 	{
@@ -480,116 +493,118 @@ jack_osc_get(Jack_OSC_Type type, uint8_t *buf, Jack_OSC_Argument *arg)
 	}
 }
 
-uint8_t *
-jack_osc_set_path(uint8_t *buf, const char *path)
+jack_osc_data_t *
+jack_osc_set_path(jack_osc_data_t *buf, const char *path)
 {
-	size_t len = jack_osc_strlen(path);
-	strncpy((char *)buf, path, len);
+	size_t len = jack_osc_strquads(path);
+	strncpy((char *)buf, path, len*4);
 	return buf + len;
 }
 
-uint8_t *
-jack_osc_set_fmt(uint8_t *buf, const char *fmt)
+jack_osc_data_t *
+jack_osc_set_fmt(jack_osc_data_t *buf, const char *fmt)
 {
 	size_t len = jack_osc_fmtlen(fmt);
-	*buf++ = ',';
-	strncpy((char *)buf, fmt, len);
-	return buf + len;
+	char *fmt_ptr = (char *)buf;
+	*fmt_ptr++ = ',';
+	strncpy(fmt_ptr, fmt, len);
+	return buf + (len+1)/sizeof(jack_osc_data_t);
 }
 
-uint8_t *
-jack_osc_set_int32(uint8_t *buf, int32_t i)
+jack_osc_data_t *
+jack_osc_set_int32(jack_osc_data_t *buf, int32_t i)
 {
 	*(int32_t *)buf = i;
-	return buf + 4;
+	return buf + 1;
 }
 
-uint8_t *
-jack_osc_set_float(uint8_t *buf, float f)
+jack_osc_data_t *
+jack_osc_set_float(jack_osc_data_t *buf, float f)
 {
 	*(float *)buf = f;
-	return buf + 4;
+	return buf + 1;
 }
 
-uint8_t *
-jack_osc_set_string(uint8_t *buf, const char *s)
+jack_osc_data_t *
+jack_osc_set_string(jack_osc_data_t *buf, const char *s)
 {
-	size_t len = jack_osc_strlen(s);
-	strncpy((char *)buf, s, len);
+	size_t len = jack_osc_strquads(s);
+	strncpy((char *)buf, s, len*4);
 	return buf + len;
 }
 
-uint8_t *
-jack_osc_set_blob(uint8_t *buf, int32_t size, uint8_t *payload)
+jack_osc_data_t *
+jack_osc_set_blob(jack_osc_data_t *buf, int32_t size, void *payload)
 {
-	size_t len = round_to_four_bytes(size);
+	size_t len = quads(size); //FIXME
 	*(int32_t *)buf = size;
-	buf += 4;
+	buf += 1;
 	memcpy(buf, payload, size);
-	memset(buf+size, '\0', len-size); // zero padding
+	memset(buf+size, '\0', len*4-size); // zero padding
 	return buf + len;
 }
 
-uint8_t *
-jack_osc_set_blob_inline(uint8_t *buf, int32_t size, uint8_t **payload)
+jack_osc_data_t *
+jack_osc_set_blob_inline(jack_osc_data_t *buf, int32_t size, void **payload)
 {
-	size_t len = round_to_four_bytes(size);
+	size_t len = quads(size); //FIXME
 	*(int32_t *)buf = size;
-	buf += 4;
+	buf += 1;
 	*payload = buf;
 	buf += size;
-	memset(buf+size, '\0', len-size); // zero padding
+	memset(buf+size, '\0', len*4-size); // zero padding
 	return buf + len;
 }
 
-uint8_t *
-jack_osc_set_int64(uint8_t *buf, int64_t h)
+jack_osc_data_t *
+jack_osc_set_int64(jack_osc_data_t *buf, int64_t h)
 {
 	*(int64_t *)buf = h;
-	return buf + 8;
+	return buf + 2;
 }
 
-uint8_t *
-jack_osc_set_double(uint8_t *buf, double d)
+jack_osc_data_t *
+jack_osc_set_double(jack_osc_data_t *buf, double d)
 {
 	*(double *)buf = d;
-	return buf + 8;
+	return buf + 2;
 }
 
-uint8_t *
-jack_osc_set_timetag(uint8_t *buf, uint64_t t)
+jack_osc_data_t *
+jack_osc_set_timetag(jack_osc_data_t *buf, uint64_t t)
 {
 	*(uint64_t *)buf = t;
-	return buf + 8;
+	return buf + 2;
 }
 
-uint8_t *
-jack_osc_set_symbol(uint8_t *buf, const char *S)
+jack_osc_data_t *
+jack_osc_set_symbol(jack_osc_data_t *buf, const char *S)
 {
-	size_t len = jack_osc_strlen(S);
-	strncpy((char *)buf, S, len);
+	size_t len = jack_osc_strquads(S);
+	strncpy((char *)buf, S, len*4);
 	return buf + len;
 }
 
-uint8_t *
-jack_osc_set_char(uint8_t *buf, char c)
+jack_osc_data_t *
+jack_osc_set_char(jack_osc_data_t *buf, char c)
 {
 	*(int32_t *)buf = c;
-	return buf + 4;
+	return buf + 1;
 }
 
-uint8_t *
-jack_osc_set_midi(uint8_t *buf, uint8_t *m)
+jack_osc_data_t *
+jack_osc_set_midi(jack_osc_data_t *buf, uint8_t *m)
 {
-	buf[0] = m[0];
-	buf[1] = m[1];
-	buf[2] = m[2];
-	buf[3] = m[3];
-	return buf + 4;
+	uint8_t *buf_ptr = (uint8_t *)buf;
+	buf_ptr[0] = m[0];
+	buf_ptr[1] = m[1];
+	buf_ptr[2] = m[2];
+	buf_ptr[3] = m[3];
+	return buf + 1;
 }
 
-uint8_t *
-jack_osc_set(Jack_OSC_Type type, uint8_t *buf, Jack_OSC_Argument *arg)
+jack_osc_data_t *
+jack_osc_set(Jack_OSC_Type type, jack_osc_data_t *buf, Jack_OSC_Argument *arg)
 {
 	switch(type)
 	{
@@ -629,9 +644,9 @@ jack_osc_set(Jack_OSC_Type type, uint8_t *buf, Jack_OSC_Argument *arg)
 }
 
 size_t
-jack_osc_vararg_set(uint8_t *buf, const char *path, const char *fmt, ...)
+jack_osc_vararg_set(jack_osc_data_t *buf, const char *path, const char *fmt, ...)
 {
-	uint8_t *ptr = buf;
+	jack_osc_data_t *ptr = buf;
 
 	if(!(ptr = jack_osc_set_path(ptr, path)))
 		return 0;
@@ -655,7 +670,7 @@ jack_osc_vararg_set(uint8_t *buf, const char *path, const char *fmt, ...)
 				ptr = jack_osc_set_string(ptr, va_arg(args, char *));
 				break;
 			case JACK_OSC_BLOB:
-				ptr = jack_osc_set_blob(ptr, va_arg(args, int32_t), va_arg(args, uint8_t *));
+				ptr = jack_osc_set_blob(ptr, va_arg(args, int32_t), va_arg(args, void *));
 				break;
 
 			case JACK_OSC_INT64:
@@ -691,5 +706,6 @@ jack_osc_vararg_set(uint8_t *buf, const char *path, const char *fmt, ...)
 
   va_end(args);
 
-	return ptr - buf;
+	size_t len = (ptr-buf)*sizeof(jack_osc_data_t);
+	return len;
 }

@@ -38,7 +38,7 @@ _udp_recv_cb(uv_udp_t *handle, ssize_t nread, const uv_buf_t *buf, const struct 
 	NetAddr_UDP_Responder *netaddr = handle->data;
 
 	if(nread > 0)
-		netaddr->cb((uint8_t *)buf->base, nread, netaddr->dat);
+		netaddr->cb((jack_osc_data_t *)buf->base, nread, netaddr->dat);
 	else if (nread < 0)
 	{
 		uv_close((uv_handle_t *)handle, NULL);

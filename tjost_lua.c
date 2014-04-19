@@ -30,10 +30,10 @@ struct _Tjost_Blob {
 	uint8_t buf[0];
 };
 
-static uint8_t buffer [TJOST_BUF_SIZE] __attribute__((aligned (8)));
+static jack_osc_data_t buffer [TJOST_BUF_SIZE] __attribute__((aligned (8)));
 
-static uint8_t *
-_push(Tjost_Host *host, char type, uint8_t *ptr)
+static jack_osc_data_t *
+_push(Tjost_Host *host, char type, jack_osc_data_t *ptr)
 {
 	lua_State *L = host->L;
 
@@ -149,7 +149,7 @@ tjost_lua_deserialize_unicast(Tjost_Event *tev)
 	Tjost_Host *host = module->host;
 	lua_State *L = host->L;
 
-	uint8_t *ptr = tev->buf;
+	jack_osc_data_t *ptr = tev->buf;
 
 	const char *path;
 	const char *fmt;
@@ -182,7 +182,7 @@ void
 tjost_lua_deserialize_broadcast(Tjost_Event *tev, Eina_Inlist *modules)
 {
 	//printf("deserialize_broadcast\n");
-	uint8_t *ptr = tev->buf;
+	jack_osc_data_t *ptr = tev->buf;
 
 	const char *path;
 	const char *fmt;
@@ -224,7 +224,7 @@ _serialize(lua_State *L, Tjost_Module *module)
 
 	size_t len;
 
-	uint8_t *ptr = buffer;
+	jack_osc_data_t *ptr = buffer;
 
 	if(!jack_osc_check_path(path))
 	{
@@ -307,7 +307,7 @@ _serialize(lua_State *L, Tjost_Module *module)
 				break;
 		}
 
-	size_t size = ptr - buffer;
+	size_t size = (ptr - buffer)*sizeof(jack_osc_data_t);
 
 	tjost_module_schedule(module, time, size, buffer);
 

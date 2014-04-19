@@ -59,7 +59,7 @@ _update_tstamp(Tjost_Module *module, uint64_t tstamp)
 }
 
 static void
-_handle_message(Tjost_Module *module, jack_nframes_t tstamp, uint8_t *buf, size_t len)
+_handle_message(Tjost_Module *module, jack_nframes_t tstamp, jack_osc_data_t *buf, size_t len)
 {
 	Mod_Net *net = module->dat;
 
@@ -85,27 +85,28 @@ _handle_message(Tjost_Module *module, jack_nframes_t tstamp, uint8_t *buf, size_
 }
 
 static void
-_handle_bundle(Tjost_Module *module, uint8_t *buf, size_t len)
+_handle_bundle(Tjost_Module *module, jack_osc_data_t *buf, size_t len)
 {
 	if(strncmp((char *)buf, bundle_str, 8)) // bundle header valid?
 		return;
 
-	uint8_t *end = buf + len;
-	uint8_t *ptr;
+	jack_osc_data_t *end = buf + len/sizeof(jack_osc_data_t);
+	jack_osc_data_t *ptr;
 
-	uint64_t timetag = ntohll(*(uint64_t *)(buf + 8));
+	uint64_t timetag = ntohll(*(uint64_t *)(buf + 2));
 	jack_nframes_t tstamp = _update_tstamp(module, timetag);
 
 	int has_nested_bundles = 0;
 
-	ptr = buf + 16; // skip bundle header
+	ptr = buf + 4; // skip bundle header
 	while(ptr < end)
 	{
 		int32_t *size = (int32_t *)ptr;
 		int32_t hsize = htonl(*size);
-		ptr += 4;
+		ptr += 1;
 
-		switch(*ptr)
+		char c = *(char *)ptr;
+		switch(c)
 		{
 			case '#':
 				has_nested_bundles = 1;
@@ -115,7 +116,7 @@ _handle_bundle(Tjost_Module *module, uint8_t *buf, size_t len)
 				_handle_message(module, tstamp, ptr, hsize);
 				break;
 			default:
-				fprintf(stderr, "not an OSC bundle item '%c'\n", *ptr);
+				fprintf(stderr, "not an OSC bundle item '%c'\n", c);
 				return;
 		}
 
@@ -125,14 +126,15 @@ _handle_bundle(Tjost_Module *module, uint8_t *buf, size_t len)
 	if(!has_nested_bundles)
 		return;
 
-	ptr = buf + 16; // skip bundle header
+	ptr = buf + 4; // skip bundle header
 	while(ptr < end)
 	{
 		int32_t *size = (int32_t *)ptr;
 		int32_t hsize = htonl(*size);
-		ptr += 4;
+		ptr += 1;
 
-		if(*ptr == '#')
+		char c = *(char *)ptr;
+		if(c == '#')
 			_handle_bundle(module, ptr, hsize);
 
 		ptr += hsize;
@@ -140,12 +142,13 @@ _handle_bundle(Tjost_Module *module, uint8_t *buf, size_t len)
 }
 
 void
-mod_net_recv_cb(uint8_t *buf, size_t len, void *data)
+mod_net_recv_cb(jack_osc_data_t *buf, size_t len, void *data)
 {
 	Tjost_Module *module = data;
 
 	// check and insert messages into sorted list
-	switch(*buf)
+	char c = *(char *)buf;
+	switch(c)
 	{
 		case '#':
 			_handle_bundle(module, buf, len);
@@ -210,11 +213,16 @@ _next(Tjost_Module *module)
 			frac = htonl(frac);
 			uint32_t nsize = htonl(size);
 
-			static uint8_t header [20];
+			//static uint8_t header [20]; //FIXME remove
+			//memcpy(header, bundle_str, 8);
+			//memcpy(header+8, &sec, 4);
+			//memcpy(header+12, &frac, 4);
+			//memcpy(header+16, &nsize, 4);
+			static jack_osc_data_t header [5];
 			memcpy(header, bundle_str, 8);
-			memcpy(header+8, &sec, 4);
-			memcpy(header+12, &frac, 4);
-			memcpy(header+16, &nsize, 4);
+			header[2] = sec;
+			header[3] = frac;
+			header[4] = nsize;
 		
 			static int32_t psize;
 			psize = size + sizeof(header); // packet size for TCP preamble
@@ -284,7 +292,7 @@ mod_net_process_in(Tjost_Module *module, jack_nframes_t nframes)
 		{
 			jack_ringbuffer_read_advance(net->rb_in, sizeof(Tjost_Event));
 
-			uint8_t *bf = tjost_host_schedule_inline(host, module, tev.time, tev.size);
+			jack_osc_data_t *bf = tjost_host_schedule_inline(host, module, tev.time, tev.size);
 			if(jack_ringbuffer_read(net->rb_in, (char *)bf, tev.size) != tev.size)
 				tjost_host_message_push(host, "net_in: %s", "ringbuffer read error");
 		}

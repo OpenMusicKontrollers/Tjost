@@ -23,7 +23,7 @@
 
 #include <tjost.h>
 
-static uint8_t buffer [TJOST_BUF_SIZE] __attribute__((aligned (8)));
+static jack_osc_data_t buffer [TJOST_BUF_SIZE] __attribute__((aligned (8)));
 static const char *midi_path = "/midi";
 
 int
@@ -63,17 +63,20 @@ process_in(jack_nframes_t nframes, void *arg)
 
 			uint32_t N = i-last_i;
 
-			uint8_t *ptr = buffer;
+			jack_osc_data_t *ptr = buffer;
 
 			ptr = jack_osc_set_path(ptr, midi_path);
 
-			uint8_t *fmt = ptr;
-			*ptr++ = ',';
-			memset(ptr, 'm', N);
-			ptr += N;
-			*ptr++ = '\0';
-			while( (ptr-fmt) % 4)
-				*ptr++ = '\0';
+			char *fmt = (char *)ptr;
+			char *fmt_ptr = fmt;
+			*fmt_ptr++ = ',';
+			memset(fmt_ptr, 'm', N);
+			fmt_ptr += N;
+			*fmt_ptr++ = '\0';
+			while( (fmt_ptr-fmt) % 4)
+				*fmt_ptr++ = '\0';
+
+			ptr = (jack_osc_data_t *)fmt_ptr;
 
 			uint32_t j;
 			for(j=last_i; j<i; j++)
@@ -90,7 +93,7 @@ process_in(jack_nframes_t nframes, void *arg)
 				ptr = jack_osc_set_midi(ptr, m);
 			}
 		
-			size_t len = ptr - buffer;
+			size_t len = (ptr - buffer)*sizeof(jack_osc_data_t);
 			tjost_host_schedule(module->host, module, mev.time + last, len, buffer);
 
 			last_i = i;

@@ -23,12 +23,12 @@
 
 #include <tjost.h>
 
-static uint8_t buf_rx [TJOST_BUF_SIZE] __attribute__((aligned (8)));
-static uint8_t buf_tx [TJOST_BUF_SIZE] __attribute__((aligned (8)));
+static jack_osc_data_t buf_rx [TJOST_BUF_SIZE] __attribute__((aligned (8)));
+static jack_osc_data_t buf_tx [TJOST_BUF_SIZE] __attribute__((aligned (8)));
 
 // non real time
 static void
-tjost_uplink_rx_push(Tjost_Host *host, Tjost_Module *module, uint8_t *buf, size_t size)
+tjost_uplink_rx_push(Tjost_Host *host, Tjost_Module *module, jack_osc_data_t *buf, size_t size)
 {
 	Tjost_Event tev;
 	tev.module = module;
@@ -45,14 +45,14 @@ tjost_uplink_rx_push(Tjost_Host *host, Tjost_Module *module, uint8_t *buf, size_
 }
 
 static int
-_connect(jack_nframes_t time, const char *path, const char *fmt, uint8_t *buf, void *dat)
+_connect(jack_nframes_t time, const char *path, const char *fmt, jack_osc_data_t *buf, void *dat)
 {
 	Tjost_Event *tev = dat;
 	Tjost_Module *module = tev->module;
 	Tjost_Host *host = module->host;
 
 	const char *port_a, *port_b;
-	uint8_t *ptr = buf;
+	jack_osc_data_t *ptr = buf;
 
 	ptr = jack_osc_get_string(ptr, &port_a);
 	ptr = jack_osc_get_string(ptr, &port_b);
@@ -63,14 +63,14 @@ _connect(jack_nframes_t time, const char *path, const char *fmt, uint8_t *buf, v
 }
 
 static int
-_disconnect(jack_nframes_t time, const char *path, const char *fmt, uint8_t *buf, void *dat)
+_disconnect(jack_nframes_t time, const char *path, const char *fmt, jack_osc_data_t *buf, void *dat)
 {
 	Tjost_Event *tev = dat;
 	Tjost_Module *module = tev->module;
 	Tjost_Host *host = module->host;
 
 	const char *port_a, *port_b;
-	uint8_t *ptr = buf;
+	jack_osc_data_t *ptr = buf;
 
 	ptr = jack_osc_get_string(ptr, &port_a);
 	ptr = jack_osc_get_string(ptr, &port_b);
@@ -81,7 +81,7 @@ _disconnect(jack_nframes_t time, const char *path, const char *fmt, uint8_t *buf
 }
 
 static int
-_ports(jack_nframes_t time, const char *path, const char *fmt, uint8_t *buf, void *dat)
+_ports(jack_nframes_t time, const char *path, const char *fmt, jack_osc_data_t *buf, void *dat)
 {
 	Tjost_Event *tev = dat;
 	Tjost_Module *module = tev->module;
@@ -92,43 +92,48 @@ _ports(jack_nframes_t time, const char *path, const char *fmt, uint8_t *buf, voi
 	if(ports)
 	{
 		const char **name;
-		uint8_t *ptr = buf_rx;
+		jack_osc_data_t *ptr = buf_rx;
 
 		ptr = jack_osc_set_path(ptr, "/jack/ports");
 
-		uint8_t *fmt = ptr;
-		*ptr++ = ',';
+		char *fmt = (char *)ptr;
+		char *fmt_ptr = fmt;
+		*fmt_ptr++ = ',';
 		for(name=ports; *name; name++)
-			*ptr++ = 's';
-		*ptr++ = '\0';
-		while( ((ptr - fmt) % 4) )
-			*ptr++ = '\0';
+			*fmt_ptr++ = 's';
+		*fmt_ptr++ = '\0';
+		while( ((fmt_ptr - fmt) % 4) )
+			*fmt_ptr++ = '\0';
+
+		ptr = (jack_osc_data_t *)fmt_ptr;
 
 		for(name=ports; *name; name++)
 			ptr = jack_osc_set_string(ptr, *name);
 
 		jack_free(ports);
-		tjost_uplink_rx_push(host, module, buf_rx, ptr-buf_rx);
+		size_t len = (ptr-buf_rx)*sizeof(jack_osc_data_t);
+		tjost_uplink_rx_push(host, module, buf_rx, len);
 	}
 	else
 	{
-		uint8_t *ptr = buf_rx;
+		jack_osc_data_t *ptr = buf_rx;
 		ptr = jack_osc_set_path(ptr, "/jack/ports");
 		ptr = jack_osc_set_fmt(ptr, "");
-		tjost_uplink_rx_push(host, module, buf_rx, ptr-buf_rx);
+		size_t len = (ptr-buf_rx)*sizeof(jack_osc_data_t);
+		tjost_uplink_rx_push(host, module, buf_rx, len);
 	}
 
 	return 1;
 }
 
 static int
-_connections(jack_nframes_t time, const char *path, const char *fmt, uint8_t *buf, void *dat)
+_connections(jack_nframes_t time, const char *path, const char *fmt, jack_osc_data_t *buf, void *dat)
 {
 	Tjost_Event *tev = dat;
 	Tjost_Module *module = tev->module;
 	Tjost_Host *host = module->host;
 
-	uint8_t *ptr = buf;
+	jack_osc_data_t *ptr = buf;
 	const char *port_name;
 
 	ptr = jack_osc_get_string(ptr, &port_name);
@@ -140,33 +145,38 @@ _connections(jack_nframes_t time, const char *path, const char *fmt, uint8_t *bu
 	if(connections)
 	{
 		const char **name;
-		uint8_t *ptr = buf_rx;
+		jack_osc_data_t *ptr = buf_rx;
 
 		ptr = jack_osc_set_path(ptr, "/jack/connections");
 
-		uint8_t *fmt = ptr;
-		*ptr++ = ',';
-		*ptr++ = 's';
+		char *fmt = (char *)ptr;
+		char *fmt_ptr = fmt;
+		*fmt_ptr++ = ',';
+		*fmt_ptr++ = 's';
 		for(name=connections; *name; name++)
-			*ptr++ = 's';
-		*ptr++ = '\0';
-		while( ((ptr - fmt) % 4) )
-			*ptr++ = '\0';
+			*fmt_ptr++ = 's';
+		*fmt_ptr++ = '\0';
+		while( ((fmt_ptr - fmt) % 4) )
+			*fmt_ptr++ = '\0';
+
+		ptr = (jack_osc_data_t *)fmt_ptr;
 
 		ptr = jack_osc_set_string(ptr, port_name);
 		for(name=connections; *name; name++)
 			ptr = jack_osc_set_string(ptr, *name);
 
 		jack_free(connections);
-		tjost_uplink_rx_push(host, module, buf_rx, ptr-buf_rx);
+		size_t len = (ptr-buf_rx)*sizeof(jack_osc_data_t);
+		tjost_uplink_rx_push(host, module, buf_rx, len);
 	}
 	else
 	{
-		uint8_t *ptr = buf_rx;
+		jack_osc_data_t *ptr = buf_rx;
 		ptr = jack_osc_set_path(ptr, "/jack/connections");
 		ptr = jack_osc_set_fmt(ptr, "s");
 		ptr = jack_osc_set_string(ptr, port_name);
-		tjost_uplink_rx_push(host, module, buf_rx, ptr-buf_rx);
+		size_t len = (ptr-buf_rx)*sizeof(jack_osc_data_t);
+		tjost_uplink_rx_push(host, module, buf_rx, len);
 	}
 
 	return 1;
@@ -233,7 +243,7 @@ tjost_uplink_rx_drain(Tjost_Host *host, int ignore)
 				jack_ringbuffer_read_advance(host->rb_uplink_rx, tev.size);
 			else
 			{
-				uint8_t *bf = tjost_host_schedule_inline(host, tev.module, tev.time, tev.size);
+				jack_osc_data_t *bf = tjost_host_schedule_inline(host, tev.module, tev.time, tev.size);
 				jack_ringbuffer_read(host->rb_uplink_rx, (char *)bf, tev.size);
 			}
 		}

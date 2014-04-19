@@ -29,8 +29,8 @@ struct _Data {
 	jack_ringbuffer_t *rb;
 	uv_async_t asio;
 };
-
-static uint8_t buffer [TJOST_BUF_SIZE] __attribute__((aligned (8)));
+	
+static jack_osc_data_t buffer [TJOST_BUF_SIZE] __attribute__((aligned (8)));
 
 static void
 _asio(uv_async_t *handle)
@@ -51,7 +51,7 @@ _asio(uv_async_t *handle)
 			{
 				const char *path;
 				const char *fmt;
-				uint8_t *ptr = buffer;
+				jack_osc_data_t *ptr = buffer;
 				ptr = jack_osc_get_path(ptr, &path);
 				ptr = jack_osc_get_fmt(ptr, &fmt);
 				printf("%08"PRIX32" %4zu: %s %s", tev.time, tev.size, path, fmt+1);
@@ -89,8 +89,9 @@ _asio(uv_async_t *handle)
 							{
 								printf("[");
 								int32_t i;
+								uint8_t *bytes = b.payload;
 								for(i=0; i<b.size; i++)
-									printf("%02"PRIX8",", b.payload[i]);
+									printf("%02"PRIX8",", bytes[i]);
 								printf("\b]");
 							}
 							break;

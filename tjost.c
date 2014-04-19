@@ -105,7 +105,7 @@ tjost_host_schedule(Tjost_Host *host, Tjost_Module *module, jack_nframes_t time,
 	host->queue = eina_inlist_sorted_insert(host->queue, EINA_INLIST_GET(tev), _tjost_schedule_sort);
 }
 
-uint8_t *
+jack_osc_data_t *
 tjost_host_schedule_inline(Tjost_Host *host, Tjost_Module *module, jack_nframes_t time, size_t len)
 {
 	Tjost_Event *tev = tjost_alloc(host, sizeof(Tjost_Event) + len);
@@ -179,7 +179,7 @@ tjost_host_message_pull(Tjost_Host *host, char *str)
 static Tjost_Mem_Chunk *
 tjost_map_memory_chunk(size_t size)
 {
-	uint8_t *area = mmap(NULL, size, PROT_READ|PROT_WRITE, MAP_32BIT|MAP_PRIVATE|MAP_ANONYMOUS|MAP_LOCKED, -1, 0);
+	void *area = mmap(NULL, size, PROT_READ|PROT_WRITE, MAP_32BIT|MAP_PRIVATE|MAP_ANONYMOUS|MAP_LOCKED, -1, 0);
 
 	if(area)
 	{

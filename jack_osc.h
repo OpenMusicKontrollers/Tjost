@@ -45,18 +45,19 @@ extern "C" {
 #define JACK_DEFAULT_OSC_TYPE JACK_DEFAULT_MIDI_TYPE
 #define JACK_DEFAULT_OSC_BUFFER_SIZE 0
 
-#define jack_osc_data_t									jack_midi_data_t
+#define jack_osc_data_t									uint32_t
 #define jack_osc_event_t								jack_midi_event_t
 
 #define jack_osc_get_event_count				jack_midi_get_event_count
 #define jack_osc_event_get							jack_midi_event_get
 #define jack_osc_clear_buffer						jack_midi_clear_buffer
 #define jack_osc_max_event_size					jack_midi_max_event_size
-#define jack_osc_event_reserve					jack_midi_event_reserve
-#define jack_osc_event_write						jack_midi_event_write
 #define jack_osc_get_lost_event_count		jack_midi_lost_event_count
 
-typedef int (*Jack_OSC_Callback) (jack_nframes_t time, const char *path, const char *fmt, uint8_t *arg, void *dat);
+#define jack_osc_event_reserve					(jack_osc_data_t *)jack_midi_event_reserve
+#define jack_osc_event_write(port_buf, time, buf, size)	jack_midi_event_write((port_buf), (time), (jack_midi_data_t *)(buf), (size))
+
+typedef int (*Jack_OSC_Callback) (jack_nframes_t time, const char *path, const char *fmt, jack_osc_data_t *arg, void *dat);
 typedef struct _Jack_OSC_Method Jack_OSC_Method;
 typedef struct _Jack_OSC_Blob Jack_OSC_Blob;
 typedef union _Jack_OSC_Argument Jack_OSC_Argument;
@@ -91,7 +92,7 @@ struct _Jack_OSC_Method {
 
 struct _Jack_OSC_Blob {
 	int32_t size;
-	uint8_t *payload;
+	void *payload;
 };
 
 union _Jack_OSC_Argument {
@@ -113,64 +114,66 @@ int jack_osc_check_path(const char *path);
 int jack_osc_check_fmt(const char *format, int offset);
 
 int jack_osc_method_match(Jack_OSC_Method *methods, const char *path, const char *fmt);
-void jack_osc_method_dispatch(jack_nframes_t time, uint8_t *buf, size_t size, Jack_OSC_Method *methods, void *dat);
-int jack_osc_message_check(uint8_t *buf, size_t size);
+void jack_osc_method_dispatch(jack_nframes_t time, jack_osc_data_t *buf, size_t size, Jack_OSC_Method *methods, void *dat);
+int jack_osc_message_check(jack_osc_data_t *buf, size_t size);
 #if __BYTE_ORDER == __BIG_ENDIAN
 #	define jack_osc_message_ntoh jack_osc_message_check
 #	define jack_osc_message_hton jack_osc_message_check
 #else
 # if __BYTE_ORDER == __LITTLE_ENDIAN
-int jack_osc_message_ntoh(uint8_t *buf, size_t size);
-int jack_osc_message_hton(uint8_t *buf, size_t size);
+int jack_osc_message_ntoh(jack_osc_data_t *buf, size_t size);
+int jack_osc_message_hton(jack_osc_data_t *buf, size_t size);
 # endif
 #endif
 
 // OSC object lengths
 size_t jack_osc_strlen(const char *buf);
 size_t jack_osc_fmtlen(const char *buf);
-size_t jack_osc_bloblen(uint8_t *buf);
-size_t jack_osc_blobsize(uint8_t *buf);
+size_t jack_osc_bloblen(jack_osc_data_t *buf);
+size_t jack_osc_strquads(const char *buf);
+size_t jack_osc_blobquads(jack_osc_data_t *buf);
+size_t jack_osc_blobsize(jack_osc_data_t *buf);
 
 // get OSC arguments from raw buffer
-uint8_t *jack_osc_get_path(uint8_t *buf, const char **path);
-uint8_t *jack_osc_get_fmt(uint8_t *buf, const char **fmt);
+jack_osc_data_t *jack_osc_get_path(jack_osc_data_t *buf, const char **path);
+jack_osc_data_t *jack_osc_get_fmt(jack_osc_data_t *buf, const char **fmt);
 
-uint8_t *jack_osc_get_int32(uint8_t *buf, int32_t *i);
-uint8_t *jack_osc_get_float(uint8_t *buf, float *f);
-uint8_t *jack_osc_get_string(uint8_t *buf, const char **s);
-uint8_t *jack_osc_get_blob(uint8_t *buf, Jack_OSC_Blob *b);
+jack_osc_data_t *jack_osc_get_int32(jack_osc_data_t *buf, int32_t *i);
+jack_osc_data_t *jack_osc_get_float(jack_osc_data_t *buf, float *f);
+jack_osc_data_t *jack_osc_get_string(jack_osc_data_t *buf, const char **s);
+jack_osc_data_t *jack_osc_get_blob(jack_osc_data_t *buf, Jack_OSC_Blob *b);
 
-uint8_t *jack_osc_get_int64(uint8_t *buf, int64_t *h);
-uint8_t *jack_osc_get_double(uint8_t *buf, double *d);
-uint8_t *jack_osc_get_timetag(uint8_t *buf, uint64_t *t);
+jack_osc_data_t *jack_osc_get_int64(jack_osc_data_t *buf, int64_t *h);
+jack_osc_data_t *jack_osc_get_double(jack_osc_data_t *buf, double *d);
+jack_osc_data_t *jack_osc_get_timetag(jack_osc_data_t *buf, uint64_t *t);
 
-uint8_t *jack_osc_get_symbol(uint8_t *buf, const char **S);
-uint8_t *jack_osc_get_char(uint8_t *buf, char *c);
-uint8_t *jack_osc_get_midi(uint8_t *buf, uint8_t **m);
+jack_osc_data_t *jack_osc_get_symbol(jack_osc_data_t *buf, const char **S);
+jack_osc_data_t *jack_osc_get_char(jack_osc_data_t *buf, char *c);
+jack_osc_data_t *jack_osc_get_midi(jack_osc_data_t *buf, uint8_t **m);
 
-uint8_t *jack_osc_skip(Jack_OSC_Type type, uint8_t *buf);
-uint8_t *jack_osc_get(Jack_OSC_Type type, uint8_t *buf, Jack_OSC_Argument *arg);
+jack_osc_data_t *jack_osc_skip(Jack_OSC_Type type, jack_osc_data_t *buf);
+jack_osc_data_t *jack_osc_get(Jack_OSC_Type type, jack_osc_data_t *buf, Jack_OSC_Argument *arg);
 
 // write OSC argument to raw buffer
-uint8_t *jack_osc_set_path(uint8_t *buf, const char *path);
-uint8_t *jack_osc_set_fmt(uint8_t *buf, const char *fmt);
+jack_osc_data_t *jack_osc_set_path(jack_osc_data_t *buf, const char *path);
+jack_osc_data_t *jack_osc_set_fmt(jack_osc_data_t *buf, const char *fmt);
 
-uint8_t *jack_osc_set_int32(uint8_t *buf, int32_t i);
-uint8_t *jack_osc_set_float(uint8_t *buf, float f);
-uint8_t *jack_osc_set_string(uint8_t *buf, const char *s);
-uint8_t *jack_osc_set_blob(uint8_t *buf, int32_t size, uint8_t *payload);
-uint8_t *jack_osc_set_blob_inline(uint8_t *buf, int32_t size, uint8_t **payload);
+jack_osc_data_t *jack_osc_set_int32(jack_osc_data_t *buf, int32_t i);
+jack_osc_data_t *jack_osc_set_float(jack_osc_data_t *buf, float f);
+jack_osc_data_t *jack_osc_set_string(jack_osc_data_t *buf, const char *s);
+jack_osc_data_t *jack_osc_set_blob(jack_osc_data_t *buf, int32_t size, void *payload);
+jack_osc_data_t *jack_osc_set_blob_inline(jack_osc_data_t *buf, int32_t size, void **payload);
 
-uint8_t *jack_osc_set_int64(uint8_t *buf, int64_t h);
-uint8_t *jack_osc_set_double(uint8_t *buf, double d);
-uint8_t *jack_osc_set_timetag(uint8_t *buf, uint64_t t);
+jack_osc_data_t *jack_osc_set_int64(jack_osc_data_t *buf, int64_t h);
+jack_osc_data_t *jack_osc_set_double(jack_osc_data_t *buf, double d);
+jack_osc_data_t *jack_osc_set_timetag(jack_osc_data_t *buf, uint64_t t);
 
-uint8_t *jack_osc_set_symbol(uint8_t *buf, const char *S);
-uint8_t *jack_osc_set_char(uint8_t *buf, char c);
-uint8_t *jack_osc_set_midi(uint8_t *buf, uint8_t *m);
+jack_osc_data_t *jack_osc_set_symbol(jack_osc_data_t *buf, const char *S);
+jack_osc_data_t *jack_osc_set_char(jack_osc_data_t *buf, char c);
+jack_osc_data_t *jack_osc_set_midi(jack_osc_data_t *buf, uint8_t *m);
 
-uint8_t *jack_osc_set(Jack_OSC_Type type, uint8_t *buf, Jack_OSC_Argument *arg);
-size_t jack_osc_vararg_set(uint8_t *buf, const char *path, const char *fmt, ...);
+jack_osc_data_t *jack_osc_set(Jack_OSC_Type type, jack_osc_data_t *buf, Jack_OSC_Argument *arg);
+size_t jack_osc_vararg_set(jack_osc_data_t *buf, const char *path, const char *fmt, ...);
 
 #define quads(size) (((((size_t)size-1) & ~0x3) >> 2) + 1)
 #define round_to_four_bytes(size) (quads((size_t)size) << 2)

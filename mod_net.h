@@ -58,7 +58,7 @@ struct _Mod_Net {
 };
 
 void mod_net_sync(uv_timer_t *handle);
-void mod_net_recv_cb(uint8_t *buf, size_t len, void *data);
+void mod_net_recv_cb(jack_osc_data_t *buf, size_t len, void *data);
 void mod_net_asio(uv_async_t *handle);
 
 int mod_net_process_in(Tjost_Module *module, jack_nframes_t);

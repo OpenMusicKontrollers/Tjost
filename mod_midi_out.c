@@ -31,7 +31,7 @@ struct _Data {
 };
 
 static int
-_midi(jack_nframes_t time, const char *path, const char *fmt, uint8_t *buf, void *dat)
+_midi(jack_nframes_t time, const char *path, const char *fmt, jack_osc_data_t *buf, void *dat)
 {
 	Data *data = dat;
 
@@ -39,7 +39,7 @@ _midi(jack_nframes_t time, const char *path, const char *fmt, uint8_t *buf, void
 	uint8_t m [3];
 	uint8_t *M;
 
-	uint8_t *ptr = buf;
+	jack_osc_data_t *ptr = buf;
 	const char *type;
 	for(type=fmt; *type!='\0'; type++)
 		switch(*type)

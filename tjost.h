@@ -67,7 +67,7 @@ struct _Tjost_Event {
 
 	jack_nframes_t time;
 	size_t size;
-	uint8_t buf [0];
+	jack_osc_data_t buf [0];
 };
 
 struct _Tjost_Module {
@@ -93,14 +93,14 @@ struct _Tjost_Child {
 };
 
 #define TJOST_MODULE_BROADCAST NULL
-#define TJOST_BUF_SIZE 0x4000
-#define TJOST_RINGBUF_SIZE 0x10000
+#define TJOST_BUF_SIZE (0x1000*sizeof(jack_osc_data_t))
+#define TJOST_RINGBUF_SIZE (0x4000*sizeof(jack_osc_data_t))
 
 struct _Tjost_Mem_Chunk {
 	EINA_INLIST;
 
 	size_t size;
-	uint8_t *area;
+	void *area;
 	pool_t pool;
 };
 
@@ -142,7 +142,7 @@ void *tjost_realloc(Tjost_Host *host, size_t len, void *buf);
 void tjost_free(Tjost_Host *host, void *buf);
 
 void tjost_host_schedule(Tjost_Host *host, Tjost_Module *module, jack_nframes_t time, size_t len, void *buf);
-uint8_t *tjost_host_schedule_inline(Tjost_Host *host, Tjost_Module *module, jack_nframes_t time, size_t len);
+jack_osc_data_t *tjost_host_schedule_inline(Tjost_Host *host, Tjost_Module *module, jack_nframes_t time, size_t len);
 void tjost_module_schedule(Tjost_Module *module, jack_nframes_t time, size_t len, void *buf);
 
 void tjost_host_message_push(Tjost_Host *host, const char *fmt, ...);

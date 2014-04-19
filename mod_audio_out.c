@@ -32,7 +32,7 @@ struct _Data {
 };
 
 static int
-_audio(jack_nframes_t time, const char *path, const char *fmt, uint8_t *buf, void *dat)
+_audio(jack_nframes_t time, const char *path, const char *fmt, jack_osc_data_t *buf, void *dat)
 {
 	Data *data = dat;
 
@@ -40,7 +40,7 @@ _audio(jack_nframes_t time, const char *path, const char *fmt, uint8_t *buf, voi
 	jack_nframes_t last;
 	int32_t sample_type;
 
-	uint8_t *ptr = buf;
+	jack_osc_data_t *ptr = buf;
 	ptr = jack_osc_get_int32(ptr, (int32_t *)&last); //TODO needs to be checked
 	ptr = jack_osc_get_int32(ptr, &sample_type);
 	ptr = jack_osc_get_blob(ptr, &b);
@@ -51,7 +51,7 @@ _audio(jack_nframes_t time, const char *path, const char *fmt, uint8_t *buf, voi
 	{
 		case SAMPLE_TYPE_UINT8:
 		{
-			uint8_t *load = (uint8_t *)b.payload;
+			uint8_t *load = b.payload;
 			int i;
 			for(i=0; i<b.size/sizeof(uint8_t); i++)
 				port_buf_out[i] = (jack_default_audio_sample_t)load[i] / 0xffU;
@@ -59,7 +59,7 @@ _audio(jack_nframes_t time, const char *path, const char *fmt, uint8_t *buf, voi
 		}
 		case SAMPLE_TYPE_INT8:
 		{
-			int8_t *load = (int8_t *)b.payload;
+			int8_t *load = b.payload;
 			int i;
 			for(i=0; i<b.size/sizeof(int8_t); i++)
 				port_buf_out[i] = (jack_default_audio_sample_t)load[i] / 0x7f;
@@ -68,7 +68,7 @@ _audio(jack_nframes_t time, const char *path, const char *fmt, uint8_t *buf, voi
 
 		case SAMPLE_TYPE_UINT12:
 		{
-			uint16_t *load = (uint16_t *)b.payload;
+			uint16_t *load = b.payload;
 			int i;
 			for(i=0; i<b.size/sizeof(uint16_t); i++)
 			{
@@ -79,7 +79,7 @@ _audio(jack_nframes_t time, const char *path, const char *fmt, uint8_t *buf, voi
 		}
 		case SAMPLE_TYPE_INT12:
 		{
-			int16_t *load = (int16_t *)b.payload;
+			int16_t *load = b.payload;
 			int i;
 			for(i=0; i<b.size/sizeof(int16_t); i++)
 			{
@@ -91,7 +91,7 @@ _audio(jack_nframes_t time, const char *path, const char *fmt, uint8_t *buf, voi
 
 		case SAMPLE_TYPE_UINT16:
 		{
-			uint16_t *load = (uint16_t *)b.payload;
+			uint16_t *load = b.payload;
 			int i;
 			for(i=0; i<b.size/sizeof(uint16_t); i++)
 			{
@@ -102,7 +102,7 @@ _audio(jack_nframes_t time, const char *path, const char *fmt, uint8_t *buf, voi
 		}
 		case SAMPLE_TYPE_INT16:
 		{
-			int16_t *load = (int16_t *)b.payload;
+			int16_t *load = b.payload;
 			int i;
 			for(i=0; i<b.size/sizeof(int16_t); i++)
 			{
@@ -114,7 +114,7 @@ _audio(jack_nframes_t time, const char *path, const char *fmt, uint8_t *buf, voi
 
 		case SAMPLE_TYPE_UINT24:
 		{
-			uint32_t *load = (uint32_t *)b.payload;
+			uint32_t *load = b.payload;
 			int i;
 			for(i=0; i<b.size/sizeof(uint32_t); i++)
 			{
@@ -125,7 +125,7 @@ _audio(jack_nframes_t time, const char *path, const char *fmt, uint8_t *buf, voi
 		}
 		case SAMPLE_TYPE_INT24:
 		{
-			int32_t *load = (int32_t *)b.payload;
+			int32_t *load = b.payload;
 			int i;
 			for(i=0; i<b.size/sizeof(int32_t); i++)
 			{
@@ -137,7 +137,7 @@ _audio(jack_nframes_t time, const char *path, const char *fmt, uint8_t *buf, voi
 
 		case SAMPLE_TYPE_UINT32:
 		{
-			uint32_t *load = (uint32_t *)b.payload;
+			uint32_t *load = b.payload;
 			int i;
 			for(i=0; i<b.size/sizeof(uint32_t); i++)
 			{
@@ -148,7 +148,7 @@ _audio(jack_nframes_t time, const char *path, const char *fmt, uint8_t *buf, voi
 		}
 		case SAMPLE_TYPE_INT32:
 		{
-			int32_t *load = (int32_t *)b.payload;
+			int32_t *load = b.payload;
 			int i;
 			for(i=0; i<b.size/sizeof(int32_t); i++)
 			{
@@ -160,7 +160,7 @@ _audio(jack_nframes_t time, const char *path, const char *fmt, uint8_t *buf, voi
 
 		case SAMPLE_TYPE_FLOAT:
 		{
-			float *load = (float *)b.payload;
+			float *load = b.payload;
 			int i;
 			for(i=0; i<b.size/sizeof(float); i++)
 			{
@@ -172,7 +172,7 @@ _audio(jack_nframes_t time, const char *path, const char *fmt, uint8_t *buf, voi
 		}
 		case SAMPLE_TYPE_DOUBLE:
 		{
-			double *load = (double *)b.payload;
+			double *load = b.payload;
 			int i;
 			for(i=0; i<b.size/sizeof(float); i++)
 			{

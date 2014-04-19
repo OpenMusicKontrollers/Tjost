@@ -84,13 +84,13 @@ process_in(jack_nframes_t nframes, void *arg)
 			break;
 	}
 
-	uint8_t *payload;
+	void *payload;
 
 	size_t len = jack_osc_strlen(AUDIO_PATH)
 						 + jack_osc_fmtlen(AUDIO_FMT)
 						 + 3 * sizeof(int32_t)
 						 + round_to_four_bytes(size);
-	uint8_t *ptr = tjost_host_schedule_inline(host, module, last, len);
+	jack_osc_data_t *ptr = tjost_host_schedule_inline(host, module, last, len);
 	ptr = jack_osc_set_path(ptr, AUDIO_PATH);
 	ptr = jack_osc_set_fmt(ptr, AUDIO_FMT);
 	ptr = jack_osc_set_int32(ptr, last);
@@ -101,7 +101,7 @@ process_in(jack_nframes_t nframes, void *arg)
 	{
 		case SAMPLE_TYPE_UINT8:
 		{
-			uint8_t *load = (uint8_t *)payload;
+			uint8_t *load = payload;
 			jack_nframes_t i;
 			for(i=0; i<nframes; i++)
 				load[i] = port_buf[i] * 0xffU;
@@ -109,7 +109,7 @@ process_in(jack_nframes_t nframes, void *arg)
 		}
 		case SAMPLE_TYPE_INT8:
 		{
-			int8_t *load = (int8_t *)payload;
+			int8_t *load = payload;
 			jack_nframes_t i;
 			for(i=0; i<nframes; i++)
 				load[i] = port_buf[i] * 0x7f;
@@ -118,7 +118,7 @@ process_in(jack_nframes_t nframes, void *arg)
 
 		case SAMPLE_TYPE_UINT12:
 		{
-			uint16_t *load = (uint16_t *)payload;
+			uint16_t *load = payload;
 			jack_nframes_t i;
 			for(i=0; i<nframes; i++)
 			{
@@ -129,7 +129,7 @@ process_in(jack_nframes_t nframes, void *arg)
 		}
 		case SAMPLE_TYPE_INT12:
 		{
-			int16_t *load = (int16_t *)payload;
+			int16_t *load = payload;
 			jack_nframes_t i;
 			for(i=0; i<nframes; i++)
 			{
@@ -141,7 +141,7 @@ process_in(jack_nframes_t nframes, void *arg)
 
 		case SAMPLE_TYPE_UINT16:
 		{
-			uint16_t *load = (uint16_t *)payload;
+			uint16_t *load = payload;
 			jack_nframes_t i;
 			for(i=0; i<nframes; i++)
 			{
@@ -152,7 +152,7 @@ process_in(jack_nframes_t nframes, void *arg)
 		}
 		case SAMPLE_TYPE_INT16:
 		{
-			int16_t *load = (int16_t *)payload;
+			int16_t *load = payload;
 			jack_nframes_t i;
 			for(i=0; i<nframes; i++)
 			{
@@ -164,7 +164,7 @@ process_in(jack_nframes_t nframes, void *arg)
 
 		case SAMPLE_TYPE_UINT24:
 		{
-			uint32_t *load = (uint32_t *)payload;
+			uint32_t *load = payload;
 			jack_nframes_t i;
 			for(i=0; i<nframes; i++)
 			{
@@ -175,7 +175,7 @@ process_in(jack_nframes_t nframes, void *arg)
 		}
 		case SAMPLE_TYPE_INT24:
 		{
-			int32_t *load = (int32_t *)payload;
+			int32_t *load = payload;
 			jack_nframes_t i;
 			for(i=0; i<nframes; i++)
 			{
@@ -187,7 +187,7 @@ process_in(jack_nframes_t nframes, void *arg)
 
 		case SAMPLE_TYPE_UINT32:
 		{
-			uint32_t *load = (uint32_t *)payload;
+			uint32_t *load = payload;
 			jack_nframes_t i;
 			for(i=0; i<nframes; i++)
 			{
@@ -198,7 +198,7 @@ process_in(jack_nframes_t nframes, void *arg)
 		}
 		case SAMPLE_TYPE_INT32:
 		{
-			int32_t *load = (int32_t *)payload;
+			int32_t *load = payload;
 			jack_nframes_t i;
 			for(i=0; i<nframes; i++)
 			{
@@ -210,7 +210,7 @@ process_in(jack_nframes_t nframes, void *arg)
 
 		case SAMPLE_TYPE_FLOAT:
 		{
-			float *load = (float *)payload;
+			float *load = payload;
 			jack_nframes_t i;
 			for(i=0; i<nframes; i++)
 			{
@@ -222,7 +222,7 @@ process_in(jack_nframes_t nframes, void *arg)
 		}
 		case SAMPLE_TYPE_DOUBLE:
 		{
-			double *load = (double *)payload;
+			double *load = payload;
 			jack_nframes_t i;
 			for(i=0; i<nframes; i++)
 			{

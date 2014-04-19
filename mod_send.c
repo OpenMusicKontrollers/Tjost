@@ -33,8 +33,8 @@ struct _Data {
 	uv_tty_t recv_client;
 };
 
-static uint8_t buffer [TJOST_BUF_SIZE] __attribute__((aligned (8)));
-static uint8_t buf2 [TJOST_BUF_SIZE] __attribute__((aligned (8)));
+static jack_osc_data_t buffer [TJOST_BUF_SIZE] __attribute__((aligned (8)));
+static jack_osc_data_t buf2 [TJOST_BUF_SIZE] __attribute__((aligned (8)));
 
 static void
 _tty_alloc(uv_handle_t *handle, size_t suggested_size, uv_buf_t *buf)
@@ -55,7 +55,7 @@ _tty_recv_cb(uv_stream_t *stream, ssize_t nread, const uv_buf_t *buf)
 	{
 		char *s = buf->base;
 
-		uint8_t *ptr = buf2;
+		jack_osc_data_t *ptr = buf2;
 		char *cur;
 		char *end;
 		char *path;
@@ -225,11 +225,9 @@ _tty_recv_cb(uv_stream_t *stream, ssize_t nread, const uv_buf_t *buf)
 			}
 		}
 
-		uint32_t len = ptr - buf2;
-
 		Tjost_Event tev;
 		tev.time = 0; // immediate execution
-		tev.size = len;
+		tev.size = (ptr - buf2)*sizeof(jack_osc_data_t);
 		if(jack_osc_message_check(buf2, tev.size))
 		{
 			if(jack_ringbuffer_write_space(dat->rb) < sizeof(Tjost_Event) + tev.size)
@@ -238,7 +236,7 @@ _tty_recv_cb(uv_stream_t *stream, ssize_t nread, const uv_buf_t *buf)
 			{
 				if(jack_ringbuffer_write(dat->rb, (const char *)&tev, sizeof(Tjost_Event)) != sizeof(Tjost_Event))
 					fprintf(stderr, "send: ringbuffer write 1 error\n");
-				if(jack_ringbuffer_write(dat->rb, (const char *)buf2, len) != len)
+				if(jack_ringbuffer_write(dat->rb, (const char *)buf2, tev.size) != tev.size)
 					fprintf(stderr, "send: ringbuffer write 2 error\n");
 			}
 		}
@@ -272,7 +270,7 @@ process_in(jack_nframes_t nframes, void *arg)
 		{
 			jack_ringbuffer_read_advance(dat->rb, sizeof(Tjost_Event));
 
-			uint8_t *bf = tjost_host_schedule_inline(host, module, tev.time, tev.size);
+			jack_osc_data_t *bf = tjost_host_schedule_inline(host, module, tev.time, tev.size);
 			if(jack_ringbuffer_read(dat->rb, (char *)bf, tev.size) != tev.size)
 				tjost_host_message_push(host, "send: %s", "ringbuffer read error");
 		}
