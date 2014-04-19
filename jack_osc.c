@@ -184,7 +184,7 @@ jack_osc_message_ntoh(jack_osc_data_t *buf, size_t size)
 		{
 			case JACK_OSC_INT32:
 			case JACK_OSC_FLOAT:
-			case JACK_OSC_MIDI:
+			case JACK_OSC_MIDI: //FIXME correct?
 			case JACK_OSC_CHAR:
 			{
 				uint32_t *u = (uint32_t *)ptr;
@@ -251,7 +251,7 @@ jack_osc_message_hton(jack_osc_data_t *buf, size_t size)
 		{
 			case JACK_OSC_INT32:
 			case JACK_OSC_FLOAT:
-			case JACK_OSC_MIDI:
+			case JACK_OSC_MIDI: //FIXME correct?
 			case JACK_OSC_CHAR:
 			{
 				uint32_t *u = (uint32_t *)ptr;

@@ -288,12 +288,13 @@ _serialize(lua_State *L, Tjost_Module *module)
 					lua_rawgeti(L, p, 2);
 					lua_rawgeti(L, p, 3);
 					lua_rawgeti(L, p, 4);
-					ptr[0] = luaL_checkinteger(L, -4);
-					ptr[1] = luaL_checkinteger(L, -3);
-					ptr[2] = luaL_checkinteger(L, -2);
-					ptr[3] = luaL_checkinteger(L, -1);
+					uint8_t *buf_ptr = (uint8_t *)ptr;
+					buf_ptr[0] = luaL_checkinteger(L, -4);
+					buf_ptr[1] = luaL_checkinteger(L, -3);
+					buf_ptr[2] = luaL_checkinteger(L, -2);
+					buf_ptr[3] = luaL_checkinteger(L, -1);
 					lua_pop(L, 4);
-					ptr += 4;
+					ptr += 1;
 				}
 				else
 					tjost_host_message_push(host, "Lua: table expected at argument position %i", p);

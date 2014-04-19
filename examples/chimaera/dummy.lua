@@ -24,25 +24,45 @@
 --]]
 
 message = plugin('dump')
-status = plugin('osc_out', 'osc.jack://status')
-data = plugin('osc_out', 'osc.jack://data')
+status = plugin('osc_out', 'status')
+--data = plugin('osc_out', 'data')
 chim = plugin('net_out', 'osc.udp://chimaera.local:4444')
 
 midi = require('midi_explicit')
 
-control = plugin('osc_in', 'osc.jack://control', function(time, path, fmt, ...)
+rate = 3000
+
+control = plugin('osc_in', 'control', function(time, path, fmt, ...)
 	chim(time, path, fmt, ...)
 end)
 
 success = function(time, uuid, path, ...)
 	local methods = {
 		['/sensors/number'] = function(time, n)
-			local bot = 3*12 - 0.5 - (n % 18 / 6);
+			local bot = 2*12 - 0.5 - (n % 18 / 6);
 			local range = n/3
 
 			midi.bot = bot
 			midi.range = range
 			message(time, '/number', 'iff', n, bot, range)
+		end,
+
+		['/engines/tcp'] = function(time)
+			chim(0, '/engines/enabled', 'ii', id(), 1)
+		end,
+	
+		['/comm/address'] = function(time)
+			chim(0, '/sensors/number', 'i', id())
+			chim(0, '/sensors/rate', 'ii', id(), rate)
+			chim(0, '/sensors/group/reset', 'i', id())
+			chim(0, '/sensors/group/attributes', 'iiiffi', id(), 0, 256, 0.0, 1.0, 0)
+			chim(0, '/sensors/group/attributes', 'iiiffi', id(), 1, 128, 0.0, 1.0, 0)
+
+			chim(0, '/engines/enabled', 'ii', id(), 0)
+			chim(0, '/engines/tcp', 'ii', id(), 1)
+			chim(0, '/engines/offset', 'if', id(), 0.002)
+			chim(0, '/engines/reset', 'i', id())
+			chim(0, '/engines/dummy/enabled', 'ii', id(), 1)
 		end
 	}
 
@@ -82,8 +102,8 @@ methods = {
 	end
 }
 
-stream = plugin('net_in', 'osc.udp://:3333', function(time, path, ...)
-	data(time, path, ...)
+stream = plugin('net_in', 'osc.tcp://:3333', '60', function(time, path, ...)
+	--data(time, path, ...)
 
 	local cb = methods[path]
 	if cb then
@@ -103,15 +123,4 @@ f = io.popen('hostname')
 hostname = f:read('*l')
 f:close()
 
-rate = 3000
 chim(0, '/comm/address', 'is', id(), hostname..'.local')
-
-chim(0, '/sensors/number', 'i', id())
-chim(0, '/sensors/rate', 'ii', id(), rate)
-chim(0, '/sensors/group/reset', 'i', id())
-chim(0, '/sensors/group/attributes', 'iiiffi', id(), 0, 256, 0.0, 1.0, 0)
-chim(0, '/sensors/group/attributes', 'iiiffi', id(), 1, 128, 0.0, 1.0, 0)
-
-chim(0, '/engines/offset', 'if', id(), 0.002)
-chim(0, '/engines/reset', 'i', id())
-chim(0, '/engines/dummy/enabled', 'ii', id(), 1)

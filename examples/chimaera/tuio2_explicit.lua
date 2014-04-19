@@ -29,8 +29,10 @@ status = plugin('osc_out', 'osc.jack://status')
 chim = plugin('net_out', 'osc.udp://chimaera.local:4444')
 trig = plugin('osc_out', 'osc.jack://trig')
 
---midi = require('midi_explicit')
-midi = require('amsynth')
+midi = require('midi_explicit')
+--midi = require('amsynth')
+
+rate = 3000
 
 control = plugin('osc_in', 'osc.jack://control', function(time, path, fmt, ...)
 	chim(time, path, fmt, ...)
@@ -44,6 +46,18 @@ success = function(time, uuid, path, ...)
 			midi.bot = bot
 			midi.range = range
 			message(time, '/number', 'iff', n, bot, range)
+		end,
+
+		['/comm/address'] = function(time)
+			chim(0, '/sensors/number', 'i', id())
+			chim(0, '/sensors/rate', 'ii', id(), rate)
+			chim(0, '/sensors/group/reset', 'i', id())
+			chim(0, '/sensors/group/attributes', 'iiiffi', id(), 0, 256, 0.0, 1.0, 0)
+			chim(0, '/sensors/group/attributes', 'iiiffi', id(), 1, 128, 0.0, 1.0, 0)
+
+			chim(0, '/engines/offset', 'if', id(), 0.002)
+			chim(0, '/engines/reset', 'i', id())
+			chim(0, '/engines/tuio2/enabled', 'ii', id(), 1)
 		end
 	}
 
@@ -177,15 +191,4 @@ f = io.popen('hostname')
 hostname = f:read('*l')
 f:close()
 
-rate = 3000
 chim(0, '/comm/address', 'is', id(), hostname..'.local')
-
-chim(0, '/sensors/number', 'i', id())
-chim(0, '/sensors/rate', 'ii', id(), rate)
-chim(0, '/sensors/group/reset', 'i', id())
-chim(0, '/sensors/group/attributes', 'iiiffi', id(), 0, 256, 0.0, 1.0, 0)
-chim(0, '/sensors/group/attributes', 'iiiffi', id(), 1, 128, 0.0, 1.0, 0)
-
-chim(0, '/engines/offset', 'if', id(), 0.002)
-chim(0, '/engines/reset', 'i', id())
-chim(0, '/engines/tuio2/enabled', 'ii', id(), 1)

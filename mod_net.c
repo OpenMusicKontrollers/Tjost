@@ -120,7 +120,7 @@ _handle_bundle(Tjost_Module *module, jack_osc_data_t *buf, size_t len)
 				return;
 		}
 
-		ptr += hsize;
+		ptr += hsize/sizeof(jack_osc_data_t);
 	}
 
 	if(!has_nested_bundles)
@@ -137,7 +137,7 @@ _handle_bundle(Tjost_Module *module, jack_osc_data_t *buf, size_t len)
 		if(c == '#')
 			_handle_bundle(module, ptr, hsize);
 
-		ptr += hsize;
+		ptr += hsize/sizeof(jack_osc_data_t);
 	}
 }
 
