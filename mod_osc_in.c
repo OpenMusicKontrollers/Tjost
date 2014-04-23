@@ -56,11 +56,8 @@ add(Tjost_Module *module, int argc, const char **argv)
 	if(!(port = jack_port_register(module->host->client, argv[0], JACK_DEFAULT_OSC_TYPE, JackPortIsInput, JACK_DEFAULT_OSC_BUFFER_SIZE)))
 		fprintf(stderr, "could not register jack port\n");
 
-#ifdef HAS_METADATA_API
-	jack_uuid_t uuid = jack_port_uuid(port);
-	if(jack_set_property(module->host->client, uuid, JACK_METADATA_EVENT_KEY, JACK_METADATA_EVENT_TYPE_OSC, NULL))
+	if(jack_osc_mark_port(module->host->client, port))
 		fprintf(stderr, "could not set event type\n");
-#endif // HAS_METADATA_API
 
 	module->dat = port;
 	module->type = TJOST_MODULE_INPUT;
@@ -73,10 +70,7 @@ del(Tjost_Module *module)
 
 	if(port)
 	{
-#ifdef HAS_METADATA_API
-		jack_uuid_t uuid = jack_port_uuid(port);
-		jack_remove_property(module->host->client, uuid, JACK_METADATA_EVENT_KEY);
-#endif // HAS_METADATA_API
+		jack_osc_unmark_port(module->host->client, port);
 		jack_port_unregister(module->host->client, port);
 	}
 }

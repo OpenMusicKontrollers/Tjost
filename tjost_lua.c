@@ -23,18 +23,6 @@
 
 #include <tjost.h>
 
-typedef struct _Tjost_Midi Tjost_Midi;
-typedef struct _Tjost_Blob Tjost_Blob;
-
-struct _Tjost_Midi {
-	uint8_t buf[4];
-};
-
-struct _Tjost_Blob {
-	int32_t size;
-	uint8_t buf[0];
-};
-
 static jack_osc_data_t buffer [TJOST_BUF_SIZE] __attribute__((aligned (8)));
 
 static jack_osc_data_t *

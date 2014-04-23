@@ -108,6 +108,10 @@ union _Jack_OSC_Argument {
 	uint8_t *m;
 };
 
+int jack_osc_mark_port(jack_client_t *client, jack_port_t *port);
+int jack_osc_unmark_port(jack_client_t *client, jack_port_t *port);
+int jack_osc_is_marked_port(jack_port_t *port);
+
 int jack_osc_check_path(const char *path);
 int jack_osc_check_fmt(const char *format, int offset);
 

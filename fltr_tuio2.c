@@ -98,7 +98,7 @@ _frm(jack_nframes_t time, const char *path, const char *fmt, lua_State *L)
 		tuio2_client->blobs = NULL;
 		tuio2_client->missing = 0;
 		tuio2_client->fid = FIRST_FRAME;
-		//fprintf(stderr, "chimaera has been reset, memux Tuio2_Client is being reset, too\n");
+		fprintf(stderr, "chimaera has been reset, memux Tuio2_Client is being reset, too\n");
 	}
 	else if( (fid < tuio2_client->fid) && (tuio2_client->missing > 0))
 	{

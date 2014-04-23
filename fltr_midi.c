@@ -40,6 +40,7 @@ struct _Midi_Client {
 	float range;
 	uint8_t effect;
 	uint8_t double_precision;
+	uint8_t channel_offset;
 
 	Eina_Inlist *blobs;
 
@@ -81,7 +82,7 @@ _on(jack_nframes_t time, const char *path, const char *fmt, lua_State *L)
 	uint32_t sid = luaL_checkint(L, 4);
 	uint16_t uid = luaL_checkint(L, 5);
 	uint16_t tid = luaL_checkint(L, 6);
-	uint32_t gid = luaL_checkint(L, 7);
+	uint32_t gid = luaL_checkint(L, 7) + midi_client->channel_offset;
 	float x = luaL_checknumber(L, 8);
 	float y = luaL_checknumber(L, 9);
 	float a = luaL_checknumber(L, 10);
@@ -100,44 +101,44 @@ _on(jack_nframes_t time, const char *path, const char *fmt, lua_State *L)
 			lua_pushstring(L, "mmmm");
 		else
 			lua_pushstring(L, "mmm");
-		lua_createtable(L, 4, 0);
 		{
-			lua_pushnumber(L, gid);				
-			lua_pushnumber(L, 0x90);		
-			lua_pushnumber(L, base);			
-			lua_pushnumber(L, vel);			
-			for(i=0; i<4; i++)
-				lua_rawseti(L, -5+i, 4-i);
+			Tjost_Midi *tm = lua_newuserdata(L, sizeof(Tjost_Midi));
+			tm->buf[0] = gid;
+			tm->buf[1] = 0x90;
+			tm->buf[2] = base;
+			tm->buf[3] = vel;
+			luaL_getmetatable(L, "Tjost_Midi");
+			lua_setmetatable(L, -2);
 		}
-		lua_createtable(L, 4, 0);
 		{
-			lua_pushnumber(L, gid);			
-			lua_pushnumber(L, 0xe0);		
-			lua_pushnumber(L, bend & 0x7f);	
-			lua_pushnumber(L, bend >> 7);	
-			for(i=0; i<4; i++)
-				lua_rawseti(L, -5+i, 4-i);
+			Tjost_Midi *tm = lua_newuserdata(L, sizeof(Tjost_Midi));
+			tm->buf[0] = gid;
+			tm->buf[1] = 0xe0;
+			tm->buf[2] = bend & 0x7f;
+			tm->buf[3] = bend >> 7;
+			luaL_getmetatable(L, "Tjost_Midi");
+			lua_setmetatable(L, -2);
 		}
 		if(midi_client->double_precision)
 		{
-			lua_createtable(L, 4, 0);
 			{
-				lua_pushnumber(L, gid);
-				lua_pushnumber(L, 0xb0);
-				lua_pushnumber(L, midi_client->effect | 0x20);	
-				lua_pushnumber(L, eff & 0x7f);	
-				for(i=0; i<4; i++)
-					lua_rawseti(L, -5+i, 4-i);
+				Tjost_Midi *tm = lua_newuserdata(L, sizeof(Tjost_Midi));
+				tm->buf[0] = gid;
+				tm->buf[1] = 0xb0;
+				tm->buf[2] = midi_client->effect | 0x20;
+				tm->buf[3] = eff & 0x7f;
+				luaL_getmetatable(L, "Tjost_Midi");
+				lua_setmetatable(L, -2);
 			}
 		}
-		lua_createtable(L, 4, 0);
 		{
-			lua_pushnumber(L, gid);	
-			lua_pushnumber(L, 0xb0);
-			lua_pushnumber(L, midi_client->effect);	
-			lua_pushnumber(L, eff >> 7);	
-			for(i=0; i<4; i++)
-				lua_rawseti(L, -5+i, 4-i);
+			Tjost_Midi *tm = lua_newuserdata(L, sizeof(Tjost_Midi));
+			tm->buf[0] = gid;
+			tm->buf[1] = 0xb0;
+			tm->buf[2] = midi_client->effect;
+			tm->buf[3] = eff >> 7;
+			luaL_getmetatable(L, "Tjost_Midi");
+			lua_setmetatable(L, -2);
 		}
 		if(lua_pcall(L, midi_client->double_precision ? 7 : 6, 0, 0))
 			fprintf(stderr, "Midi_Client 'on' error: %s\n", lua_tostring(L, -1));
@@ -160,7 +161,7 @@ _off(jack_nframes_t time, const char *path, const char *fmt, lua_State *L)
 	uint32_t sid = luaL_checkint(L, 4);
 	uint16_t uid = luaL_checkint(L, 5);
 	uint16_t tid = luaL_checkint(L, 6);
-	uint32_t gid = luaL_checkint(L, 7);
+	uint32_t gid = luaL_checkint(L, 7) + midi_client->channel_offset;
 
 	Midi_Blob *b;
 	EINA_INLIST_FOREACH(midi_client->blobs, b)
@@ -175,14 +176,14 @@ _off(jack_nframes_t time, const char *path, const char *fmt, lua_State *L)
 		lua_pushnumber(L, time);
 		lua_pushstring(L, "/midi");
 		lua_pushstring(L, "m");
-		lua_createtable(L, 4, 0);
 		{
-			lua_pushnumber(L, gid);				
-			lua_pushnumber(L, 0x80);		
-			lua_pushnumber(L, base);			
-			lua_pushnumber(L, vel);			
-			for(i=0; i<4; i++)
-				lua_rawseti(L, -5+i, 4-i);
+			Tjost_Midi *tm = lua_newuserdata(L, sizeof(Tjost_Midi));
+			tm->buf[0] = gid;
+			tm->buf[1] = 0x80;
+			tm->buf[2] = base;
+			tm->buf[3] = vel;
+			luaL_getmetatable(L, "Tjost_Midi");
+			lua_setmetatable(L, -2);
 		}
 		if(lua_pcall(L, 4, 0, 0))
 			fprintf(stderr, "Midi_Client 'off' error: %s\n", lua_tostring(L, -1));
@@ -203,7 +204,7 @@ _set(jack_nframes_t time, const char *path, const char *fmt, lua_State *L)
 	uint32_t sid = luaL_checkint(L, 4);
 	uint16_t uid = luaL_checkint(L, 5);
 	uint16_t tid = luaL_checkint(L, 6);
-	uint32_t gid = luaL_checkint(L, 7);
+	uint32_t gid = luaL_checkint(L, 7) + midi_client->channel_offset;
 	float x = luaL_checknumber(L, 8);
 	float y = luaL_checknumber(L, 9);
 	float a = luaL_checknumber(L, 10);
@@ -227,35 +228,35 @@ _set(jack_nframes_t time, const char *path, const char *fmt, lua_State *L)
 			lua_pushstring(L, "mmm");
 		else
 			lua_pushstring(L, "mm");
-		lua_createtable(L, 4, 0);
 		{
-			lua_pushnumber(L, gid);			
-			lua_pushnumber(L, 0xe0);		
-			lua_pushnumber(L, bend & 0x7f);	
-			lua_pushnumber(L, bend >> 7);	
-			for(i=0; i<4; i++)
-				lua_rawseti(L, -5+i, 4-i);
+			Tjost_Midi *tm = lua_newuserdata(L, sizeof(Tjost_Midi));
+			tm->buf[0] = gid;
+			tm->buf[1] = 0xe0;
+			tm->buf[2] = bend & 0x7f;
+			tm->buf[3] = bend >> 7;
+			luaL_getmetatable(L, "Tjost_Midi");
+			lua_setmetatable(L, -2);
 		}
 		if(midi_client->double_precision)
 		{
-			lua_createtable(L, 4, 0);
 			{
-				lua_pushnumber(L, gid);
-				lua_pushnumber(L, 0xb0);
-				lua_pushnumber(L, midi_client->effect | 0x20);	
-				lua_pushnumber(L, eff & 0x7f);	
-				for(i=0; i<4; i++)
-					lua_rawseti(L, -5+i, 4-i);
+				Tjost_Midi *tm = lua_newuserdata(L, sizeof(Tjost_Midi));
+				tm->buf[0] = gid;
+				tm->buf[1] = 0xb0;
+				tm->buf[2] = midi_client->effect | 0x20;
+				tm->buf[3] = eff & 0x7f;
+				luaL_getmetatable(L, "Tjost_Midi");
+				lua_setmetatable(L, -2);
 			}
 		}
-		lua_createtable(L, 4, 0);
 		{
-			lua_pushnumber(L, gid);	
-			lua_pushnumber(L, 0xb0);
-			lua_pushnumber(L, midi_client->effect);	
-			lua_pushnumber(L, eff >> 7);	
-			for(i=0; i<4; i++)
-				lua_rawseti(L, -5+i, 4-i);
+			Tjost_Midi *tm = lua_newuserdata(L, sizeof(Tjost_Midi));
+			tm->buf[0] = gid;
+			tm->buf[1] = 0xb0;
+			tm->buf[2] = midi_client->effect;
+			tm->buf[3] = eff >> 7;
+			luaL_getmetatable(L, "Tjost_Midi");
+			lua_setmetatable(L, -2);
 		}
 		if(lua_pcall(L, midi_client->double_precision ? 6 : 5, 0, 0))
 			fprintf(stderr, "Midi_Client 'set' error: %s\n", lua_tostring(L, -1));
@@ -314,6 +315,16 @@ _double_precision(jack_nframes_t time, const char *path, const char *fmt, lua_St
 }
 
 static int
+_channel_offset(jack_nframes_t time, const char *path, const char *fmt, lua_State *L)
+{
+	Midi_Client *midi_client = luaL_checkudata(L, lua_upvalueindex(2), "Fltr_Midi");
+
+	midi_client->channel_offset = luaL_checkint(L, 4); // TODO check range
+
+	return 0;
+}
+
+static int
 _func(lua_State *L)
 {	
 	jack_nframes_t time = luaL_checkint(L, 1);
@@ -344,6 +355,9 @@ _func(lua_State *L)
 	else if(!strcmp(path, "/double_precision") && !strcmp(fmt, "i"))
 		return _double_precision(time, path, fmt, L);
 
+	else if(!strcmp(path, "/channel_offset") && !strcmp(fmt, "i"))
+		return _channel_offset(time, path, fmt, L);
+
 	return 0;
 }
 
@@ -363,6 +377,7 @@ _new(lua_State *L)
 		midi_client->double_precision = 1;
 		midi_client->bot = 2*12 - 0.5 - ( (n % 18) / 6.f);
 		midi_client->range = n/3.f;
+		midi_client->channel_offset = 0;
 
 		lua_pushcclosure(L, _func, 2);
 	}

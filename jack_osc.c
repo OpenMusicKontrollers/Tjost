@@ -27,6 +27,12 @@
 
 #include <jack_osc.h>
 
+#include <tjost_config.h>
+
+#ifdef HAS_METADATA_API
+#	include <jack/metadata.h>
+#endif // HAS_METADATA_API
+
 // characters not allowed in OSC path string
 static const char invalid_path_chars [] = {
 	' ', '#',
@@ -41,6 +47,51 @@ static const char valid_format_chars [] = {
 	JACK_OSC_SYMBOL, JACK_OSC_CHAR, JACK_OSC_MIDI,
 	'\0'
 };
+
+int
+jack_osc_mark_port(jack_client_t *client, jack_port_t *port)
+{
+#ifdef HAS_METADATA_API
+	jack_uuid_t uuid = jack_port_uuid(port);
+	return jack_set_property(client, uuid, JACK_METADATA_EVENT_KEY, JACK_METADATA_EVENT_TYPE_OSC, NULL);
+#else
+	return 0;
+#endif // HAS_METADATA_API
+}
+
+int
+jack_osc_unmark_port(jack_client_t *client, jack_port_t *port)
+{
+#ifdef HAS_METADATA_API
+	jack_uuid_t uuid = jack_port_uuid(port);
+	return jack_remove_property(client, uuid, JACK_METADATA_EVENT_KEY);
+#else
+	return 0;
+#endif // HAS_METADATA_API
+}
+
+int
+jack_osc_is_marked_port(jack_port_t *port)
+{
+#ifdef HAS_METADATA_API
+	jack_uuid_t uuid = jack_port_uuid(port);
+	char *value = NULL;
+	char *type = NULL;
+
+	int marked = 0;
+
+	if( (jack_get_property(uuid, JACK_METADATA_EVENT_KEY, &value, &type) == 0) &&
+			(strcmp(value, JACK_METADATA_EVENT_TYPE_OSC) == 0) )
+		marked = 1;
+	if(value)
+		jack_free(value);
+	if(type)
+		jack_free(type);
+	return marked;
+#else
+	return 0;
+#endif // HAS_METADATA_API
+}
 
 // check for valid path string
 int

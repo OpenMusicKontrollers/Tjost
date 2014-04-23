@@ -53,6 +53,8 @@ extern "C" {
 #include <jack/uuid.h>
 #endif // HAS_METADATA_API
 
+typedef struct _Tjost_Midi Tjost_Midi;
+typedef struct _Tjost_Blob Tjost_Blob;
 typedef struct _Tjost_Event Tjost_Event;
 typedef struct _Tjost_Module Tjost_Module;
 typedef struct _Tjost_Child Tjost_Child;
@@ -66,6 +68,15 @@ typedef void (*Tjost_Module_Del_Cb)(Tjost_Module *module);
 #define TJOST_MODULE_OUTPUT 0b010
 #define TJOST_MODULE_IN_OUT (TJOST_MODULE_INPUT | TJOST_MODULE_OUTPUT)
 #define TJOST_MODULE_UPLINK 0b100
+
+struct _Tjost_Midi {
+	uint8_t buf[4];
+};
+
+struct _Tjost_Blob {
+	int32_t size;
+	uint8_t buf[0];
+};
 
 struct _Tjost_Event {
 	EINA_INLIST;
