@@ -23,7 +23,7 @@
 --     distribution.
 --]]
 
-message = plugin('dump')
+message = tjost.plugin('dump')
 
 graph = {}
 
@@ -100,7 +100,7 @@ methods = {
 	end
 }
 
-uplink = plugin('uplink', function(time, path, fmt, ...)
+uplink = tjost.plugin('uplink', function(time, path, fmt, ...)
 	message(time, path, fmt, ...)
 
 	local cb = methods[path]

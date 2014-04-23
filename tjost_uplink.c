@@ -327,6 +327,7 @@ tjost_graph_order(void *arg)
 	return 0;
 }
 
+#ifdef HAS_METADATA_API
 // non real time
 void
 tjost_property_change(jack_uuid_t uuid, const char *key, jack_property_change_t change, void *arg)
@@ -341,5 +342,5 @@ tjost_property_change(jack_uuid_t uuid, const char *key, jack_property_change_t 
 			fprintf(stderr, "could not set event type\n");
 		*/
 	}
-
 }
+#endif // HAS_METADATA_API

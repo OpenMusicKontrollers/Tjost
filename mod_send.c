@@ -31,18 +31,18 @@ struct _Data {
 	jack_ringbuffer_t *rb;
 
 	uv_tty_t recv_client;
+	char line [1024];
+	jack_osc_data_t buffer [TJOST_BUF_SIZE] __attribute__((aligned (8)));
 };
-
-static jack_osc_data_t buffer [TJOST_BUF_SIZE] __attribute__((aligned (8)));
-static jack_osc_data_t buf2 [TJOST_BUF_SIZE] __attribute__((aligned (8)));
 
 static void
 _tty_alloc(uv_handle_t *handle, size_t suggested_size, uv_buf_t *buf)
 {
 	Tjost_Module *module = handle->data;
+	Data *dat = module->dat;
 
-	buf->base = (char *)buffer;
-	buf->len = TJOST_BUF_SIZE;
+	buf->base = dat->line;
+	buf->len = sizeof(dat->line);
 }
 
 static void
@@ -55,7 +55,7 @@ _tty_recv_cb(uv_stream_t *stream, ssize_t nread, const uv_buf_t *buf)
 	{
 		char *s = buf->base;
 
-		jack_osc_data_t *ptr = buf2;
+		jack_osc_data_t *ptr = dat->buffer;
 		char *cur;
 		char *end;
 		char *path;
@@ -227,8 +227,8 @@ _tty_recv_cb(uv_stream_t *stream, ssize_t nread, const uv_buf_t *buf)
 
 		Tjost_Event tev;
 		tev.time = 0; // immediate execution
-		tev.size = (ptr - buf2)*sizeof(jack_osc_data_t);
-		if(jack_osc_message_check(buf2, tev.size))
+		tev.size = (ptr - dat->buffer)*sizeof(jack_osc_data_t);
+		if(jack_osc_message_check(dat->buffer, tev.size))
 		{
 			if(jack_ringbuffer_write_space(dat->rb) < sizeof(Tjost_Event) + tev.size)
 				fprintf(stderr, "send: ringbuffer overflow\n");
@@ -236,7 +236,7 @@ _tty_recv_cb(uv_stream_t *stream, ssize_t nread, const uv_buf_t *buf)
 			{
 				if(jack_ringbuffer_write(dat->rb, (const char *)&tev, sizeof(Tjost_Event)) != sizeof(Tjost_Event))
 					fprintf(stderr, "send: ringbuffer write 1 error\n");
-				if(jack_ringbuffer_write(dat->rb, (const char *)buf2, tev.size) != tev.size)
+				if(jack_ringbuffer_write(dat->rb, (const char *)dat->buffer, tev.size) != tev.size)
 					fprintf(stderr, "send: ringbuffer write 2 error\n");
 			}
 		}

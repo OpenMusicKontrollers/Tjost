@@ -23,7 +23,7 @@
 --     distribution.
 --]]
 
-osc_in = plugin('osc_in', 'osc.midi')
-midi_out = plugin('midi_out', 'midi')
+osc_in = tjost.plugin('osc_in', 'osc.midi')
+midi_out = tjost.plugin('midi_out', 'midi')
 
-chain(osc_in, midi_out)
+tjost.chain(osc_in, midi_out)

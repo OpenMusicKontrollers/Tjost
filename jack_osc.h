@@ -36,8 +36,6 @@ extern "C" {
 #include <jack/ringbuffer.h>
 #include <jack/weakmacros.h>
 #include <jack/midiport.h>
-#include <jack/metadata.h>
-#include <jack/uuid.h>
 
 #define JACK_METADATA_EVENT_KEY "http://jackaudio.org/event/type"
 #define JACK_METADATA_EVENT_TYPE_OSC "Open Sound Control"

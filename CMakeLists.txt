@@ -10,6 +10,7 @@ set(LIBS "-lm")
 find_package(PkgConfig REQUIRED)
 
 include_directories("${PROJECT_SOURCE_DIR}")
+include_directories("${PROJECT_BINARY_DIR}")
 include_directories("${PROJECT_SOURCE_DIR}/tlsf-3.0")
 
 # libuv
@@ -22,10 +23,13 @@ pkg_search_module(JACK REQUIRED jack)
 include_directories(${JACK_INCLUDE_DIRS})
 set(LIBS ${LIBS} ${JACK_LDFLAGS})
 
+# metadata
+option(HAS_METADATA_API "use JACK metadata API" ON)
+configure_file(${CMAKE_CURRENT_SOURCE_DIR}/tjost_config.h.in ${CMAKE_CURRENT_BINARY_DIR}/tjost_config.h @ONLY)
+
 # alsa
 pkg_search_module(ALSA REQUIRED alsa)
 include_directories(${ALSA_INCLUDE_DIRS})
-#set(LIBS ${LIBS} ${ALSA_LDFLAGS})
 
 # lua
 option(USE_LUAJIT "use LuaJIT" ON)

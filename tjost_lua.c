@@ -23,7 +23,12 @@
 
 #include <tjost.h>
 
+typedef struct _Tjost_Midi Tjost_Midi;
 typedef struct _Tjost_Blob Tjost_Blob;
+
+struct _Tjost_Midi {
+	uint8_t buf[4];
+};
 
 struct _Tjost_Blob {
 	int32_t size;
@@ -127,11 +132,15 @@ _push(Tjost_Host *host, char type, jack_osc_data_t *ptr)
 		{
 			uint8_t *m;
 			ptr = jack_osc_get_midi(ptr, &m);
-			lua_createtable(L, 4, 0);
-			lua_pushnumber(L, m[0]);	lua_rawseti(L, -2, 1);
-			lua_pushnumber(L, m[1]);	lua_rawseti(L, -2, 2);
-			lua_pushnumber(L, m[2]);	lua_rawseti(L, -2, 3);
-			lua_pushnumber(L, m[3]);	lua_rawseti(L, -2, 4);
+
+			Tjost_Midi *tm = lua_newuserdata(L, sizeof(Tjost_Midi));
+			luaL_getmetatable(L, "Tjost_Midi");
+			lua_setmetatable(L, -2);
+
+			tm->buf[0] = m[0];
+			tm->buf[1] = m[1];
+			tm->buf[2] = m[2];
+			tm->buf[3] = m[3];
 			return ptr;
 		}
 
@@ -281,23 +290,10 @@ _serialize(lua_State *L, Tjost_Module *module)
 				ptr = jack_osc_set_symbol(ptr, luaL_checkstring(L, p));
 				break;
 			case 'm':
-				if(lua_istable(L, p))
 				{
-					// is more efficient than jack_osc_set_midi...
-					lua_rawgeti(L, p, 1);
-					lua_rawgeti(L, p, 2);
-					lua_rawgeti(L, p, 3);
-					lua_rawgeti(L, p, 4);
-					uint8_t *buf_ptr = (uint8_t *)ptr;
-					buf_ptr[0] = luaL_checkinteger(L, -4);
-					buf_ptr[1] = luaL_checkinteger(L, -3);
-					buf_ptr[2] = luaL_checkinteger(L, -2);
-					buf_ptr[3] = luaL_checkinteger(L, -1);
-					lua_pop(L, 4);
-					ptr += 1;
+					Tjost_Midi *tm = luaL_checkudata(L, p, "Tjost_Midi");
+					ptr = jack_osc_set_midi(ptr, tm->buf);
 				}
-				else
-					tjost_host_message_push(host, "Lua: table expected at argument position %i", p);
 				break;
 			case 'c':
 				ptr = jack_osc_set_char(ptr, luaL_checknumber(L, p));
@@ -355,7 +351,7 @@ _clear(Tjost_Module *module)
 static int
 _gc_input(lua_State *L)
 {
-	printf("_gc_input\n");
+	//printf("_gc_input\n");
 	Tjost_Module *module = luaL_checkudata(L, 1, "Tjost_Input");
 	Tjost_Host *host = module->host;
 
@@ -380,7 +376,7 @@ _gc_input(lua_State *L)
 static int
 _gc_output(lua_State *L)
 {
-	printf("_gc_output\n");
+	//printf("_gc_output\n");
 	Tjost_Module *module = luaL_checkudata(L, 1, "Tjost_Output");
 	Tjost_Host *host = module->host;
 
@@ -399,7 +395,7 @@ _gc_output(lua_State *L)
 static int
 _gc_in_out(lua_State *L)
 {
-	printf("_gc_in_out\n");
+	//printf("_gc_in_out\n");
 	Tjost_Module *module = luaL_checkudata(L, 1, "Tjost_In_Out");
 	Tjost_Host *host = module->host;
 
@@ -425,7 +421,7 @@ _gc_in_out(lua_State *L)
 static int
 _gc_uplink(lua_State *L)
 {
-	printf("_gc_uplink\n");
+	//printf("_gc_uplink\n");
 	Tjost_Module *module = luaL_checkudata(L, 1, "Tjost_Uplink");
 	Tjost_Host *host = module->host;
 
@@ -504,10 +500,40 @@ _len_blob(lua_State *L)
 }
 
 static int
-_buf_blob(lua_State *L)
+_index_midi(lua_State *L)
 {
-	Tjost_Blob *tb = luaL_checkudata(L, 1, "Tjost_Blob");
-	lua_pushlightuserdata(L, tb->buf);
+	Tjost_Midi *tm = luaL_checkudata(L, 1, "Tjost_Midi");
+	int typ = lua_type(L, 2);
+	if(typ == LUA_TNUMBER)
+	{
+		int index = luaL_checkint(L, 2);
+		if( (index >= 0) && (index < 4) )
+			lua_pushnumber(L, tm->buf[index]);
+		else
+			lua_pushnil(L);
+	}
+	else if( (typ == LUA_TSTRING) && !strcmp(lua_tostring(L, 2), "raw") )
+		lua_pushlightuserdata(L, tm->buf);
+	else
+		lua_pushnil(L);
+	return 1;
+}
+
+static int
+_newindex_midi(lua_State *L)
+{
+	Tjost_Midi *tm = luaL_checkudata(L, 1, "Tjost_Midi");
+	int index = luaL_checkint(L, 2);
+	if( (index >= 0) && (index < 4) )
+		tm->buf[index] = luaL_checkint(L, 3);
+	return 0;
+}
+
+static int
+_len_midi(lua_State *L)
+{
+	Tjost_Midi *tm = luaL_checkudata(L, 1, "Tjost_Midi");
+	lua_pushnumber(L, 4);
 	return 1;
 }
 
@@ -541,6 +567,13 @@ const luaL_Reg tjost_blob_mt [] = {
 	{"__index", _index_blob},
 	{"__newindex", _newindex_blob},
 	{"__len", _len_blob},
+	{NULL, NULL}
+};
+
+const luaL_Reg tjost_midi_mt [] = {
+	{"__index", _index_midi},
+	{"__newindex", _newindex_midi},
+	{"__len", _len_midi},
 	{NULL, NULL}
 };
 
@@ -620,6 +653,9 @@ _plugin(lua_State *L)
 			lua_setmetatable(L, -2);
 			break;
 		case TJOST_MODULE_UPLINK:
+			if(!(module->process_out = eina_module_symbol_get(mod, "process_out")))
+				fprintf(stderr, "could not get 'process_out' symbol\n");
+
 			host->uplinks = eina_inlist_append(host->uplinks, EINA_INLIST_GET(module));
 			
 			luaL_getmetatable(L, "Tjost_Uplink");
@@ -663,9 +699,21 @@ _blob(lua_State *L)
 	return 1;
 }
 
+static int
+_midi(lua_State *L)
+{
+	Tjost_Midi *tm = lua_newuserdata(L, sizeof(Tjost_Midi));
+	memset(tm, 0, 4);
+	luaL_getmetatable(L, "Tjost_Midi");
+	lua_setmetatable(L, -2);
+
+	return 1;
+}
+
 const luaL_Reg tjost_globals [] = {
 	{"plugin", _plugin},
 	{"chain", _chain},
 	{"blob", _blob},
+	{"midi", _midi},
 	{NULL, NULL}
 };

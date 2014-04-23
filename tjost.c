@@ -491,8 +491,10 @@ main(int argc, const char **argv)
 	*/
 	if(jack_set_graph_order_callback(host.client, tjost_graph_order, &host))
 		FAIL("could not set graph_order callback\n");
+#ifdef HAS_METADATA_API
 	if(jack_set_property_change_callback(host.client, tjost_property_change, &host))
 		FAIL("could not set property_change callback\n");
+#endif // HAS_METADATA_API
 
 	// init message ringbuffer
 	if(!(host.rb_msg = jack_ringbuffer_create(TJOST_RINGBUF_SIZE)))
@@ -520,14 +522,10 @@ main(int argc, const char **argv)
 		FAIL("could not initialize Lua\n");
 	luaL_openlibs(host.L);
 
-#if LUA_VERSION_NUM == 502
-	lua_pushglobaltable(host.L);
-#elif LUA_VERSION_NUM == 501
-	lua_pushvalue(host.L, LUA_GLOBALSINDEX);
-#endif
+	// register Tjost methods
 	lua_pushlightuserdata(host.L, &host);
-	luaL_openlib(host.L, NULL, tjost_globals, 1);
-	lua_pop(host.L, 1); // _G
+	luaL_openlib(host.L, "tjost", tjost_globals, 1);
+	lua_pop(host.L, 1); // tjost 
 
 	// register metatables
 	luaL_newmetatable(host.L, "Tjost_Input"); // mt
@@ -556,6 +554,10 @@ main(int argc, const char **argv)
 
 	luaL_newmetatable(host.L, "Tjost_Blob"); // mt
 	luaL_register(host.L, NULL, tjost_blob_mt);
+	lua_pop(host.L, 1); // mt
+
+	luaL_newmetatable(host.L, "Tjost_Midi"); // mt
+	luaL_register(host.L, NULL, tjost_midi_mt);
 	lua_pop(host.L, 1); // mt
 
 	lua_getglobal(host.L, "package");

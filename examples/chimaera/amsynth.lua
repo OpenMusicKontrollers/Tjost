@@ -46,13 +46,13 @@ local m = {
 local n = 128
 
 local midi = {
-	[0] = plugin('midi_out', 'midi.base'),
-	[1] = plugin('midi_out', 'midi.lead')
+	[0] = tjost.plugin('midi_out', 'midi.base'),
+	[1] = tjost.plugin('midi_out', 'midi.lead')
 }
 
 local lv2 = {
-	[0] = plugin('osc_out', 'osc.jack://lv2.base'),
-	[1] = plugin('osc_out', 'osc.jack://lv2.lead')
+	[0] = tjost.plugin('osc_out', 'osc.jack://lv2.base'),
+	[1] = tjost.plugin('osc_out', 'osc.jack://lv2.lead')
 }
 
 return {

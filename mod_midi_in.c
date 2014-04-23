@@ -23,7 +23,6 @@
 
 #include <tjost.h>
 
-static jack_osc_data_t buffer [TJOST_BUF_SIZE] __attribute__((aligned (8)));
 static const char *midi_path = "/midi";
 
 int
@@ -63,7 +62,8 @@ process_in(jack_nframes_t nframes, void *arg)
 
 			uint32_t N = i-last_i;
 
-			jack_osc_data_t *ptr = buffer;
+			size_t len = jack_osc_strlen(midi_path) + (quads(N+2) + N)*sizeof(uint32_t);
+			jack_osc_data_t *ptr = tjost_host_schedule_inline(module->host, module, mev.time + last, len);
 
 			ptr = jack_osc_set_path(ptr, midi_path);
 
@@ -93,9 +93,6 @@ process_in(jack_nframes_t nframes, void *arg)
 				ptr = jack_osc_set_midi(ptr, m);
 			}
 		
-			size_t len = (ptr - buffer)*sizeof(jack_osc_data_t);
-			tjost_host_schedule(module->host, module, mev.time + last, len, buffer);
-
 			last_i = i;
 			last_time = mev.time;
 		}

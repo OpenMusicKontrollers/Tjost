@@ -23,7 +23,7 @@
 --     distribution.
 --]]
 
-beat = plugin('midi_out', 'drum')
+beat = tjost.plugin('midi_out', 'drum')
 
 octave = 2
 base = octave*12
@@ -84,7 +84,7 @@ methods = {
 	end
 }
 
-control = plugin('osc_in', 'osc.jack://trig', function(time, path, fmt, ...)
+control = tjost.plugin('osc_in', 'osc.jack://trig', function(time, path, fmt, ...)
 	local cb = methods[path]
 	if cb then
 		cb(time, ...)

@@ -1,0 +1,44 @@
+*** lib_aux.c	2014-04-08 16:21:12.201937287 +0200
+--- lib_aux.c	2014-04-08 16:21:05.351944652 +0200
+*************** LUALIB_API lua_State *luaL_newstate(void
+*** 334,356 ****
+    lua_State *L;
+    void *ud = lj_alloc_create();
+    if (ud == NULL) return NULL;
+- #if LJ_64
+-   L = lj_state_newstate(lj_alloc_f, ud);
+- #else
+    L = lua_newstate(lj_alloc_f, ud);
+- #endif
+    if (L) G(L)->panic = panic;
+    return L;
+  }
+  
+- #if LJ_64
+- LUA_API lua_State *lua_newstate(lua_Alloc f, void *ud)
+- {
+-   UNUSED(f); UNUSED(ud);
+-   fputs("Must use luaL_newstate() for 64 bit target\n", stderr);
+-   return NULL;
+- }
+- #endif
+- 
+  #endif
+  
+--- 334,343 ----
+*** lj_state.c	2014-04-08 16:21:08.695274390 +0200
+--- lj_state.c	2014-04-08 16:20:59.601950834 +0200
+*************** static void close_state(lua_State *L)
+*** 175,185 ****
+      g->allocf(g->allocd, G2GG(g), sizeof(GG_State), 0);
+  }
+  
+- #if LJ_64
+- lua_State *lj_state_newstate(lua_Alloc f, void *ud)
+- #else
+  LUA_API lua_State *lua_newstate(lua_Alloc f, void *ud)
+- #endif
+  {
+    GG_State *GG = (GG_State *)f(ud, NULL, 0, sizeof(GG_State));
+    lua_State *L = &GG->L;
+--- 175,181 ----

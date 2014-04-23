@@ -23,8 +23,8 @@
 --     distribution.
 --]]
 
-beat = plugin('midi_out', 'drum')
---beat = plugin('osc_out', 'osc.jack://drum')
+beat = tjost.plugin('midi_out', 'drum')
+--beat = tjost.plugin('osc_out', 'osc.jack://drum')
 
 octave = 2
 base = octave*0x0c
@@ -85,14 +85,14 @@ methods = {
 	end
 }
 
-control = plugin('osc_in', 'osc.jack://trig', function(time, path, fmt, ...)
+control = tjost.plugin('osc_in', 'osc.jack://trig', function(time, path, fmt, ...)
 	local cb = methods[path]
 	if cb then
 		cb(time, fmt, ...)
 	end
 end)
 
-loopback = plugin('loopback', function(time, path, fmt, ...)
+loopback = tjost.plugin('loopback', function(time, path, fmt, ...)
 	if spe then
 		sstamp = time
 		coroutine.resume(sequencer)

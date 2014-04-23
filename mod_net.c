@@ -242,6 +242,8 @@ _next(Tjost_Module *module)
 			{
 				msg[2].base = vec[0].buf;
 				msg[2].len = size;
+			
+				assert((uintptr_t)msg[2].base % sizeof(jack_osc_data_t) == 0);
 
 				msg[3].len = 0;
 			}
@@ -249,10 +251,14 @@ _next(Tjost_Module *module)
 			{
 				msg[2].base = vec[0].buf;
 				msg[2].len = vec[0].len;
+				
+				assert((uintptr_t)msg[2].base % sizeof(jack_osc_data_t) == 0);
 
 				assert(size - vec[0].len <= vec[1].len);
 				msg[3].base = vec[1].buf;
 				msg[3].len = size - vec[0].len;
+				
+				assert((uintptr_t)msg[3].base % sizeof(jack_osc_data_t) == 0);
 			}
 
 			switch(net->type)

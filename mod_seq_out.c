@@ -36,9 +36,8 @@ struct _Data {
 	int queue;
 	jack_ringbuffer_t *rb;
 	uv_async_t asio;
+	jack_osc_data_t buffer [TJOST_BUF_SIZE] __attribute__((aligned (8)));
 };
-
-static jack_osc_data_t buffer [TJOST_BUF_SIZE] __attribute__((aligned (8)));
 
 static int
 _midi(jack_nframes_t time, const char *path, const char *fmt, jack_osc_data_t *buf, void *arg)
@@ -105,9 +104,25 @@ _asio(uv_async_t *handle)
 		if(jack_ringbuffer_read_space(dat->rb) >= sizeof(Tjost_Event) + tev.size)
 		{
 			jack_ringbuffer_read_advance(dat->rb, sizeof(Tjost_Event));
-			jack_ringbuffer_read(dat->rb, (char *)buffer, tev.size);
+			
+			jack_ringbuffer_data_t vec [2];
+			jack_ringbuffer_get_read_vector(dat->rb, vec);
+			
+			jack_osc_data_t *buffer;
+			if(vec[0].len >= tev.size)
+				buffer = (jack_osc_data_t *)vec[0].buf;
+			else
+			{
+				buffer = dat->buffer;
+				jack_ringbuffer_read(dat->rb, (char *)buffer, tev.size);
+			}
+			
+			assert((uintptr_t)buffer % sizeof(jack_osc_data_t) == 0);
 
 			jack_osc_method_dispatch(tev.time, buffer, tev.size, methods, module);
+			
+			if(vec[0].len >= tev.size)
+				jack_ringbuffer_read_advance(dat->rb, tev.size);
 		}
 		else
 			break;

@@ -38,46 +38,46 @@ mt = {
 osc_methods = {}
 setmetatable(osc_methods, mt)
 
-osc_in = plugin('osc_in', 'osc.jack://rx', function(time, path, fmt, ...)
+osc_in = tjost.plugin('osc_in', 'osc.in', function(time, path, fmt, ...)
 	local method = osc_methods[path]
 	if method then
 		method(time, fmt, ...)
 	end
 end)
 
-osc_out = plugin('osc_out', 'osc.jack://tx')
+osc_out = tjost.plugin('osc_out', 'osc.out')
 
 osc_stereo = 0
 osc_mono = {}
 
-osc_stereo = plugin('osc_in', 'osc.jack://stereo', function(time, path, ...)
+osc_stereo = tjost.plugin('osc_in', 'osc.stereo', function(time, path, ...)
 	local method = osc_mono[path]
 	if method then
 		method(time, '/mono', ...)
 	end
 end)
 
-osc_mono['/left'] = plugin('osc_out', 'osc.jack://left')
-osc_mono['/right'] = plugin('osc_out', 'osc.jack://right')
+osc_mono['/left'] = tjost.plugin('osc_out', 'osc.left')
+osc_mono['/right'] = tjost.plugin('osc_out', 'osc.right')
 
 midi_out = {}
 
-midi_in = plugin('osc_in', 'osc.jack://midi', function(...)
+midi_in = tjost.plugin('osc_in', 'osc.midi', function(...)
 	midi_out.base(...)
 	midi_out.lead(...)
 end)
 
-net_out = plugin('net_out', 'osc.udp://localhost:3333')
-net_in = plugin('net_in', 'osc.udp://:4444', function(...)
+net_out = tjost.plugin('net_out', 'osc.udp://localhost:3333')
+net_in = tjost.plugin('net_in', 'osc.udp://:4444', function(...)
 	print(...)
 	net_out(...)
 end)
 
-midi_clk = plugin('midi_in', 'clk', function(...)
+midi_clk = tjost.plugin('midi_in', 'clk', function(...)
 	midi_out.base(...)
 	midi_out.lead(...)
 	net_out(...)
 end)
 
-midi_out.base = plugin('midi_out', 'base')
-midi_out.lead = plugin('midi_out', 'lead')
+midi_out.base = tjost.plugin('midi_out', 'base')
+midi_out.lead = tjost.plugin('midi_out', 'lead')

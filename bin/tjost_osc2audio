@@ -23,7 +23,7 @@
 --     distribution.
 --]]
 
-osc_in = plugin('osc_in', 'osc.audio')
-audio_out = plugin('audio_out', 'audio')
+osc_in = tjost.plugin('osc_in', 'osc.audio')
+audio_out = tjost.plugin('audio_out', 'audio')
 
-chain(osc_in, audio_out)
+tjost.chain(osc_in, audio_out)

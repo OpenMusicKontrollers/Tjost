@@ -23,16 +23,16 @@
 --     distribution.
 --]]
 
-message = plugin('dump')
-status = plugin('osc_out', 'status')
---data = plugin('osc_out', 'data')
-chim = plugin('net_out', 'osc.udp://chimaera.local:4444')
+message = tjost.plugin('dump')
+status = tjost.plugin('osc_out', 'status')
+--data = tjost.plugin('osc_out', 'data')
+chim = tjost.plugin('net_out', 'osc.udp://chimaera.local:4444')
 
 midi = require('midi_explicit')
 
 rate = 3000
 
-control = plugin('osc_in', 'control', function(time, path, fmt, ...)
+control = tjost.plugin('osc_in', 'control', function(time, path, fmt, ...)
 	chim(time, path, fmt, ...)
 end)
 
@@ -72,7 +72,7 @@ success = function(time, uuid, path, ...)
 	end
 end
 
-conf = plugin('net_in', 'osc.udp://:4444', function(time, path, fmt, ...)
+conf = tjost.plugin('net_in', 'osc.udp://:4444', function(time, path, fmt, ...)
 	status(time, path, fmt, ...)
 	message(time, path, fmt, ...)
 	if path == '/success' then
@@ -80,7 +80,7 @@ conf = plugin('net_in', 'osc.udp://:4444', function(time, path, fmt, ...)
 	end
 end)
 
-debug = plugin('net_in', 'osc.udp://:6666', function(...)
+debug = tjost.plugin('net_in', 'osc.udp://:6666', function(...)
 	status(...)
 end)
 
@@ -102,7 +102,7 @@ methods = {
 	end
 }
 
-stream = plugin('net_in', 'osc.tcp://:3333', '60', function(time, path, ...)
+stream = tjost.plugin('net_in', 'osc.tcp://:3333', '60', function(time, path, ...)
 	--data(time, path, ...)
 
 	local cb = methods[path]

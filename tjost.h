@@ -46,6 +46,13 @@ extern "C" {
 // JACKified OpenSoundControl
 #include <jack_osc.h>
 
+#include <tjost_config.h>
+
+#ifdef HAS_METADATA_API
+#include <jack/metadata.h>
+#include <jack/uuid.h>
+#endif // HAS_METADATA_API
+
 typedef struct _Tjost_Event Tjost_Event;
 typedef struct _Tjost_Module Tjost_Module;
 typedef struct _Tjost_Child Tjost_Child;
@@ -157,6 +164,7 @@ extern const luaL_Reg tjost_in_out_mt [];
 extern const luaL_Reg tjost_uplink_mt [];
 extern const luaL_Reg tjost_globals [];
 extern const luaL_Reg tjost_blob_mt [];
+extern const luaL_Reg tjost_midi_mt [];
 
 // in tjost_uplink.c
 void tjost_uplink_tx_drain(uv_async_t *handle);
@@ -168,7 +176,9 @@ void tjost_port_registration(jack_port_id_t id, int state, void *arg);
 void tjost_port_connect(jack_port_id_t id_a, jack_port_id_t id_b, int state, void *arg);
 void tjost_port_rename(jack_port_id_t port, const char *old_name, const char *new_name, void *arg);
 int tjost_graph_order(void *arg);
+#ifdef HAS_METADATA_API
 void tjost_property_change(jack_uuid_t uuid, const char *key, jack_property_change_t change, void *arg);
+#endif // HAS_METADATA_API
 
 #ifdef __cplusplus
 }

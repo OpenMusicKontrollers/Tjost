@@ -23,7 +23,7 @@
 --     distribution.
 --]]
 
-osc_in = plugin('osc_in', 'osc.dump')
-dump = plugin('dump')
+osc_in = tjost.plugin('osc_in', 'osc.dump')
+dump = tjost.plugin('dump')
 
-chain(osc_in, dump)
+tjost.chain(osc_in, dump)

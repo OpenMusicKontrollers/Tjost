@@ -23,7 +23,7 @@
 --     distribution.
 --]]
 
-send = plugin('send')
-osc_out = plugin('osc_out', 'osc.send')
+send = tjost.plugin('send')
+osc_out = tjost.plugin('osc_out', 'osc.send')
 
-chain(send, osc_out)
+tjost.chain(send, osc_out)

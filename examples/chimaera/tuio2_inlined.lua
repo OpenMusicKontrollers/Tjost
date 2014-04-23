@@ -23,18 +23,18 @@
 --     distribution.
 --]]
 
-message = plugin('dump')
-status = plugin('osc_out', 'osc.jack://status')
---data = plugin('osc_out', 'osc.jack://data')
-chim = plugin('net_out', 'osc.udp://chimaera.local:4444')
---trig = plugin('osc_out', 'osc.jack://trig')
+message = tjost.plugin('dump')
+status = tjost.plugin('osc_out', 'osc.jack://status')
+--data = tjost.plugin('osc_out', 'osc.jack://data')
+chim = tjost.plugin('net_out', 'osc.udp://chimaera.local:4444')
+--trig = tjost.plugin('osc_out', 'osc.jack://trig')
 
 midi = require('midi')
 tuio2 = require('tuio2')
 
 rate = 3000
 
-control = plugin('osc_in', 'osc.jack://control', function(time, path, fmt, ...)
+control = tjost.plugin('osc_in', 'osc.jack://control', function(time, path, fmt, ...)
 	chim(time, path, fmt, ...)
 end)
 
@@ -71,7 +71,7 @@ success = function(time, uuid, path, ...)
 	end
 end
 
-conf = plugin('net_in', 'osc.udp://:4444', function(time, path, fmt, ...)
+conf = tjost.plugin('net_in', 'osc.udp://:4444', function(time, path, fmt, ...)
 	status(time, path, fmt, ...)
 	message(time, path, fmt, ...)
 	if path == '/success' then
@@ -79,14 +79,14 @@ conf = plugin('net_in', 'osc.udp://:4444', function(time, path, fmt, ...)
 	end
 end)
 
-debug = plugin('net_in', 'osc.udp://:6666', function(...)
+debug = tjost.plugin('net_in', 'osc.udp://:6666', function(...)
 	status(...)
 end)
 
-midi_out = plugin('midi_out', 'midi')
+midi_out = tjost.plugin('midi_out', 'midi')
 midi_fltr = midi(midi_out)
 tuio2_fltr = tuio2(midi_fltr)
-stream = plugin('net_in', 'osc.udp://:3333', '60', tuio2_fltr)
+stream = tjost.plugin('net_in', 'osc.udp://:3333', '60', tuio2_fltr)
 
 id = coroutine.wrap(function()
 	local i = math.random(1024)

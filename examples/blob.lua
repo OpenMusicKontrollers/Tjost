@@ -26,7 +26,7 @@
 local ffi = require('ffi')
 buf_t = ffi.typeof('uint8_t *')
 
-osc_in = plugin('send', function(time, path, fmt, ...)
+osc_in = tjost.plugin('send', function(time, path, fmt, ...)
 	for i, v in ipairs({...}) do
 		local buf = buf_t(v.raw)
 		print(i, v, #v, buf, buf[0], buf[1], buf[2], buf[3])

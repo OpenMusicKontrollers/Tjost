@@ -1,4 +1,4 @@
-#!/usr/local/bin/tjost -d
+#!/usr/local/bin/tjost -i
 
 --[[
 -- Copyright (c) 2014 Hanspeter Portner (dev@open-music-kontrollers.ch)
@@ -23,7 +23,18 @@
 --     distribution.
 --]]
 
-osc_in = tjost.plugin('osc_in', 'osc.midi')
-midi_out = tjost.plugin('seq_out', 'midi.seq')
+local ffi = require('ffi')
+buf_t = ffi.typeof('uint8_t *')
 
-tjost.chain(osc_in, midi_out)
+midi_out = tjost.plugin('midi_out', 'midi.out')
+
+midi_in = tjost.plugin('midi_in', 'midi.in', function(time, path, fmt, ...)
+	for _, v in ipairs({...}) do
+		local m = buf_t(v.raw)
+
+		if (m[1] == 0x90) or (m[1] == 0x80) then
+			m[2] = m[2] + 12 -- shift frequency up by 1 octave
+		end
+	end
+	midi_out(time, path, fmt, ...)
+end)

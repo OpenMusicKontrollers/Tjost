@@ -27,15 +27,15 @@ host = argv[4]
 offset = argv[5] or 0.001 -- 1ms
 
 if host then
-	net_io = plugin('net_out', host, offset)
-	osc_in = plugin('osc_in', host)
+	net_io = tjost.plugin('net_out', host, offset)
+	osc_in = tjost.plugin('osc_in', host)
 
-	chain(osc_in, net_io)
+	tjost.chain(osc_in, net_io)
 
 	if string.find(host, 'osc.tcp://') then
-		osc_out = plugin('osc_out', 'osc.net')
+		osc_out = tjost.plugin('osc_out', 'osc.net')
 
-		chain(net_io, osc_out)
+		tjost.chain(net_io, osc_out)
 	end
 else
 	print('no address given (osc.tcp://localhost:4444)')
