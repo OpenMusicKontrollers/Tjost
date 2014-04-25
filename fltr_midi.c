@@ -80,12 +80,10 @@ _on(jack_nframes_t time, const char *path, const char *fmt, lua_State *L)
 
 	int i;
 	uint32_t sid = luaL_checkint(L, 4);
-	uint16_t uid = luaL_checkint(L, 5);
-	uint16_t tid = luaL_checkint(L, 6);
-	uint32_t gid = luaL_checkint(L, 7) + midi_client->channel_offset;
-	float x = luaL_checknumber(L, 8);
-	float y = luaL_checknumber(L, 9);
-	float a = luaL_checknumber(L, 10);
+	uint16_t gid = luaL_checkint(L, 5) + midi_client->channel_offset;
+	uint32_t pid = luaL_checkint(L, 6);
+	float x = luaL_checknumber(L, 7);
+	float y = luaL_checknumber(L, 8);
 
 	float key = midi_client->bot + x*midi_client->range;
 	uint8_t base = floor(key);
@@ -159,9 +157,8 @@ _off(jack_nframes_t time, const char *path, const char *fmt, lua_State *L)
 
 	int i;
 	uint32_t sid = luaL_checkint(L, 4);
-	uint16_t uid = luaL_checkint(L, 5);
-	uint16_t tid = luaL_checkint(L, 6);
-	uint32_t gid = luaL_checkint(L, 7) + midi_client->channel_offset;
+	uint32_t gid = luaL_checkint(L, 5) + midi_client->channel_offset;
+	uint16_t pid = luaL_checkint(L, 6);
 
 	Midi_Blob *b;
 	EINA_INLIST_FOREACH(midi_client->blobs, b)
@@ -202,12 +199,10 @@ _set(jack_nframes_t time, const char *path, const char *fmt, lua_State *L)
 
 	int i;
 	uint32_t sid = luaL_checkint(L, 4);
-	uint16_t uid = luaL_checkint(L, 5);
-	uint16_t tid = luaL_checkint(L, 6);
-	uint32_t gid = luaL_checkint(L, 7) + midi_client->channel_offset;
-	float x = luaL_checknumber(L, 8);
-	float y = luaL_checknumber(L, 9);
-	float a = luaL_checknumber(L, 10);
+	uint32_t gid = luaL_checkint(L, 5) + midi_client->channel_offset;
+	uint16_t pid = luaL_checkint(L, 6);
+	float x = luaL_checknumber(L, 7);
+	float y = luaL_checknumber(L, 8);
 
 	Midi_Blob *b;
 	EINA_INLIST_FOREACH(midi_client->blobs, b)
@@ -331,13 +326,13 @@ _func(lua_State *L)
 	const char *path = luaL_checkstring(L, 2);
 	const char *fmt = luaL_checkstring(L, 3);
 
-	if(!strcmp(path, "/on") && !strcmp(fmt, "iiiifff"))
+	if(!strcmp(path, "/on") && !strcmp(fmt, "iiiff"))
 		return _on(time, path, fmt, L);
 		
-	else if(!strcmp(path, "/off") && !strcmp(fmt, "iiii"))
+	else if(!strcmp(path, "/off") && !strcmp(fmt, "iii"))
 		return _off(time, path, fmt, L);
 
-	else if(!strcmp(path, "/set") && !strcmp(fmt, "iiiifff"))
+	else if(!strcmp(path, "/set") && !strcmp(fmt, "iiiff"))
 		return _set(time, path, fmt, L);
 
 	else if(!strcmp(path, "/idle"))

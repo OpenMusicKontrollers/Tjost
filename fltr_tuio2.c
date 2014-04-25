@@ -217,12 +217,11 @@ _alv(jack_nframes_t time, const char *path, const char *fmt, lua_State *L)
 			{
 				lua_pushnumber(L, time);
 				lua_pushstring(L, "/off");
-				lua_pushstring(L, "iiii");
+				lua_pushstring(L, "iii");
 				lua_pushnumber(L, ptr->sid);
-				lua_pushnumber(L, ptr->uid);
-				lua_pushnumber(L, ptr->tid);
 				lua_pushnumber(L, ptr->gid);
-				if(lua_pcall(L, 7, 0, 0))
+				lua_pushnumber(L, ptr->tid);
+				if(lua_pcall(L, 6, 0, 0))
 					fprintf(stderr, "Tuio2_Client 'off' error: %s\n", lua_tostring(L, -1)); //TODO tjost_message
 			}
 
@@ -242,15 +241,13 @@ _alv(jack_nframes_t time, const char *path, const char *fmt, lua_State *L)
 			{
 				lua_pushnumber(L, time);
 				lua_pushstring(L, "/on");
-				lua_pushstring(L, "iiiifff");
+				lua_pushstring(L, "iiiff");
 				lua_pushnumber(L, ptr->sid);
-				lua_pushnumber(L, ptr->uid);
-				lua_pushnumber(L, ptr->tid);
 				lua_pushnumber(L, ptr->gid);
+				lua_pushnumber(L, ptr->tid);
 				lua_pushnumber(L, ptr->x);
 				lua_pushnumber(L, ptr->z);
-				lua_pushnumber(L, ptr->a);
-				if(lua_pcall(L, 10, 0, 0))
+				if(lua_pcall(L, 8, 0, 0))
 					fprintf(stderr, "Tuio2_Client 'on' error: %s\n", lua_tostring(L, -1)); //TODO tjost_message
 			}
 		}
@@ -260,15 +257,13 @@ _alv(jack_nframes_t time, const char *path, const char *fmt, lua_State *L)
 			{
 				lua_pushnumber(L, time);
 				lua_pushstring(L, "/set");
-				lua_pushstring(L, "iiiifff");
+				lua_pushstring(L, "iiiff");
 				lua_pushnumber(L, ptr->sid);
-				lua_pushnumber(L, ptr->uid);
-				lua_pushnumber(L, ptr->tid);
 				lua_pushnumber(L, ptr->gid);
+				lua_pushnumber(L, ptr->tid);
 				lua_pushnumber(L, ptr->x);
 				lua_pushnumber(L, ptr->z);
-				lua_pushnumber(L, ptr->a);
-				if(lua_pcall(L, 10, 0, 0))
+				if(lua_pcall(L, 8, 0, 0))
 					fprintf(stderr, "Tuio2_Client 'set' error: %s\n", lua_tostring(L, -1)); //TODO tjost_message
 			}
 		}
