@@ -1,4 +1,4 @@
-#!/usr/local/bin/tjost -d
+#!/usr/local/bin/tjost -i
 
 --[[
 -- Copyright (c) 2014 Hanspeter Portner (dev@open-music-kontrollers.ch)
@@ -23,20 +23,6 @@
 --     distribution.
 --]]
 
-host = argv[4]
-offset = argv[5] or 0 -- immediate timestamp
+message = tjost.plugin('dump')
 
-if host then
-	net_io = tjost.plugin('net_out', host, offset)
-	osc_in = tjost.plugin('osc_in', host)
-
-	tjost.chain(osc_in, net_io)
-
-	if string.find(host, 'osc.tcp://') then
-		osc_out = tjost.plugin('osc_out', 'osc.net')
-
-		tjost.chain(net_io, osc_out)
-	end
-else
-	print('no address given (osc.tcp://localhost:4444)')
-end
+timer = tjost.plugin('timer', '2.0', message)

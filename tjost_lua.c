@@ -597,11 +597,14 @@ _plugin(lua_State *L)
 
 	module->host = host;
 
-	module->add(module, argc-1, argv+1); //FIXME wrong argc when callback function present
+	// has a responder function ? TODO check Output of Uplink
+	int has_callback = lua_isfunction(L, -2) || lua_isuserdata(L, -2) ? 1 : 0;
+
+	module->add(module, argc-1-has_callback, argv+1);
 
 	free(argv);
 
-	if(lua_isfunction(L, -2) || lua_isuserdata(L, -2)) // has a responder function ? TODO check Output of Uplink
+	if(has_callback) // TODO check whether this module actually has any input
 	{
 		// put responder function | user data into registry
 		lua_pushlightuserdata(L, module);

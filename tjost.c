@@ -336,8 +336,7 @@ _process_indirect(jack_nframes_t nframes, void *arg)
 				tjost_lua_deserialize_unicast(tev);
 		}
 		else
-			tjost_host_message_push(host, "main loop: ignoring out-of-order event %u %u",
-				last, tev->time);
+			tjost_host_message_push(host, "main loop: %s %i", "ignoring late event", tev->time - last);
 
 		host->queue = eina_inlist_remove(host->queue, EINA_INLIST_GET(tev));
 		tjost_free(host, tev);

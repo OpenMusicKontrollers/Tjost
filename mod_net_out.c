@@ -24,6 +24,8 @@
 #include <tjost.h>
 #include <mod_net.h>
 
+#define MOD_NAME "net_out"
+
 typedef struct _Data Data;
 
 struct _Data {
@@ -57,7 +59,7 @@ add(Tjost_Module *module, int argc, const char **argv)
 	else if(!strncmp(argv[0], "osc.tcp://", 10))
 		dat->net.type = SOCKET_TCP;
 	else
-		fprintf(stderr, "mod_net_out: unknown protocol '%s'\n", argv[0]);
+		fprintf(stderr, MOD_NAME": unknown protocol '%s'\n", argv[0]);
 
 	if( (argc > 1) && argv[1])
 	{
@@ -77,31 +79,31 @@ add(Tjost_Module *module, int argc, const char **argv)
 	{
 		case SOCKET_UDP:
 			if(netaddr_udp_sender_init(&dat->net.handle.udp_tx, loop, argv[0])) //TODO close?
-				fprintf(stderr, "could not initialize socket\n");
+				fprintf(stderr, MOD_NAME": could not initialize socket\n");
 			module->type = TJOST_MODULE_OUTPUT;
 			break;
 		case SOCKET_TCP:
 			if(netaddr_tcp_endpoint_init(&dat->net.handle.tcp, NETADDR_TCP_SENDER, loop, argv[0], mod_net_recv_cb, module)) //TODO close?
-				fprintf(stderr, "could not initialize socket\n");
+				fprintf(stderr, MOD_NAME": could not initialize socket\n");
 			module->type = TJOST_MODULE_IN_OUT;
 			break;
 	}
 
 	if(!(dat->net.rb_out = jack_ringbuffer_create(TJOST_RINGBUF_SIZE)))
-		fprintf(stderr, "could not initialize ringbuffer\n");
+		fprintf(stderr, MOD_NAME": could not initialize ringbuffer\n");
 	if(!(dat->net.rb_in = jack_ringbuffer_create(TJOST_RINGBUF_SIZE)))
-		fprintf(stderr, "could not initialize ringbuffer\n");
+		fprintf(stderr, MOD_NAME": could not initialize ringbuffer\n");
 
 	int err;
 	dat->net.asio.data = module;
 	if((err = uv_async_init(loop, &dat->net.asio, mod_net_asio)))
-		fprintf(stderr, "mod_net_out: %s\n", uv_err_name(err));
+		fprintf(stderr, MOD_NAME": %s\n", uv_err_name(err));
 
 	dat->net.sync.data = module;
 	if((err = uv_timer_init(loop, &dat->net.sync)))
-		fprintf(stderr, "mod_net_out: %s\n", uv_err_name(err));
+		fprintf(stderr, MOD_NAME": %s\n", uv_err_name(err));
 	if((err = uv_timer_start(&dat->net.sync, mod_net_sync, 0, 1000))) // ms
-		fprintf(stderr, "mod_net_out: %s\n", uv_err_name(err));
+		fprintf(stderr, MOD_NAME": %s\n", uv_err_name(err));
 }
 
 void
@@ -111,7 +113,7 @@ del(Tjost_Module *module)
 
 	int err;
 	if((err = uv_timer_stop(&dat->net.sync)))
-		fprintf(stderr, "mod_net_out: %s\n", uv_err_name(err));
+		fprintf(stderr, MOD_NAME": %s\n", uv_err_name(err));
 	uv_close((uv_handle_t *)&dat->net.asio, NULL);
 	
 	if(dat->net.rb_out)

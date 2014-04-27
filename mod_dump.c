@@ -25,6 +25,8 @@
 
 #include <tjost.h>
 
+#define MOD_NAME "dump"
+
 typedef struct _Data Data;
 
 struct _Data {
@@ -165,7 +167,7 @@ _asio(uv_async_t *handle)
 
 			}
 			else
-				fprintf(stderr, "tx OSC message invalid\n");
+				fprintf(stderr, MOD_NAME": tx OSC message invalid\n");
 
 			if(vec[0].len >= tev.size)
 				jack_ringbuffer_read_advance(dat->rb, tev.size);
@@ -200,7 +202,7 @@ process_out(jack_nframes_t nframes, void *arg)
 		if(tev->time >= last)
 		{
 			if(jack_ringbuffer_write_space(dat->rb) < sizeof(Tjost_Event) + tev->size)
-				tjost_host_message_push(host, "mod_dump: %s", "ringbuffer overflow");
+				tjost_host_message_push(host, MOD_NAME": %s", "ringbuffer overflow");
 			else
 			{
 				//tev->time -= last; // time relative to current period
@@ -209,7 +211,7 @@ process_out(jack_nframes_t nframes, void *arg)
 			}
 		}
 		else
-			tjost_host_message_push(host, "mod_dump: %s", "ignoring out-of-order event");
+			tjost_host_message_push(host, MOD_NAME": %s %i", "ignoring late event", tev->time - last);
 
 		module->queue = eina_inlist_remove(module->queue, EINA_INLIST_GET(tev));
 		tjost_free(host, tev);
@@ -219,7 +221,7 @@ process_out(jack_nframes_t nframes, void *arg)
 	{
 		int err;
 		if((err = uv_async_send(&dat->asio)))
-			tjost_host_message_push(host, "mod_dump: %s", uv_err_name(err));
+			tjost_host_message_push(host, MOD_NAME": %s", uv_err_name(err));
 	}
 
 	return 0;
@@ -231,14 +233,14 @@ add(Tjost_Module *module, int argc, const char **argv)
 	Data *dat = tjost_alloc(module->host, sizeof(Data));
 
 	if(!(dat->rb = jack_ringbuffer_create(TJOST_RINGBUF_SIZE)))
-		fprintf(stderr, "could not initialize ringbuffer\n");
+		fprintf(stderr, MOD_NAME": could not initialize ringbuffer\n");
 	
 	uv_loop_t *loop = uv_default_loop();
 
 	dat->asio.data = module;
 	int err;
 	if((err = uv_async_init(loop, &dat->asio, _asio)))
-		fprintf(stderr, "mod_dump: %s\n", uv_err_name(err));
+		fprintf(stderr, MOD_NAME": %s\n", uv_err_name(err));
 
 	module->dat = dat;
 	module->type = TJOST_MODULE_OUTPUT;

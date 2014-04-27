@@ -23,6 +23,8 @@
 
 #include <tjost.h>
 
+#define MOD_NAME "midi_in"
+
 static const char *midi_path = "/midi";
 
 int
@@ -109,7 +111,7 @@ add(Tjost_Module *module, int argc, const char **argv)
 	jack_port_t *port = NULL;
 
 	if(!(port = jack_port_register(module->host->client, argv[0], JACK_DEFAULT_MIDI_TYPE, JackPortIsInput, 0)))
-		fprintf(stderr, "could not register jack port\n");
+		fprintf(stderr, MOD_NAME": could not register jack port\n");
 
 	module->dat = port;
 

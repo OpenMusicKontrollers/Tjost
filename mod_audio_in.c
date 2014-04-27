@@ -24,6 +24,8 @@
 #include <tjost.h>
 #include <mod_audio.h>
 
+#define MOD_NAME "audio_in"
+
 static Sample_Type sample_type = SAMPLE_TYPE_FLOAT; //TODO make this configurable
 
 int
@@ -245,7 +247,7 @@ add(Tjost_Module *module, int argc, const char **argv)
 	jack_port_t *port = NULL;
 
 	if(!(port = jack_port_register(module->host->client, argv[0], JACK_DEFAULT_AUDIO_TYPE, JackPortIsInput, 0)))
-		fprintf(stderr, "could not register jack port\n");
+		fprintf(stderr, MOD_NAME": could not register jack port\n");
 
 	module->dat = port;
 

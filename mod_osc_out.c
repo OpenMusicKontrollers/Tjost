@@ -23,6 +23,8 @@
 
 #include <tjost.h>
 
+#define MOD_NAME "osc_out"
+
 int
 process_out(jack_nframes_t nframes, void *arg)
 {
@@ -52,12 +54,12 @@ process_out(jack_nframes_t nframes, void *arg)
 		if(tev->time >= last)
 		{
 			if(jack_osc_max_event_size(port_buf) < tev->size)
-				tjost_host_message_push(host, "mod_osc_out: %s", "buffer overflow");
+				tjost_host_message_push(host, MOD_NAME": %s", "buffer overflow");
 			else
 				jack_osc_event_write(port_buf, tev->time - last, tev->buf, tev->size);
 		}
 		else
-			tjost_host_message_push(host, "mod_osc_out: %s", "ignoring out-of-order event");
+			tjost_host_message_push(host, MOD_NAME": %s %i", "ignoring late event", tev->time - last);
 
 		module->queue = eina_inlist_remove(module->queue, EINA_INLIST_GET(tev));
 		tjost_free(host, tev);
@@ -72,10 +74,10 @@ add(Tjost_Module *module, int argc, const char **argv)
 	jack_port_t *port = NULL;
 
 	if(!(port = jack_port_register(module->host->client, argv[0], JACK_DEFAULT_OSC_TYPE, JackPortIsOutput, JACK_DEFAULT_OSC_BUFFER_SIZE)))
-		fprintf(stderr, "could not register jack port\n");
+		fprintf(stderr, MOD_NAME": could not register jack port\n");
 
 	if(jack_osc_mark_port(module->host->client, port))
-		fprintf(stderr, "could not set event type\n");
+		fprintf(stderr, MOD_NAME": could not set event type\n");
 
 	module->dat = port;
 	module->type = TJOST_MODULE_OUTPUT;

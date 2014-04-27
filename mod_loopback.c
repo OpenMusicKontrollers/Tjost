@@ -23,6 +23,8 @@
 
 #include <tjost.h>
 
+#define MOD_NAME "loopback"
+
 int
 process_out(jack_nframes_t nframes, void *arg)
 {
@@ -45,7 +47,7 @@ process_out(jack_nframes_t nframes, void *arg)
 		if(tev->time >= last - nframes)
 			tjost_host_schedule(host, module, tev->time, tev->size, tev->buf); // schedule for next period
 		else
-			tjost_host_message_push(host, "mod_loopback: %s", "ignoring out-of-order event");
+			tjost_host_message_push(host, MOD_NAME": %s %i", "ignoring late event", tev->time - last);
 
 		module->queue = eina_inlist_remove(module->queue, EINA_INLIST_GET(tev));
 		tjost_free(host, tev);

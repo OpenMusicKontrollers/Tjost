@@ -23,6 +23,8 @@
 
 #include <tjost.h>
 
+#define MOD_NAME "midi_out"
+
 typedef struct _Data Data;
 
 struct _Data {
@@ -51,7 +53,7 @@ _midi(jack_nframes_t time, const char *path, const char *fmt, jack_osc_data_t *b
 				m[2] = M[3];
 
 				if(jack_midi_max_event_size(data->port_buf) < 3)
-					tjost_host_message_push(data->module->host, "mod_midi_out: %s", "buffer overflow");
+					tjost_host_message_push(data->module->host, MOD_NAME": %s", "buffer overflow");
 				else
 					jack_midi_event_write(data->port_buf, time, m, 3);
 				break;
@@ -103,7 +105,7 @@ process_out(jack_nframes_t nframes, void *arg)
 		if(tev->time >= last)
 			jack_osc_method_dispatch(tev->time - last, tev->buf, tev->size, methods, &data);
 		else
-			tjost_host_message_push(host, "mod_midi_out: %s", "ignoring out-of-order event");
+			tjost_host_message_push(host, MOD_NAME": %s %i", "ignoring late event", tev->time - last);
 
 		module->queue = eina_inlist_remove(module->queue, EINA_INLIST_GET(tev));
 		tjost_free(host, tev);
@@ -118,7 +120,7 @@ add(Tjost_Module *module, int argc, const char **argv)
 	jack_port_t *port = NULL;
 
 	if(!(port = jack_port_register(module->host->client, argv[0], JACK_DEFAULT_MIDI_TYPE, JackPortIsOutput, 0)))
-		fprintf(stderr, "could not register jack port\n");
+		fprintf(stderr, MOD_NAME": could not register jack port\n");
 
 	module->dat = port;
 	module->type = TJOST_MODULE_OUTPUT;

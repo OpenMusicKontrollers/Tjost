@@ -23,6 +23,8 @@
 
 #include <tjost.h>
 
+#define MOD_NAME "osc_in"
+
 int
 process_in(jack_nframes_t nframes, void *arg)
 {
@@ -54,10 +56,10 @@ add(Tjost_Module *module, int argc, const char **argv)
 	jack_port_t *port = NULL;
 
 	if(!(port = jack_port_register(module->host->client, argv[0], JACK_DEFAULT_OSC_TYPE, JackPortIsInput, JACK_DEFAULT_OSC_BUFFER_SIZE)))
-		fprintf(stderr, "could not register jack port\n");
+		fprintf(stderr, MOD_NAME": could not register jack port\n");
 
 	if(jack_osc_mark_port(module->host->client, port))
-		fprintf(stderr, "could not set event type\n");
+		fprintf(stderr, MOD_NAME": could not set event type\n");
 
 	module->dat = port;
 	module->type = TJOST_MODULE_INPUT;

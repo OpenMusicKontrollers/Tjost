@@ -25,6 +25,8 @@
 
 #include <tjost.h>
 
+#define MOD_NAME "send"
+
 typedef struct _Data Data;
 
 struct _Data {
@@ -69,7 +71,7 @@ _tty_recv_cb(uv_stream_t *stream, ssize_t nread, const uv_buf_t *buf)
 		path = cur;
 		if(!jack_osc_check_path(path))
 		{
-			fprintf(stderr, "invalid path: %s\n", path);
+			fprintf(stderr, MOD_NAME": invalid path: %s\n", path);
 			return;
 		}
 		ptr = jack_osc_set_path(ptr, path);
@@ -91,7 +93,7 @@ _tty_recv_cb(uv_stream_t *stream, ssize_t nread, const uv_buf_t *buf)
 			fmt = "";
 		if(!jack_osc_check_fmt(fmt, 0))
 		{
-			fprintf(stderr, "invalid format: %s\n", fmt);
+			fprintf(stderr, MOD_NAME": invalid format: %s\n", fmt);
 			return;
 		}
 		ptr = jack_osc_set_fmt(ptr, fmt);
@@ -114,7 +116,7 @@ _tty_recv_cb(uv_stream_t *stream, ssize_t nread, const uv_buf_t *buf)
 					*end++ = '\0';
 				}
 				else
-					fprintf(stderr, "argument '%c' missing\n", *type);
+					fprintf(stderr, MOD_NAME": argument '%c' missing\n", *type);
 
 				// skip whitespace
 				while( (end < s+nread) && isspace(*end))
@@ -129,7 +131,7 @@ _tty_recv_cb(uv_stream_t *stream, ssize_t nread, const uv_buf_t *buf)
 					if(sscanf(cur, "%"SCNi32, &i))
 						ptr = jack_osc_set_int32(ptr, i);
 					else
-						fprintf(stderr, "type mismatch at '%c'\n", *type);
+						fprintf(stderr, MOD_NAME": type mismatch at '%c'\n", *type);
 					break;
 				}
 				case 'f':
@@ -138,7 +140,7 @@ _tty_recv_cb(uv_stream_t *stream, ssize_t nread, const uv_buf_t *buf)
 					if(sscanf(cur, "%f", &f))
 						ptr = jack_osc_set_float(ptr, f);
 					else
-						fprintf(stderr, "type mismatch at '%c'\n", *type);
+						fprintf(stderr, MOD_NAME": type mismatch at '%c'\n", *type);
 					break;
 				}
 				case 's':
@@ -154,7 +156,7 @@ _tty_recv_cb(uv_stream_t *stream, ssize_t nread, const uv_buf_t *buf)
 					int i;
 					for(i=0; i<size; i++)
 						if(!sscanf(cur+i*2, "%02"SCNx8, payload+i))
-							fprintf(stderr, "type mismatch at '%c'\n", *type);
+							fprintf(stderr, MOD_NAME": type mismatch at '%c'\n", *type);
 					ptr = jack_osc_set_blob(ptr, size, payload);
 					free(payload);
 					break;
@@ -172,7 +174,7 @@ _tty_recv_cb(uv_stream_t *stream, ssize_t nread, const uv_buf_t *buf)
 					if(sscanf(cur, "%"SCNi64, &h))
 						ptr = jack_osc_set_int64(ptr, h);
 					else
-						fprintf(stderr, "type mismatch at '%c'\n", *type);
+						fprintf(stderr, MOD_NAME": type mismatch at '%c'\n", *type);
 					break;
 				}
 				case 'd':
@@ -181,7 +183,7 @@ _tty_recv_cb(uv_stream_t *stream, ssize_t nread, const uv_buf_t *buf)
 					if(sscanf(cur, "%lf", &d))
 						ptr = jack_osc_set_double(ptr, d);
 					else
-						fprintf(stderr, "type mismatch at '%c'\n", *type);
+						fprintf(stderr, MOD_NAME": type mismatch at '%c'\n", *type);
 					break;
 				}
 				case 't':
@@ -194,7 +196,7 @@ _tty_recv_cb(uv_stream_t *stream, ssize_t nread, const uv_buf_t *buf)
 						ptr = jack_osc_set_timetag(ptr, t);
 					}
 					else
-						fprintf(stderr, "type mismatch at '%c'\n", *type);
+						fprintf(stderr, MOD_NAME": type mismatch at '%c'\n", *type);
 					break;
 				}
 
@@ -216,7 +218,7 @@ _tty_recv_cb(uv_stream_t *stream, ssize_t nread, const uv_buf_t *buf)
 					if(sscanf(cur, "%02"SCNx8"%02"SCNx8"%02"SCNx8"%02"SCNx8, m, m+1, m+2, m+3))
 						ptr = jack_osc_set_midi(ptr, m);
 					else
-						fprintf(stderr, "type mismatch at '%c'\n", *type);
+						fprintf(stderr, MOD_NAME": type mismatch at '%c'\n", *type);
 					break;
 				}
 
@@ -231,25 +233,25 @@ _tty_recv_cb(uv_stream_t *stream, ssize_t nread, const uv_buf_t *buf)
 		if(jack_osc_message_check(dat->buffer, tev.size))
 		{
 			if(jack_ringbuffer_write_space(dat->rb) < sizeof(Tjost_Event) + tev.size)
-				fprintf(stderr, "send: ringbuffer overflow\n");
+				fprintf(stderr, MOD_NAME": ringbuffer overflow\n");
 			else
 			{
 				if(jack_ringbuffer_write(dat->rb, (const char *)&tev, sizeof(Tjost_Event)) != sizeof(Tjost_Event))
-					fprintf(stderr, "send: ringbuffer write 1 error\n");
+					fprintf(stderr, MOD_NAME": ringbuffer write 1 error\n");
 				if(jack_ringbuffer_write(dat->rb, (const char *)dat->buffer, tev.size) != tev.size)
-					fprintf(stderr, "send: ringbuffer write 2 error\n");
+					fprintf(stderr, MOD_NAME": ringbuffer write 2 error\n");
 			}
 		}
 		else
-			fprintf(stderr, "rx OSC message invalid\n");
+			fprintf(stderr, MOD_NAME": rx OSC message invalid\n");
 	}
 	else if (nread < 0)
 	{
 		int err;
 		if((err = uv_read_stop((uv_stream_t *)&dat->recv_client)))
-			fprintf(stderr, "send: %s\n", uv_err_name(err));
+			fprintf(stderr, MOD_NAME": %s\n", uv_err_name(err));
 		uv_close((uv_handle_t *)&dat->recv_client, NULL);
-		fprintf(stderr, "%s\n", uv_err_name(nread));
+		fprintf(stderr, MOD_NAME": %s\n", uv_err_name(nread));
 	}
 }
 
@@ -264,7 +266,7 @@ process_in(jack_nframes_t nframes, void *arg)
 	while(jack_ringbuffer_read_space(dat->rb) >= sizeof(Tjost_Event))
 	{
 		if(jack_ringbuffer_peek(dat->rb, (char *)&tev, sizeof(Tjost_Event)) != sizeof(Tjost_Event))
-			tjost_host_message_push(host, "send: %s", "ringbuffer peek error");
+			tjost_host_message_push(host, MOD_NAME": %s", "ringbuffer peek error");
 
 		if(jack_ringbuffer_read_space(dat->rb) >= sizeof(Tjost_Event) + tev.size)
 		{
@@ -272,7 +274,7 @@ process_in(jack_nframes_t nframes, void *arg)
 
 			jack_osc_data_t *bf = tjost_host_schedule_inline(host, module, tev.time, tev.size);
 			if(jack_ringbuffer_read(dat->rb, (char *)bf, tev.size) != tev.size)
-				tjost_host_message_push(host, "send: %s", "ringbuffer read error");
+				tjost_host_message_push(host, MOD_NAME": %s", "ringbuffer read error");
 		}
 		else
 			break;
@@ -287,16 +289,16 @@ add(Tjost_Module *module, int argc, const char **argv)
 	Data *dat = tjost_alloc(module->host, sizeof(Data));
 
 	if(!(dat->rb = jack_ringbuffer_create(TJOST_RINGBUF_SIZE)))
-		fprintf(stderr, "could not initialize ringbuffer\n");
+		fprintf(stderr, MOD_NAME": could not initialize ringbuffer\n");
 	
 	uv_loop_t *loop = uv_default_loop();
 
 	dat->recv_client.data = module;
 	int err;
 	if((err = uv_tty_init(loop, &dat->recv_client, 0, 1)))
-		fprintf(stderr, "send: %s\n", uv_err_name(err));
+		fprintf(stderr, MOD_NAME": %s\n", uv_err_name(err));
 	if((err = uv_read_start((uv_stream_t *)&dat->recv_client, _tty_alloc, _tty_recv_cb)))
-		fprintf(stderr, "send: %s\n", uv_err_name(err));
+		fprintf(stderr, MOD_NAME": %s\n", uv_err_name(err));
 
 	module->dat = dat;
 	module->type = TJOST_MODULE_INPUT;

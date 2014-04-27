@@ -2,12 +2,9 @@ cmake_minimum_required(VERSION 2.8)
 
 project(tjost)
 
-set (CMAKE_MODULE_PATH ${CMAKE_SOURCE_DIR}/cmake)
-
-set(LIBS "-lm")
-
 # pkg-config
 find_package(PkgConfig REQUIRED)
+include(CheckIncludeFiles)
 
 include_directories("${PROJECT_SOURCE_DIR}")
 include_directories("${PROJECT_BINARY_DIR}")
@@ -24,7 +21,7 @@ include_directories(${JACK_INCLUDE_DIRS})
 set(LIBS ${LIBS} ${JACK_LDFLAGS})
 
 # metadata
-option(HAS_METADATA_API "use JACK metadata API" ON)
+CHECK_INCLUDE_FILES("jack/metadata.h" HAS_METADATA_API)
 configure_file(${CMAKE_CURRENT_SOURCE_DIR}/tjost_config.h.in ${CMAKE_CURRENT_BINARY_DIR}/tjost_config.h @ONLY)
 
 # alsa
@@ -73,6 +70,11 @@ install(TARGETS tjost DESTINATION bin)
 add_library(uplink MODULE mod_uplink.c)
 set_target_properties(uplink PROPERTIES PREFIX "")
 install(TARGETS uplink DESTINATION lib/tjost)
+
+# mod_timer
+add_library(timer MODULE mod_timer.c)
+set_target_properties(timer PROPERTIES PREFIX "")
+install(TARGETS timer DESTINATION lib/tjost)
 
 # mod_loopback
 add_library(loopback MODULE mod_loopback.c)
