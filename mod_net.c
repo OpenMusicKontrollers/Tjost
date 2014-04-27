@@ -328,23 +328,22 @@ mod_net_process_out(Tjost_Module *module, jack_nframes_t nframes)
 	{
 		if(tev->time >= last + nframes)
 			break;
-
-		if(tev->time == 0) // immediate execution
+		else if(tev->time < last)
+		{
+			tjost_host_message_push(host, MOD_NAME": %s %i", "late event", tev->time - last);
+			tev->time = last;
+		}
+		else if(tev->time == 0) // immediate execution
 			tev->time = last;
 
-		if(tev->time >= last)
-		{
-			if(jack_ringbuffer_write_space(net->rb_out) < sizeof(Tjost_Event) + tev->size)
-				tjost_host_message_push(host, MOD_NAME": %s", "ringbuffer overflow");
-			else
-			{
-				jack_ringbuffer_write(net->rb_out, (const char *)tev, sizeof(Tjost_Event));
-				jack_osc_message_hton(tev->buf, tev->size); // TODO check return argument
-				jack_ringbuffer_write(net->rb_out, (const char *)tev->buf, tev->size);
-			}
-		}
+		if(jack_ringbuffer_write_space(net->rb_out) < sizeof(Tjost_Event) + tev->size)
+			tjost_host_message_push(host, MOD_NAME": %s", "ringbuffer overflow");
 		else
-			tjost_host_message_push(host, MOD_NAME": %s %i", "ignoring late event", tev->time - last);
+		{
+			jack_ringbuffer_write(net->rb_out, (const char *)tev, sizeof(Tjost_Event));
+			jack_osc_message_hton(tev->buf, tev->size); // TODO check return argument
+			jack_ringbuffer_write(net->rb_out, (const char *)tev->buf, tev->size);
+		}
 
 		module->queue = eina_inlist_remove(module->queue, EINA_INLIST_GET(tev));
 		tjost_free(host, tev);

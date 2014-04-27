@@ -324,19 +324,18 @@ _process_indirect(jack_nframes_t nframes, void *arg)
 	{
 		if(tev->time >= last + nframes)
 			break;
-
-		if(tev->time == 0) // immediate execution
+		else if(tev->time < last)
+		{
+			tjost_host_message_push(host, "main loop: %s %i", "late event", tev->time - last);
+			tev->time = last;
+		}
+		else if(tev->time == 0) // immediate execution
 			tev->time = last;
 
-		if(tev->time >= last)
-		{
-			if(tev->module == TJOST_MODULE_BROADCAST)
-				tjost_lua_deserialize_broadcast(tev, host->uplinks);
-			else
-				tjost_lua_deserialize_unicast(tev);
-		}
+		if(tev->module == TJOST_MODULE_BROADCAST)
+			tjost_lua_deserialize_broadcast(tev, host->uplinks);
 		else
-			tjost_host_message_push(host, "main loop: %s %i", "ignoring late event", tev->time - last);
+			tjost_lua_deserialize_unicast(tev);
 
 		host->queue = eina_inlist_remove(host->queue, EINA_INLIST_GET(tev));
 		tjost_free(host, tev);
@@ -389,16 +388,16 @@ _process_direct(jack_nframes_t nframes, void *arg)
 	{
 		if(tev->time >= last + nframes)
 			break;
-
-		if(tev->time == 0) // immediate execution
+		else if(tev->time < last)
+		{
+			tjost_host_message_push(host, "main loop: %s %i", "late event", tev->time - last);
+			tev->time = last;
+		}
+		else if(tev->time == 0) // immediate execution
 			tev->time = last;
 
-		if(tev->time >= last)
-			EINA_INLIST_FOREACH(tev->module->children, child)
-				tjost_module_schedule(child->module, tev->time, tev->size, tev->buf);
-		else
-			tjost_host_message_push(host, "main loop: ignoring out-of-order event %u %u",
-				last, tev->time);
+		EINA_INLIST_FOREACH(tev->module->children, child)
+			tjost_module_schedule(child->module, tev->time, tev->size, tev->buf);
 
 		host->queue = eina_inlist_remove(host->queue, EINA_INLIST_GET(tev));
 		tjost_free(host, tev);
@@ -582,7 +581,7 @@ main(int argc, const char **argv)
 
 	uv_loop_t *loop = uv_default_loop();
 
-	// init libev
+	// init libuv
 	int err;
 	if((err = uv_signal_init(loop, &host.sigterm)))
 		fprintf(stderr, "main: %s\n", uv_err_name(err));
@@ -618,13 +617,13 @@ main(int argc, const char **argv)
 	if(jack_activate(host.client))
 		FAIL("could not activate jack client\n");
 
-	// run libev
+	// run libuv
 	uv_run(loop, UV_RUN_DEFAULT);
 
 cleanup:
 	fprintf(stderr, "cleaning up\n");
 
-	// deinit libev
+	// deinit libuv
 	uv_close((uv_handle_t *)&host.rtmem, NULL);
 	uv_close((uv_handle_t *)&host.uplink_tx, NULL);
 	uv_close((uv_handle_t *)&host.msg, NULL);

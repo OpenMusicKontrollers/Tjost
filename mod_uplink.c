@@ -40,17 +40,16 @@ process_out(jack_nframes_t nframes, void *arg)
 	{
 		if(tev->time >= last + nframes)
 			break;
-
-		if(tev->time == 0) // immediate execution
+		else if(tev->time < last)
+		{
+			tjost_host_message_push(host, MOD_NAME": %s %i", "late event", tev->time - last);
+			tev->time = last;
+		}
+		else if(tev->time == 0) // immediate execution
 			tev->time = last;
 
-		if(tev->time >= last)
-		{
-			tev->module = module; // reply as unicast
-			tjost_uplink_tx_push(host, tev);
-		}
-		else
-			tjost_host_message_push(host, MOD_NAME": %s %i", "ignoring late event", tev->time - last);
+		tev->module = module; // reply as unicast
+		tjost_uplink_tx_push(host, tev);
 
 		module->queue = eina_inlist_remove(module->queue, EINA_INLIST_GET(tev));
 		tjost_free(host, tev);

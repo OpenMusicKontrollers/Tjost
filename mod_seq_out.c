@@ -147,23 +147,22 @@ process_out(jack_nframes_t nframes, void *arg)
 	{
 		if(tev->time >= last + nframes)
 			break;
-
-		if(tev->time == 0) // immediate execution
+		else if(tev->time < last)
+		{
+			tjost_host_message_push(host, MOD_NAME": %s %i", "late event", tev->time - last);
+			tev->time = last;
+		}
+		else if(tev->time == 0) // immediate execution
 			tev->time = last;
 
-		if(tev->time >= last)
-		{
-			if(jack_ringbuffer_write_space(dat->rb) < sizeof(Tjost_Event) + tev->size)
-				tjost_host_message_push(host, MOD_NAME": %s", "ringbuffer overflow");
-			else
-			{
-				tev->time -= last; // time relative to current period
-				jack_ringbuffer_write(dat->rb, (const char *)tev, sizeof(Tjost_Event));
-				jack_ringbuffer_write(dat->rb, (const char *)tev->buf, tev->size);
-			}
-		}
+		if(jack_ringbuffer_write_space(dat->rb) < sizeof(Tjost_Event) + tev->size)
+			tjost_host_message_push(host, MOD_NAME": %s", "ringbuffer overflow");
 		else
-			tjost_host_message_push(host, MOD_NAME": %s %i", "ignoring late event", tev->time - last);
+		{
+			tev->time -= last; // time relative to current period
+			jack_ringbuffer_write(dat->rb, (const char *)tev, sizeof(Tjost_Event));
+			jack_ringbuffer_write(dat->rb, (const char *)tev->buf, tev->size);
+		}
 
 		module->queue = eina_inlist_remove(module->queue, EINA_INLIST_GET(tev));
 		tjost_free(host, tev);
