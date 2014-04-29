@@ -102,7 +102,7 @@ _asio(uv_async_t *handle)
 							Jack_OSC_Blob b;
 							ptr = jack_osc_get_blob(ptr, &b);
 							printf(" (%"PRIi32")", b.size);
-							if(0) //TODO
+#if 0 //TODO
 							{
 								printf("[");
 								int32_t i;
@@ -111,6 +111,7 @@ _asio(uv_async_t *handle)
 									printf("%02"PRIX8",", bytes[i]);
 								printf("\b]");
 							}
+#endif
 							break;
 						}
 
@@ -195,13 +196,13 @@ process_out(jack_nframes_t nframes, void *arg)
 	{
 		if(tev->time >= last + nframes)
 			break;
+		else if(tev->time == 0) // immediate execution
+			tev->time = last;
 		else if(tev->time < last)
 		{
 			tjost_host_message_push(host, MOD_NAME": %s %i", "late event", tev->time - last);
 			tev->time = last;
 		}
-		else if(tev->time == 0) // immediate execution
-			tev->time = last;
 
 		if(jack_ringbuffer_write_space(dat->rb) < sizeof(Tjost_Event) + tev->size)
 			tjost_host_message_push(host, MOD_NAME": %s", "ringbuffer overflow");

@@ -1,4 +1,4 @@
-#!/usr/local/bin/tjost -i
+#!/usr/bin/env tjost
 
 --[[
 -- Copyright (c) 2014 Hanspeter Portner (dev@open-music-kontrollers.ch)
@@ -25,20 +25,12 @@
 
 resp_out = tjost.plugin('osc_out', 'responder.tx')
 
-tcp_in = tjost.plugin('net_in', 'osc.tcp://:3333', '60', function(...)
-	resp_out(...)
-end)
+tcp_in = tjost.plugin('net_in', 'osc.tcp://:3333', '60', resp_out)
 
-resp_in = tjost.plugin('osc_in', 'responder.rx', function(...)
-	tcp_in(...)
-end)
+resp_in = tjost.plugin('osc_in', 'responder.rx', tcp_in)
 
 send_out = tjost.plugin('osc_out', 'sender.tx')
 
-tcp_out = tjost.plugin('net_out', 'osc.tcp://localhost:3333', '0.1', function(...)
-	send_out(...)
-end)
+tcp_out = tjost.plugin('net_out', 'osc.tcp://localhost:3333', '0.1', send_out)
 
-send_in = tjost.plugin('osc_in', 'sender.rx', function(...)
-	tcp_out(...)
-end)
+send_in = tjost.plugin('osc_in', 'sender.rx', tcp_out)

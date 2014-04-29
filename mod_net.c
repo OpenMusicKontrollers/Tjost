@@ -49,10 +49,13 @@ _update_tstamp(Tjost_Module *module, uint64_t tstamp)
 	if(tstamp == 1ULL)
 		return 0; // immediate execution
 
-	uint64_t tstamp_sec = tstamp >> 32;
+	uint32_t tstamp_sec = tstamp >> 32;
 	uint32_t tstamp_frac = tstamp & 0xffffffff;
 
-	diff = tstamp_sec - net->sync_osc.tv_sec;
+	if(tstamp_sec >= net->sync_osc.tv_sec)
+		diff = tstamp_sec - net->sync_osc.tv_sec;
+	else
+		diff = -(net->sync_osc.tv_sec - tstamp_sec);
 	diff += tstamp_frac * SLICE;
 	diff -= net->sync_osc.tv_nsec * 1e-9;
 
@@ -328,13 +331,13 @@ mod_net_process_out(Tjost_Module *module, jack_nframes_t nframes)
 	{
 		if(tev->time >= last + nframes)
 			break;
+		else if(tev->time == 0) // immediate execution
+			tev->time = last;
 		else if(tev->time < last)
 		{
 			tjost_host_message_push(host, MOD_NAME": %s %i", "late event", tev->time - last);
 			tev->time = last;
 		}
-		else if(tev->time == 0) // immediate execution
-			tev->time = last;
 
 		if(jack_ringbuffer_write_space(net->rb_out) < sizeof(Tjost_Event) + tev->size)
 			tjost_host_message_push(host, MOD_NAME": %s", "ringbuffer overflow");

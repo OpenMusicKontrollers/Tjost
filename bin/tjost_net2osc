@@ -1,4 +1,4 @@
-#!/usr/local/bin/tjost -d
+#!/usr/bin/env tjost
 
 --[[
 -- Copyright (c) 2014 Hanspeter Portner (dev@open-music-kontrollers.ch)
@@ -27,15 +27,11 @@ host = argv[4]
 rtprio = argv[5] or '60'
 
 if host then
-	net_io = tjost.plugin('net_in', host, rtprio)
 	osc_out = tjost.plugin('osc_out', host)
-
-	tjost.chain(net_io, osc_out)
+	net_io = tjost.plugin('net_in', host, rtprio, osc_out)
 
 	if string.find(host, 'osc.tcp://') then
-		osc_in = tjost.plugin('osc_in', 'osc.net')
-
-		tjost.chain(osc_in, net_io)
+		osc_in = tjost.plugin('osc_in', 'osc.net', net_io)
 	end
 else
 	print('no address given (osc.tcp://:3333)')

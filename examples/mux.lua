@@ -1,4 +1,4 @@
-#!/usr/local/bin/tjost -i
+#!/usr/bin/env tjost
 
 --[[
 -- Copyright (c) 2014 Hanspeter Portner (dev@open-music-kontrollers.ch)
@@ -60,24 +60,19 @@ end)
 osc_mono['/left'] = tjost.plugin('osc_out', 'osc.left')
 osc_mono['/right'] = tjost.plugin('osc_out', 'osc.right')
 
-midi_out = {}
+midi_out = {
+	base = tjost.plugin('midi_out', 'base'),
+	lead = tjost.plugin('midi_out', 'lead')
+}
 
-midi_in = tjost.plugin('osc_in', 'osc.midi', function(...)
-	midi_out.base(...)
-	midi_out.lead(...)
-end)
+midi_in = tjost.plugin('osc_in', 'osc.midi')
+tjost.chain(midi_in, midi_out.base)
+tjost.chain(midi_in, midi_out.lead)
 
 net_out = tjost.plugin('net_out', 'osc.udp://localhost:3333')
-net_in = tjost.plugin('net_in', 'osc.udp://:4444', function(...)
-	print(...)
-	net_out(...)
-end)
+net_in = tjost.plugin('net_in', 'osc.udp://:4444', net_out)
 
-midi_clk = tjost.plugin('midi_in', 'clk', function(...)
-	midi_out.base(...)
-	midi_out.lead(...)
-	net_out(...)
-end)
-
-midi_out.base = tjost.plugin('midi_out', 'base')
-midi_out.lead = tjost.plugin('midi_out', 'lead')
+midi_clk = tjost.plugin('midi_in', 'clk')
+tjost.chain(midi_clk, midi_out.base)
+tjost.chain(midi_clk, midi_out.lead)
+tjost.chain(midi_clk, net_out)

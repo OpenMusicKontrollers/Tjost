@@ -1,4 +1,4 @@
-#!/usr/local/bin/tjost -d
+#!/usr/bin/env tjost
 
 --[[
 -- Copyright (c) 2014 Hanspeter Portner (dev@open-music-kontrollers.ch)
@@ -23,7 +23,5 @@
 --     distribution.
 --]]
 
-midi_in = tjost.plugin('raw_in', 'virtual')
 osc_out = tjost.plugin('osc_out', 'osc.midi')
-
-tjost.chain(midi_in, osc_out)
+midi_in = tjost.plugin('raw_in', 'virtual', osc_out)

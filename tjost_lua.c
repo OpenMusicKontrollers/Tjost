@@ -139,9 +139,9 @@ _push(Tjost_Host *host, char type, jack_osc_data_t *ptr)
 }
 
 void
-tjost_lua_deserialize_unicast(Tjost_Event *tev)
+tjost_lua_deserialize(Tjost_Event *tev)
 {
-	//printf("deserialize_unicast\n");
+	//printf("deserialize\n");
 	Tjost_Module *module = tev->module;
 	Tjost_Host *host = module->host;
 	lua_State *L = host->L;
@@ -172,41 +172,6 @@ tjost_lua_deserialize_unicast(Tjost_Event *tev)
 
 		if(lua_pcall(L, argc, 0, 0))
 			tjost_host_message_push(host, "Lua: callback error '%s'", lua_tostring(L, -1));
-	}
-}
-
-void
-tjost_lua_deserialize_broadcast(Tjost_Event *tev, Eina_Inlist *modules)
-{
-	//printf("deserialize_broadcast\n");
-	jack_osc_data_t *ptr = tev->buf;
-
-	const char *path;
-	const char *fmt;
-
-	ptr = jack_osc_get_path(ptr, &path);
-	ptr = jack_osc_get_fmt(ptr, &fmt);
-
-	Tjost_Module *module;
-	EINA_INLIST_FOREACH(modules, module)
-	{
-		Tjost_Host *host = module->host;
-		lua_State *L = host->L;
-
-		lua_pushlightuserdata(L, module);
-		lua_rawget(L, LUA_REGISTRYINDEX); // responder function
-		{
-			lua_pushnumber(L, tev->time);
-			lua_pushstring(L, path);
-			lua_pushstring(L, fmt+1);
-
-			const char *type;
-			for(type=fmt+1; *type!='\0'; type++)
-				ptr = _push(host, *type, ptr);
-
-			if(lua_pcall(L, 3 + strlen(fmt+1), 0, 0))
-				tjost_host_message_push(host, "Lua: callback error '%s'", lua_tostring(L, -1));
-		}
 	}
 }
 
@@ -598,19 +563,35 @@ _plugin(lua_State *L)
 	module->host = host;
 
 	// has a responder function ? TODO check Output of Uplink
-	int has_callback = lua_isfunction(L, -2) || lua_isuserdata(L, -2) ? 1 : 0;
+	int has_callback = 0;
+	switch(lua_type(L, -2))
+	{
+		case LUA_TFUNCTION:
+		{
+			has_callback = 1;
+			module->has_lua_callback = 1;
+
+			lua_pushlightuserdata(L, module);
+			lua_pushvalue(L, -3); // responder function
+			lua_rawset(L, LUA_REGISTRYINDEX);
+			break;
+		}
+		case LUA_TUSERDATA:
+		{
+			has_callback = 1;
+
+			Tjost_Module *mod_out = lua_touserdata(L, -2);
+			Tjost_Child *child = tjost_alloc(host, sizeof(Tjost_Child));
+			child->module = mod_out;
+			module->children = eina_inlist_append(module->children, EINA_INLIST_GET(child));
+			break;
+		}
+		default:
+			break;
+	}
 
 	module->add(module, argc-1-has_callback, argv+1);
-
 	free(argv);
-
-	if(has_callback) // TODO check whether this module actually has any input
-	{
-		// put responder function | user data into registry
-		lua_pushlightuserdata(L, module);
-		lua_pushvalue(L, -3); // responder function
-		lua_rawset(L, LUA_REGISTRYINDEX);
-	}
 
 	switch(module->type)
 	{
@@ -644,6 +625,8 @@ _plugin(lua_State *L)
 			lua_setmetatable(L, -2);
 			break;
 		case TJOST_MODULE_UPLINK:
+			// uplinks get input from tjost main loop directly
+
 			if(!(module->process_out = eina_module_symbol_get(mod, "process_out")))
 				fprintf(stderr, "could not get 'process_out' symbol\n");
 
@@ -666,9 +649,9 @@ _chain(lua_State *L)
 
 	if( (mod_in->type & TJOST_MODULE_INPUT) && (mod_out->type & TJOST_MODULE_OUTPUT) )
 	{
-		Tjost_Child *child = tjost_alloc(host, sizeof(Tjost_Child)); //TODO free
+		Tjost_Child *child = tjost_alloc(host, sizeof(Tjost_Child));
 		child->module = mod_out;
-		mod_in->children = eina_inlist_append(mod_in->children, EINA_INLIST_GET(child)); //TODO free
+		mod_in->children = eina_inlist_append(mod_in->children, EINA_INLIST_GET(child));
 	}
 	else
 		fprintf(stderr, "could not setup module chain\n");

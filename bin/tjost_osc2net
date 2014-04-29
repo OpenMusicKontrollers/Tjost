@@ -1,4 +1,4 @@
-#!/usr/local/bin/tjost -d
+#!/usr/bin/env tjost
 
 --[[
 -- Copyright (c) 2014 Hanspeter Portner (dev@open-music-kontrollers.ch)
@@ -28,9 +28,7 @@ offset = argv[5] or 0 -- immediate timestamp
 
 if host then
 	net_io = tjost.plugin('net_out', host, offset)
-	osc_in = tjost.plugin('osc_in', host)
-
-	tjost.chain(osc_in, net_io)
+	osc_in = tjost.plugin('osc_in', host, net_io)
 
 	if string.find(host, 'osc.tcp://') then
 		osc_out = tjost.plugin('osc_out', 'osc.net')

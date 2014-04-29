@@ -1,4 +1,4 @@
-#!/usr/local/bin/tjost -d
+#!/usr/bin/env tjost
 
 --[[
 -- Copyright (c) 2014 Hanspeter Portner (dev@open-music-kontrollers.ch)
@@ -23,7 +23,5 @@
 --     distribution.
 --]]
 
-osc_in = tjost.plugin('osc_in', 'osc.audio')
 audio_out = tjost.plugin('audio_out', 'audio')
-
-tjost.chain(osc_in, audio_out)
+osc_in = tjost.plugin('osc_in', 'osc.audio', audio_out)

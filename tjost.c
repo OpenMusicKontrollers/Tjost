@@ -299,10 +299,12 @@ tjost_free(Tjost_Host *host, void *buf)
 }
 
 static int
-_process_indirect(jack_nframes_t nframes, void *arg)
+_process(jack_nframes_t nframes, void *arg)
 {
 	Tjost_Host *host = arg;
 	Tjost_Module *module;
+	Tjost_Child *child;
+	Tjost_Module *uplink;
 
 	jack_nframes_t last = jack_last_frame_time(host->client);
 
@@ -324,18 +326,43 @@ _process_indirect(jack_nframes_t nframes, void *arg)
 	{
 		if(tev->time >= last + nframes)
 			break;
+		else if(tev->time == 0) // immediate execution
+			tev->time = last;
 		else if(tev->time < last)
 		{
 			tjost_host_message_push(host, "main loop: %s %i", "late event", tev->time - last);
 			tev->time = last;
 		}
-		else if(tev->time == 0) // immediate execution
-			tev->time = last;
 
-		if(tev->module == TJOST_MODULE_BROADCAST)
-			tjost_lua_deserialize_broadcast(tev, host->uplinks);
-		else
-			tjost_lua_deserialize_unicast(tev);
+		if(tev->module == TJOST_MODULE_BROADCAST) // is uplink message
+		{
+			EINA_INLIST_FOREACH(host->uplinks, uplink)
+			{
+				// send to all children modules
+				EINA_INLIST_FOREACH(uplink->children, child)
+					tjost_module_schedule(child->module, tev->time, tev->size, tev->buf);
+
+				// serialize to Lua callback function
+				if(uplink->has_lua_callback)
+				{
+					tev->module = uplink;
+					tjost_lua_deserialize(tev);
+				}
+			}
+		}
+		else // != TJOST_MODULE_BROADCAST
+		{
+			// send to all children modules
+			EINA_INLIST_FOREACH(tev->module->children, child)
+				tjost_module_schedule(child->module, tev->time, tev->size, tev->buf);
+
+			// serialize to Lua callback function
+			if(tev->module->has_lua_callback)
+			{
+				//tjost_host_message_push(host, "main loop: Lua logic for %p", tev->module);
+				tjost_lua_deserialize(tev);
+			}
+		}
 
 		host->queue = eina_inlist_remove(host->queue, EINA_INLIST_GET(tev));
 		tjost_free(host, tev);
@@ -352,76 +379,11 @@ _process_indirect(jack_nframes_t nframes, void *arg)
 
 	// write uplink events to rinbbuffer
 	int err;
-	if((err = uv_async_send(&host->uplink_tx))) //TODO check if there are any
-		fprintf(stderr, "process_indirect: %s\n", uv_err_name(err));
+	if((err = uv_async_send(&host->uplink_tx))) //TODO check if needed
+		fprintf(stderr, "process_direct: %s\n", uv_err_name(err));
 
 	// run garbage collection step
-	lua_gc(host->L, LUA_GCSTEP, 0);
-	
-	return 0;
-}
-
-static int
-_process_direct(jack_nframes_t nframes, void *arg)
-{
-	Tjost_Host *host = arg;
-	Tjost_Module *module;
-	Tjost_Child *child;
-
-	jack_nframes_t last = jack_last_frame_time(host->client);
-
-	// extend memory if requested
-	tjost_add_memory(host);
-
-	// receive from uplink ringbuffer
-	tjost_uplink_rx_drain(host, 1);
-
-	// receive on all inputs
-	EINA_INLIST_FOREACH(host->modules, module)
-		if(module->type & TJOST_MODULE_INPUT)
-			module->process_in(nframes, module);
-
-	// handle main queue events
-	Eina_Inlist *l;
-	Tjost_Event *tev;
-	EINA_INLIST_FOREACH_SAFE(host->queue, l, tev)
-	{
-		if(tev->time >= last + nframes)
-			break;
-		else if(tev->time < last)
-		{
-			tjost_host_message_push(host, "main loop: %s %i", "late event", tev->time - last);
-			tev->time = last;
-		}
-		else if(tev->time == 0) // immediate execution
-			tev->time = last;
-
-		EINA_INLIST_FOREACH(tev->module->children, child)
-			tjost_module_schedule(child->module, tev->time, tev->size, tev->buf);
-
-		host->queue = eina_inlist_remove(host->queue, EINA_INLIST_GET(tev));
-		tjost_free(host, tev);
-	}
-
-	// send on all outputs
-	EINA_INLIST_FOREACH(host->modules, module)
-	{
-		if(module->type & TJOST_MODULE_INPUT)
-		{
-			EINA_INLIST_FOREACH(module->children, child)
-				child->module->process_out(nframes, child->module);
-		}
-		//module->process_out(nframes, module);
-	}
-
-	// send on all uplinks
-	EINA_INLIST_FOREACH(host->uplinks, module)
-		module->process_out(nframes, module);
-
-	// write uplink events to rinbbuffer
-	int err;
-	if((err = uv_async_send(&host->uplink_tx)))
-		fprintf(stderr, "process_direct: %s\n", uv_err_name(err));
+	lua_gc(host->L, LUA_GCSTEP, 0); //TODO check if needed
 	
 	return 0;
 }
@@ -438,14 +400,6 @@ main(int argc, const char **argv)
 	fprintf(stderr, "FAIL: "__VA_ARGS__); \
 	goto cleanup; \
 }
-
-	int indirect;
-	if(!strcmp(argv[1], "-i"))
-		indirect = 1;
-	else if (!strcmp(argv[1], "-d"))
-		indirect = 0;
-	else
-		FAIL("choose whether to run in (-i)indirect or (-d)irect mode\n");
 
 	// init eina
 	eina_init();
@@ -465,16 +419,8 @@ main(int argc, const char **argv)
 	jack_status_t status;
 	if(!(host.client = jack_client_open("Tjost", options, &status, server_name)))
 		FAIL("could not open client\n");
-	if(indirect)
-	{
-		if(jack_set_process_callback(host.client, _process_indirect, &host))
-			FAIL("could not set process callback\n");
-	}
-	else // direct
-	{
-		if(jack_set_process_callback(host.client, _process_direct, &host))
-			FAIL("could not set process callback\n");
-	}
+	if(jack_set_process_callback(host.client, _process, &host))
+		FAIL("could not set process callback\n");
 	jack_on_shutdown(host.client, _shutdown, &host);
 
 	if(jack_set_client_registration_callback(host.client, tjost_client_registration, &host))
@@ -575,7 +521,7 @@ main(int argc, const char **argv)
 	lua_setglobal(host.L, "argv");
 
 	// load file
-	if(luaL_dofile(host.L, argv[2]))
+	if(luaL_dofile(host.L, argv[1]))
 		FAIL("error loading file: %s\n", lua_tostring(host.L, -1));
 	lua_gc(host.L, LUA_GCSTOP, 0); // disable automatic garbage collection
 

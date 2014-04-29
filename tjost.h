@@ -102,6 +102,7 @@ struct _Tjost_Module {
 
 	Eina_Inlist *queue; // module output event queue
 	Eina_Inlist *children; // child modules for direct mode
+	int has_lua_callback;
 };
 
 struct _Tjost_Child {
@@ -167,8 +168,7 @@ void tjost_host_message_push(Tjost_Host *host, const char *fmt, ...);
 int tjost_host_message_pull(Tjost_Host *host, char *str);
 
 // in tjost_lua.c
-void tjost_lua_deserialize_unicast(Tjost_Event *tev);
-void tjost_lua_deserialize_broadcast(Tjost_Event *tev, Eina_Inlist *modules);
+void tjost_lua_deserialize(Tjost_Event *tev);
 extern const luaL_Reg tjost_input_mt [];
 extern const luaL_Reg tjost_output_mt [];
 extern const luaL_Reg tjost_in_out_mt [];

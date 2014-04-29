@@ -160,10 +160,12 @@ _off(jack_nframes_t time, const char *path, const char *fmt, lua_State *L)
 	uint32_t gid = luaL_checkint(L, 5) + midi_client->channel_offset;
 	uint16_t pid = luaL_checkint(L, 6);
 
-	Midi_Blob *b;
+	Midi_Blob *b = NULL;
 	EINA_INLIST_FOREACH(midi_client->blobs, b)
 		if(b->sid == sid)
 			break;
+	if(!b)
+		return 0;
 	
 	uint8_t base = b->key;
 	uint8_t vel = 0x7f;
@@ -204,10 +206,12 @@ _set(jack_nframes_t time, const char *path, const char *fmt, lua_State *L)
 	float x = luaL_checknumber(L, 7);
 	float y = luaL_checknumber(L, 8);
 
-	Midi_Blob *b;
+	Midi_Blob *b = NULL;
 	EINA_INLIST_FOREACH(midi_client->blobs, b)
 		if(b->sid == sid)
 			break;
+	if(!b)
+		return 0;
 
 	float key = midi_client->bot + x*midi_client->range;
 	uint8_t base = b->key;
@@ -264,7 +268,7 @@ static int
 _idle(jack_nframes_t time, const char *path, const char *fmt, lua_State *L)
 {
 	Midi_Client *midi_client = luaL_checkudata(L, lua_upvalueindex(2), "Fltr_Midi");
-	//TODO
+	// do nothing
 
 	return 0;
 }

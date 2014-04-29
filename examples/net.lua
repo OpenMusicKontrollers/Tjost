@@ -1,4 +1,4 @@
-#!/usr/local/bin/tjost -i
+#!/usr/bin/env tjost
 
 --[[
 -- Copyright (c) 2014 Hanspeter Portner (dev@open-music-kontrollers.ch)
@@ -31,10 +31,5 @@ osc_out = tjost.plugin('osc_out', host)
 net_out = tjost.plugin('net_out', remote)
 
 -- inputs
-osc_in = tjost.plugin('osc_in', remote, function(...)
-	net_out(...)
-end)
-
-net_in = tjost.plugin('net_in', host, function(...)
-	osc_out(...)
-end)
+osc_in = tjost.plugin('osc_in', remote, net_out)
+net_in = tjost.plugin('net_in', host, osc_out)

@@ -1,4 +1,4 @@
-#!/usr/local/bin/tjost -d
+#!/usr/bin/env tjost
 
 --[[
 -- Copyright (c) 2014 Hanspeter Portner (dev@open-music-kontrollers.ch)
@@ -23,7 +23,5 @@
 --     distribution.
 --]]
 
-send = tjost.plugin('send')
 osc_out = tjost.plugin('osc_out', 'osc.send')
-
-tjost.chain(send, osc_out)
+send = tjost.plugin('send', osc_out)

@@ -1,4 +1,4 @@
-#!/usr/local/bin/tjost -i
+#!/usr/bin/env tjost
 
 --[[
 -- Copyright (c) 2014 Hanspeter Portner (dev@open-music-kontrollers.ch)

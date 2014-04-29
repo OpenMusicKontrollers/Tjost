@@ -1,4 +1,4 @@
-#!/usr/local/bin/tjost -i
+#!/usr/bin/env tjost
 
 --[[
 -- Copyright (c) 2014 Hanspeter Portner (dev@open-music-kontrollers.ch)
@@ -66,6 +66,4 @@ uplink = tjost.plugin('uplink', function(time, path, fmt, ...)
 	end
 end)
 
-osc_in = tjost.plugin('osc_in', 'osc.uplink', function(...)
-	uplink(...)
-end)
+osc_in = tjost.plugin('osc_in', 'osc.uplink', uplink)
