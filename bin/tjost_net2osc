@@ -23,8 +23,8 @@
 --     distribution.
 --]]
 
-host = argv[4]
-rtprio = argv[5] or '60'
+host = argv[3]
+rtprio = argv[4] or '60'
 
 if host then
 	osc_out = tjost.plugin('osc_out', host)

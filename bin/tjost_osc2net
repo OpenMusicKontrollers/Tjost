@@ -23,8 +23,8 @@
 --     distribution.
 --]]
 
-host = argv[4]
-offset = argv[5] or 0 -- immediate timestamp
+host = argv[3]
+offset = argv[4] or 0 -- immediate timestamp
 
 if host then
 	net_io = tjost.plugin('net_out', host, offset)
