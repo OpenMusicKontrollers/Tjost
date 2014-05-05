@@ -328,13 +328,14 @@ tjost_graph_order(void *arg)
 }
 
 #ifdef HAS_METADATA_API
+#	include <jackey.h>
 // non real time
 void
 tjost_property_change(jack_uuid_t uuid, const char *key, jack_property_change_t change, void *arg)
 {
 	Tjost_Host *host = arg;
 
-	if( (change == PropertyDeleted) && !strcmp(key, JACK_METADATA_EVENT_KEY))
+	if( (change == PropertyDeleted) && !strcmp(key, JACKEY_EVENT_TYPE))
 	{
 		/* FIXME check whether this is one of our ports and reset event port type
 		fprintf(stderr, "WARNING: metadata for event port type '%s' has been deleted\n", key);

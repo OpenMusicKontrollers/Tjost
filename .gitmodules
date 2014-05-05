@@ -1,0 +1,3 @@
+[submodule "jackey"]
+	path = jackey
+	url = https://github.com/drobilla/jackey.git

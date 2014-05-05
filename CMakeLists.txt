@@ -9,6 +9,7 @@ include(CheckIncludeFiles)
 include_directories("${PROJECT_SOURCE_DIR}")
 include_directories("${PROJECT_BINARY_DIR}")
 include_directories("${PROJECT_SOURCE_DIR}/tlsf-3.0")
+include_directories("${PROJECT_SOURCE_DIR}/jackey")
 
 # libuv
 pkg_search_module(UV REQUIRED libuv)

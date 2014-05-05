@@ -31,6 +31,7 @@
 
 #ifdef HAS_METADATA_API
 #	include <jack/metadata.h>
+#	include <jackey.h>
 #endif // HAS_METADATA_API
 
 // characters not allowed in OSC path string
@@ -53,7 +54,7 @@ jack_osc_mark_port(jack_client_t *client, jack_port_t *port)
 {
 #ifdef HAS_METADATA_API
 	jack_uuid_t uuid = jack_port_uuid(port);
-	return jack_set_property(client, uuid, JACK_METADATA_EVENT_KEY, JACK_METADATA_EVENT_TYPE_OSC, NULL);
+	return jack_set_property(client, uuid, JACKEY_EVENT_TYPE, "OSC", NULL);
 #else
 	return 0;
 #endif // HAS_METADATA_API
@@ -64,7 +65,7 @@ jack_osc_unmark_port(jack_client_t *client, jack_port_t *port)
 {
 #ifdef HAS_METADATA_API
 	jack_uuid_t uuid = jack_port_uuid(port);
-	return jack_remove_property(client, uuid, JACK_METADATA_EVENT_KEY);
+	return jack_remove_property(client, uuid, JACKEY_EVENT_TYPE);
 #else
 	return 0;
 #endif // HAS_METADATA_API
@@ -80,8 +81,8 @@ jack_osc_is_marked_port(jack_port_t *port)
 
 	int marked = 0;
 
-	if( (jack_get_property(uuid, JACK_METADATA_EVENT_KEY, &value, &type) == 0) &&
-			(strcmp(value, JACK_METADATA_EVENT_TYPE_OSC) == 0) )
+	if( (jack_get_property(uuid, JACKEY_EVENT_TYPE, &value, &type) == 0) &&
+			(strcmp(value, "OSC") == 0) )
 		marked = 1;
 	if(value)
 		jack_free(value);

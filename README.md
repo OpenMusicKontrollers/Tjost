@@ -15,7 +15,7 @@
 
 ### JACK
 
-Tjost makes use of JACK's new metadata API. However, as this is only available in JACK1, if you link to JACK2, you need to disable its usage in CMake.
+Tjost makes use of JACK's new metadata API. However, as this is only available in JACK1, if you link to JACK2, it won't use it.
 
 ### Lua
 
@@ -25,19 +25,19 @@ LuaJIT on 64-bit platforms has custom memory allocators disabled by default beca
 
 ### Build / install
 
+	git clone git@github.com:OpenMusicKontrollers/Tjost.git Tjost
+	cd Tjost
+	git submodule init
+	git submodule update
 	mkdir build
 	cd build
 	cmake ..
 	make
 	sudo make install
 
-### Direct invocation (by-passing Lua logic event processor)
+### Invocation
 
-  tjost -d script.lua [command line argument list]
-
-### Indirect invocation (with enabled Lua logic event processor)
-
-  tjost -i script.lua [command line argument list]
+  tjost script.lua [command line argument list]
 
 ### Scripting
 
