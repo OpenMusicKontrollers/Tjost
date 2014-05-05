@@ -39,6 +39,97 @@ LuaJIT on 64-bit platforms has custom memory allocators disabled by default beca
 
   tjost script.lua [command line argument list]
 
+### Utility scrits
+
+#### tjost\_dump
+
+Dump JACK OSC messages to stdout in human readable form.
+
+	tjost_dump
+
+#### tjost\_send
+
+Inject OSC messages into JACK from stdin in human readable form.
+
+	tjost_send
+
+	/hello s world
+	/midi m 01904a7f
+	/mix ifTFINhdtc 13 1.2 45 3.4 00000000.00000001 a
+	/blob b 090a7f4a37
+
+#### tjost\_net2osc
+
+Inject OSC from UDP/TCP into JACK.
+
+Listen on UDP port 3333 with a realtime priority of 60 for the network thread.
+
+	tjost_net2osc osc.udp://:3333 60
+
+Listen on TCP port 4444 (and send to client as this is a two-way communication).
+
+	tjost_net2osc osc.tcp://:4444 60
+
+#### tjost\_osc2net
+
+Eject OSC from JACK to UDP/TCP.
+
+Send to localhost on UDP port 3333 with no scheduling delay.
+
+	tjost_osc2net osc.udp://localhost:3333 0.0
+
+Send to localhost on TCP port 4444 with 1ms scheduling delay (and receive from server as this is a two-way communication).
+
+	tjost_osc2net osc.tcp://localhost:4444 0.001
+
+#### tjost\_midi2osc
+
+Embed MIDI from JACK MIDI in OSC MIDI.
+
+	tjost_midi2osc
+
+#### tjost\_osc2midi
+
+Extract embedded MIDI in OSC to JACK MIDI.
+
+	tjost_osc2midi
+
+#### tjost\_raw2osc
+
+Embed MIDI from ALSA Raw MIDI in OSC MIDI.
+
+	tjost_raw2osc
+
+#### tjost\_osc2raw
+
+Extract embedded MIDI in OSC to ALSA Raw MIDI.
+
+	tjost_osc2raw
+
+#### tjost\_seq2osc
+
+Embed MIDI from ALSA Sequencer MIDI in OSC MIDI.
+
+	tjost_seq2osc
+
+#### tjost\_osc2seq
+
+Extract embedded MIDI in OSC to ALSA Sequencer MIDI.
+
+	tjost_osc2seq
+
+#### tjost\_audio2osc
+
+Embed JACK Audio into JACK OSC.
+
+	tjost_audio2osc
+
+#### tjost\_osc2audio
+
+Extract embedded audio from OSC to JACK Audio.
+
+	tjost_osc2audio
+
 ### Scripting
 
 (under construction)
