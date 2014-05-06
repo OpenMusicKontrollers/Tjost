@@ -68,7 +68,7 @@ _handle_message(Tjost_Module *module, jack_nframes_t tstamp, jack_osc_data_t *bu
 {
 	Mod_Net *net = module->dat;
 
-	if(jack_osc_message_ntoh(buf, len))
+	if(jack_osc_message_check(buf, len))
 	{
 		Tjost_Event tev;
 		tev.module = module;
@@ -95,20 +95,20 @@ _handle_bundle(Tjost_Module *module, jack_osc_data_t *buf, size_t len)
 	if(strncmp((char *)buf, bundle_str, 8)) // bundle header valid?
 		return;
 
-	jack_osc_data_t *end = buf + len/sizeof(jack_osc_data_t);
+	jack_osc_data_t *end = buf + len;
 	jack_osc_data_t *ptr;
 
-	uint64_t timetag = ntohll(*(uint64_t *)(buf + 2));
+	uint64_t timetag = ntohll(*(uint64_t *)(buf + 8));
 	jack_nframes_t tstamp = _update_tstamp(module, timetag);
 
 	int has_nested_bundles = 0;
 
-	ptr = buf + 4; // skip bundle header
+	ptr = buf + 16; // skip bundle header
 	while(ptr < end)
 	{
 		int32_t *size = (int32_t *)ptr;
 		int32_t hsize = htonl(*size);
-		ptr += 1;
+		ptr += 4;
 
 		char c = *(char *)ptr;
 		switch(c)
@@ -125,24 +125,24 @@ _handle_bundle(Tjost_Module *module, jack_osc_data_t *buf, size_t len)
 				return;
 		}
 
-		ptr += hsize/sizeof(jack_osc_data_t);
+		ptr += hsize;
 	}
 
 	if(!has_nested_bundles)
 		return;
 
-	ptr = buf + 4; // skip bundle header
+	ptr = buf + 16; // skip bundle header
 	while(ptr < end)
 	{
 		int32_t *size = (int32_t *)ptr;
 		int32_t hsize = htonl(*size);
-		ptr += 1;
+		ptr += 4;
 
 		char c = *(char *)ptr;
 		if(c == '#')
 			_handle_bundle(module, ptr, hsize);
 
-		ptr += hsize/sizeof(jack_osc_data_t);
+		ptr += hsize;
 	}
 }
 
@@ -218,16 +218,11 @@ _next(Tjost_Module *module)
 			frac = htonl(frac);
 			uint32_t nsize = htonl(size);
 
-			//static uint8_t header [20]; //FIXME remove
-			//memcpy(header, bundle_str, 8);
-			//memcpy(header+8, &sec, 4);
-			//memcpy(header+12, &frac, 4);
-			//memcpy(header+16, &nsize, 4);
-			static jack_osc_data_t header [5];
+			static uint8_t header [20];
 			memcpy(header, bundle_str, 8);
-			header[2] = sec;
-			header[3] = frac;
-			header[4] = nsize;
+			memcpy(header+8, &sec, 4);
+			memcpy(header+12, &frac, 4);
+			memcpy(header+16, &nsize, 4);
 		
 			static int32_t psize;
 			psize = size + sizeof(header); // packet size for TCP preamble
@@ -248,7 +243,7 @@ _next(Tjost_Module *module)
 				msg[2].base = vec[0].buf;
 				msg[2].len = size;
 			
-				assert((uintptr_t)msg[2].base % sizeof(jack_osc_data_t) == 0);
+				assert((uintptr_t)msg[2].base % sizeof(uint32_t) == 0);
 
 				msg[3].len = 0;
 			}
@@ -257,13 +252,13 @@ _next(Tjost_Module *module)
 				msg[2].base = vec[0].buf;
 				msg[2].len = vec[0].len;
 				
-				assert((uintptr_t)msg[2].base % sizeof(jack_osc_data_t) == 0);
+				assert((uintptr_t)msg[2].base % sizeof(uint32_t) == 0);
 
 				assert(size - vec[0].len <= vec[1].len);
 				msg[3].base = vec[1].buf;
 				msg[3].len = size - vec[0].len;
 				
-				assert((uintptr_t)msg[3].base % sizeof(jack_osc_data_t) == 0);
+				assert((uintptr_t)msg[3].base % sizeof(uint32_t) == 0);
 			}
 
 			switch(net->type)
@@ -344,7 +339,6 @@ mod_net_process_out(Tjost_Module *module, jack_nframes_t nframes)
 		else
 		{
 			jack_ringbuffer_write(net->rb_out, (const char *)tev, sizeof(Tjost_Event));
-			jack_osc_message_hton(tev->buf, tev->size); // TODO check return argument
 			jack_ringbuffer_write(net->rb_out, (const char *)tev->buf, tev->size);
 		}
 

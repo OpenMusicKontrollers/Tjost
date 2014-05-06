@@ -89,12 +89,12 @@ _poll(uv_poll_t *handle, int status, int events)
 			m[0] = m[1] & 0x0f;
 			m[1] = m[1] & 0xf0;
 
-			jack_osc_data_t buf [5];
+			jack_osc_data_t buf [20];
 			jack_osc_data_t *ptr = buf;
 			ptr = jack_osc_set_path(ptr, "/midi");
 			ptr = jack_osc_set_fmt(ptr, "m");
 			ptr = jack_osc_set_midi(ptr, m);
-			size_t len = (ptr - buf)*sizeof(jack_osc_data_t);
+			size_t len = ptr - buf;
 
 			Tjost_Event tev;
 			tev.time = 0; // immediate execution

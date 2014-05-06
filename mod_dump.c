@@ -62,7 +62,7 @@ _asio(uv_async_t *handle)
 				jack_ringbuffer_read(dat->rb, (char *)buffer, tev.size);
 			}
 
-			assert((uintptr_t)buffer % sizeof(jack_osc_data_t) == 0);
+			assert((uintptr_t)buffer % sizeof(uint32_t) == 0);
 
 			if(jack_osc_message_check(buffer, tev.size))
 			{

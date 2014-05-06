@@ -257,7 +257,7 @@ _serialize(lua_State *L, Tjost_Module *module)
 				break;
 		}
 
-	size_t size = (ptr - buffer)*sizeof(jack_osc_data_t);
+	size_t size = ptr - buffer;
 
 	tjost_module_schedule(module, time, size, buffer);
 

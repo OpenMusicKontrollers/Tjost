@@ -111,7 +111,7 @@ _ports(jack_nframes_t time, const char *path, const char *fmt, jack_osc_data_t *
 			ptr = jack_osc_set_string(ptr, *name);
 
 		jack_free(ports);
-		size_t len = (ptr-buf_rx)*sizeof(jack_osc_data_t);
+		size_t len = ptr-buf_rx;
 		tjost_uplink_rx_push(host, module, buf_rx, len);
 	}
 	else
@@ -119,7 +119,7 @@ _ports(jack_nframes_t time, const char *path, const char *fmt, jack_osc_data_t *
 		jack_osc_data_t *ptr = buf_rx;
 		ptr = jack_osc_set_path(ptr, "/jack/ports");
 		ptr = jack_osc_set_fmt(ptr, "");
-		size_t len = (ptr-buf_rx)*sizeof(jack_osc_data_t);
+		size_t len = ptr-buf_rx;
 		tjost_uplink_rx_push(host, module, buf_rx, len);
 	}
 
@@ -166,7 +166,7 @@ _connections(jack_nframes_t time, const char *path, const char *fmt, jack_osc_da
 			ptr = jack_osc_set_string(ptr, *name);
 
 		jack_free(connections);
-		size_t len = (ptr-buf_rx)*sizeof(jack_osc_data_t);
+		size_t len = ptr-buf_rx;
 		tjost_uplink_rx_push(host, module, buf_rx, len);
 	}
 	else
@@ -175,7 +175,7 @@ _connections(jack_nframes_t time, const char *path, const char *fmt, jack_osc_da
 		ptr = jack_osc_set_path(ptr, "/jack/connections");
 		ptr = jack_osc_set_fmt(ptr, "s");
 		ptr = jack_osc_set_string(ptr, port_name);
-		size_t len = (ptr-buf_rx)*sizeof(jack_osc_data_t);
+		size_t len = ptr-buf_rx;
 		tjost_uplink_rx_push(host, module, buf_rx, len);
 	}
 
@@ -335,7 +335,7 @@ tjost_property_change(jack_uuid_t uuid, const char *key, jack_property_change_t 
 {
 	Tjost_Host *host = arg;
 
-	if( (change == PropertyDeleted) && !strcmp(key, JACKEY_EVENT_TYPE))
+	if( (change == PropertyDeleted) && !strcmp(key, JACKEY_EVENT_TYPES))
 	{
 		/* FIXME check whether this is one of our ports and reset event port type
 		fprintf(stderr, "WARNING: metadata for event port type '%s' has been deleted\n", key);

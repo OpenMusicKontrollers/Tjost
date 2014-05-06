@@ -229,7 +229,7 @@ _tty_recv_cb(uv_stream_t *stream, ssize_t nread, const uv_buf_t *buf)
 
 		Tjost_Event tev;
 		tev.time = 0; // immediate execution
-		tev.size = (ptr - dat->buffer)*sizeof(jack_osc_data_t);
+		tev.size = ptr - dat->buffer;
 		if(jack_osc_message_check(dat->buffer, tev.size))
 		{
 			if(jack_ringbuffer_write_space(dat->rb) < sizeof(Tjost_Event) + tev.size)

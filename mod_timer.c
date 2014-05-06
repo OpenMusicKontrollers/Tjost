@@ -66,11 +66,11 @@ _timeup(uv_timer_t *handle)
 	Tjost_Module *module = handle->data;
 	Data *dat = module->dat;
 
-	jack_osc_data_t buf [3];
+	jack_osc_data_t buf [12];
 	jack_osc_data_t *ptr = buf;
 	ptr = jack_osc_set_path(ptr, "/timeup");
 	ptr = jack_osc_set_fmt(ptr, "");
-	size_t len = (ptr - buf)*sizeof(jack_osc_data_t);
+	size_t len = ptr - buf;
 
 	Tjost_Event tev;
 	tev.time = 0; // immediate execution

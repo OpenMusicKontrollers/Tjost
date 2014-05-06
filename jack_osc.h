@@ -40,17 +40,16 @@ extern "C" {
 #define JACK_DEFAULT_OSC_TYPE JACK_DEFAULT_MIDI_TYPE
 #define JACK_DEFAULT_OSC_BUFFER_SIZE 0
 
-#define jack_osc_data_t									uint32_t
-#define jack_osc_event_t								jack_midi_event_t
+typedef jack_midi_data_t								jack_osc_data_t;
+typedef jack_midi_event_t								jack_osc_event_t;
 
 #define jack_osc_get_event_count				jack_midi_get_event_count
 #define jack_osc_event_get							jack_midi_event_get
 #define jack_osc_clear_buffer						jack_midi_clear_buffer
 #define jack_osc_max_event_size					jack_midi_max_event_size
+#define jack_osc_event_reserve					jack_midi_event_reserve
+#define jack_osc_event_write						jack_midi_event_write
 #define jack_osc_get_lost_event_count		jack_midi_lost_event_count
-
-#define jack_osc_event_reserve					(jack_osc_data_t *)jack_midi_event_reserve
-#define jack_osc_event_write(port_buf, time, buf, size)	jack_midi_event_write((port_buf), (time), (jack_midi_data_t *)(buf), (size))
 
 typedef int (*Jack_OSC_Callback) (jack_nframes_t time, const char *path, const char *fmt, jack_osc_data_t *arg, void *dat);
 typedef struct _Jack_OSC_Method Jack_OSC_Method;
@@ -115,22 +114,11 @@ int jack_osc_check_fmt(const char *format, int offset);
 int jack_osc_method_match(Jack_OSC_Method *methods, const char *path, const char *fmt);
 void jack_osc_method_dispatch(jack_nframes_t time, jack_osc_data_t *buf, size_t size, Jack_OSC_Method *methods, void *dat);
 int jack_osc_message_check(jack_osc_data_t *buf, size_t size);
-#if __BYTE_ORDER == __BIG_ENDIAN
-#	define jack_osc_message_ntoh jack_osc_message_check
-#	define jack_osc_message_hton jack_osc_message_check
-#else
-# if __BYTE_ORDER == __LITTLE_ENDIAN
-int jack_osc_message_ntoh(jack_osc_data_t *buf, size_t size);
-int jack_osc_message_hton(jack_osc_data_t *buf, size_t size);
-# endif
-#endif
 
 // OSC object lengths
 size_t jack_osc_strlen(const char *buf);
 size_t jack_osc_fmtlen(const char *buf);
 size_t jack_osc_bloblen(jack_osc_data_t *buf);
-size_t jack_osc_strquads(const char *buf);
-size_t jack_osc_blobquads(jack_osc_data_t *buf);
 size_t jack_osc_blobsize(jack_osc_data_t *buf);
 
 // get OSC arguments from raw buffer
