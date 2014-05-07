@@ -162,6 +162,7 @@ return {
 	end,
 
 	idle = function(self, time)
+		--[[
 		raw[1][0] = 0
 		raw[1][1] = CONTROLLER
 		raw[1][2] = ALL_NOTES_OFF
@@ -174,5 +175,6 @@ return {
 		
 		midi[0](time, mpath, 'm', m[1])
 		midi[1](time, mpath, 'm', m[2])
+		--]]
 	end
 }

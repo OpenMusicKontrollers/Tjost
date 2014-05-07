@@ -25,16 +25,9 @@
 
 message = tjost.plugin('dump')
 status = tjost.plugin('osc_out', 'status')
---data = tjost.plugin('osc_out', 'data')
 chim = tjost.plugin('net_out', 'osc.udp://chimaera.local:4444')
 
-midi = require('midi_explicit')
-
 rate = 3000
-
-control = tjost.plugin('osc_in', 'control', function(time, path, fmt, ...)
-	chim(time, path, fmt, ...)
-end)
 
 success = function(time, uuid, path, ...)
 	local methods = {
@@ -42,8 +35,9 @@ success = function(time, uuid, path, ...)
 			local bot = 2*12 - 0.5 - (n % 18 / 6);
 			local range = n/3
 
-			midi.bot = bot
-			midi.range = range
+			chim(0, '/engines/oscmidi/offset', 'if', id(), bot)
+			chim(0, '/engines/oscmidi/range', 'if', id(), bot)
+			chim(0, '/engines/oscmidi/effect', 'ii', id(), 0x07)
 			message(time, '/number', 'iff', n, bot, range)
 		end,
 
@@ -62,7 +56,7 @@ success = function(time, uuid, path, ...)
 			chim(0, '/engines/tcp', 'ii', id(), 1)
 			chim(0, '/engines/offset', 'if', id(), 0.002)
 			chim(0, '/engines/reset', 'i', id())
-			chim(0, '/engines/dummy/enabled', 'ii', id(), 1)
+			chim(0, '/engines/oscmidi/enabled', 'ii', id(), 1)
 		end
 	}
 
@@ -84,32 +78,8 @@ debug = tjost.plugin('net_in', 'osc.udp://:6666', function(...)
 	status(...)
 end)
 
-methods = {
-	['/on'] = function(time, fmt, ...)
-		midi:on(time, ...)
-	end,
-
-	['/off'] = function(time, fmt, ...)
-		midi:off(time, ...)
-	end,
-
-	['/set'] = function(time, fmt, ...)
-		midi:set(time, ...)
-	end,
-
-	['/idle'] = function(time, fmt)
-		midi:idle(time)
-	end
-}
-
-stream = tjost.plugin('net_in', 'osc.tcp://:3333', '60', function(time, path, ...)
-	--data(time, path, ...)
-
-	local cb = methods[path]
-	if cb then
-		cb(time, ...)
-	end
-end)
+midi_out = tjost.plugin('midi_out', 'midi.out')
+stream = tjost.plugin('net_in', 'osc.tcp://:3333', '60', midi_out)
 
 id = coroutine.wrap(function()
 	local i = math.random(1024)

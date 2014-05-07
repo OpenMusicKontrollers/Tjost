@@ -21,6 +21,9 @@
 --     distribution.
 --]]
 
+local ffi = require('ffi')
+midi_t = ffi.typeof('uint8_t *')
+
 local bit32 = bit32 or bit -- compatibility with Lua5.2 and LuaJIT
 
 local PITCHBEND = 0xe0
@@ -39,8 +42,17 @@ local bases = {}
 
 -- preallocate table
 local m = {
-	{0, 0, 0, 0},
-	{0, 0, 0, 0}
+	tjost.midi(),
+	tjost.midi(),
+	tjost.midi(),
+	tjost.midi()
+}
+
+local raw = {
+	midi_t(m[1].raw),
+	midi_t(m[2].raw),
+	midi_t(m[3].raw),
+	midi_t(m[4].raw)
 }
 
 local n = 128
@@ -70,15 +82,15 @@ return {
 		base = math.floor(key)
 		bend = (key-base)/self.range*0x2000 + 0x1fff
 
-		m[1][1] = gid
-		m[1][2] = 0x90
-		m[1][3] = base
-		m[1][4] = 0x7f
+		raw[1][0] = gid
+		raw[1][1] = 0x90
+		raw[1][2] = base
+		raw[1][3] = 0x7f
 
-		m[2][1] = gid
-		m[2][2] = PITCHBEND
-		m[2][3] = bit32.band(bend, 0x7f)
-		m[2][4] = bit32.rshift(bend, 7)
+		raw[2][0] = gid
+		raw[2][1] = PITCHBEND
+		raw[2][2] = bit32.band(bend, 0x7f)
+		raw[2][3] = bit32.rshift(bend, 7)
 
 		midi[gid](time, mpath, 'mm', m[1], m[2])
 		lv2[gid](time, lv2path, 'if', 14, y*2-0.5)
@@ -92,10 +104,10 @@ return {
 
 		base = bases[sid]
 
-		m[1][1] = gid
-		m[1][2] = 0x80
-		m[1][3] = base
-		m[1][4] = 0x00
+		raw[1][0] = gid
+		raw[1][1] = 0x80
+		raw[1][2] = base
+		raw[1][3] = 0x00
 
 		bases[sid] = nil
 
@@ -109,10 +121,10 @@ return {
 		base = bases[sid]
 		bend = (key-base)/self.range*0x2000 + 0x1fff
 
-		m[1][1] = gid
-		m[1][2] = PITCHBEND
-		m[1][3] = bit32.band(bend, 0x7f)
-		m[1][4] = bit32.rshift(bend, 7)
+		raw[1][0] = gid
+		raw[1][1] = PITCHBEND
+		raw[1][2] = bit32.band(bend, 0x7f)
+		raw[1][3] = bit32.rshift(bend, 7)
 
 		midi[gid](time, mpath, 'm', m[1])
 		lv2[gid](time, lv2path, 'if', 14, y*2-0.5)
@@ -121,15 +133,15 @@ return {
 
 	idle = function(self, time)
 		--[[
-		m[1][1] = 0
-		m[1][2] = CONTROLLER
-		m[1][3] = ALL_NOTES_OFF
-		m[1][4] = 0x0
+		raw[1][0] = 0
+		raw[1][1] = CONTROLLER
+		raw[1][2] = ALL_NOTES_OFF
+		raw[1][3] = 0x0
 
-		m[2][1] = 1
-		m[2][2] = CONTROLLER
-		m[2][3] = ALL_NOTES_OFF
-		m[2][4] = 0x0
+		raw[2][0] = 1
+		raw[2][1] = CONTROLLER
+		raw[2][2] = ALL_NOTES_OFF
+		raw[2][3] = 0x0
 		
 		midi[0](time, mpath, 'm', m[1])
 		midi[1](time, mpath, 'm', m[2])
