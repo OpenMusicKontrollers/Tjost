@@ -146,6 +146,16 @@ add_library(audio_out MODULE mod_audio_out.c)
 set_target_properties(audio_out PROPERTIES PREFIX "")
 install(TARGETS audio_out DESTINATION lib/tjost)
 
+# mod_cv_in
+add_library(cv_in MODULE mod_cv_in.c)
+set_target_properties(cv_in PROPERTIES PREFIX "")
+install(TARGETS cv_in DESTINATION lib/tjost)
+
+# mod_cv_out
+add_library(cv_out MODULE mod_cv_out.c)
+set_target_properties(cv_out PROPERTIES PREFIX "")
+install(TARGETS cv_out DESTINATION lib/tjost)
+
 # mod_net_out
 add_library(net_out MODULE mod_net_out.c mod_net.c netaddr_udp.c netaddr_tcp.c)
 set_target_properties(net_out PROPERTIES PREFIX "")

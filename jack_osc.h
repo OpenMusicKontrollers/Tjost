@@ -49,7 +49,7 @@ typedef jack_midi_event_t								jack_osc_event_t;
 #define jack_osc_max_event_size					jack_midi_max_event_size
 #define jack_osc_event_reserve					jack_midi_event_reserve
 #define jack_osc_event_write						jack_midi_event_write
-#define jack_osc_get_lost_event_count		jack_midi_lost_event_count
+#define jack_osc_get_lost_event_count		jack_midi_get_lost_event_count
 
 typedef int (*Jack_OSC_Callback) (jack_nframes_t time, const char *path, const char *fmt, jack_osc_data_t *arg, void *dat);
 typedef struct _Jack_OSC_Method Jack_OSC_Method;

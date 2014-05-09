@@ -112,8 +112,8 @@ struct _Tjost_Child {
 };
 
 #define TJOST_MODULE_BROADCAST NULL
-#define TJOST_BUF_SIZE (0x1000*sizeof(jack_osc_data_t))
-#define TJOST_RINGBUF_SIZE (0x4000*sizeof(jack_osc_data_t))
+#define TJOST_BUF_SIZE (0x4000)
+#define TJOST_RINGBUF_SIZE (0x10000)
 
 struct _Tjost_Mem_Chunk {
 	EINA_INLIST;
