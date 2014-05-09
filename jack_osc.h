@@ -31,25 +31,7 @@ extern "C" {
 #include <arpa/inet.h> // hton & co.
 #include <stdint.h>
 
-#include <jack/jack.h>
-#include <jack/types.h>
-#include <jack/ringbuffer.h>
-#include <jack/weakmacros.h>
-#include <jack/midiport.h>
-
-#define JACK_DEFAULT_OSC_TYPE JACK_DEFAULT_MIDI_TYPE
-#define JACK_DEFAULT_OSC_BUFFER_SIZE 0
-
-typedef jack_midi_data_t								jack_osc_data_t;
-typedef jack_midi_event_t								jack_osc_event_t;
-
-#define jack_osc_get_event_count				jack_midi_get_event_count
-#define jack_osc_event_get							jack_midi_event_get
-#define jack_osc_clear_buffer						jack_midi_clear_buffer
-#define jack_osc_max_event_size					jack_midi_max_event_size
-#define jack_osc_event_reserve					jack_midi_event_reserve
-#define jack_osc_event_write						jack_midi_event_write
-#define jack_osc_get_lost_event_count		jack_midi_get_lost_event_count
+#include <jack_osc/jack_osc.h>
 
 typedef int (*Jack_OSC_Callback) (jack_nframes_t time, const char *path, const char *fmt, jack_osc_data_t *arg, void *dat);
 typedef struct _Jack_OSC_Method Jack_OSC_Method;

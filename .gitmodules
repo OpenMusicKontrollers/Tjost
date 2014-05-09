@@ -1,3 +1,6 @@
 [submodule "jackey"]
 	path = jackey
 	url = https://github.com/drobilla/jackey.git
+[submodule "jack_osc"]
+	path = jack_osc
+	url = https://github.com/ventosus/jack_osc.git

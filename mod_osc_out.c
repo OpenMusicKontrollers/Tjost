@@ -72,7 +72,7 @@ add(Tjost_Module *module, int argc, const char **argv)
 {
 	jack_port_t *port = NULL;
 
-	if(!(port = jack_port_register(module->host->client, argv[0], JACK_DEFAULT_OSC_TYPE, JackPortIsOutput, JACK_DEFAULT_OSC_BUFFER_SIZE)))
+	if(!(port = jack_port_register(module->host->client, argv[0], JACK_DEFAULT_OSC_TYPE, JackPortIsOutput, 0)))
 		fprintf(stderr, MOD_NAME": could not register jack port\n");
 
 	if(jack_osc_mark_port(module->host->client, port))
