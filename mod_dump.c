@@ -32,7 +32,7 @@ typedef struct _Data Data;
 struct _Data {
 	jack_ringbuffer_t *rb;
 	uv_async_t asio;
-	jack_osc_data_t buffer [TJOST_BUF_SIZE] __attribute__((aligned (8)));
+	jack_osc_data_t buffer [TJOST_BUF_SIZE];
 };
 	
 
