@@ -72,7 +72,7 @@ jack_osc_mark_port(jack_client_t *client, jack_port_t *port)
 {
 #ifdef HAS_METADATA_API
 	jack_uuid_t uuid = jack_port_uuid(port);
-	return jack_set_property(client, uuid, JACKEY_EVENT_TYPES, "OSC", NULL);
+	return jack_set_property(client, uuid, JACKEY_EVENT_TYPES, JACK_EVENT_TYPE__OSC, NULL);
 #else
 	return 0;
 #endif // HAS_METADATA_API
@@ -100,7 +100,7 @@ jack_osc_is_marked_port(jack_port_t *port)
 	int marked = 0;
 
 	if( (jack_get_property(uuid, JACKEY_EVENT_TYPES, &value, &type) == 0) &&
-			(strstr(value, "OSC") != NULL) )
+			(strstr(value, JACK_EVENT_TYPE__OSC) != NULL) )
 		marked = 1;
 	if(value)
 		jack_free(value);
