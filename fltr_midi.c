@@ -299,16 +299,7 @@ _effect(jack_nframes_t time, const char *path, const char *fmt, lua_State *L)
 	Midi_Client *midi_client = luaL_checkudata(L, lua_upvalueindex(2), "Fltr_Midi");
 
 	midi_client->effect = luaL_checkint(L, 4); // TODO check range
-
-	return 0;
-}
-
-static int
-_double_precision(jack_nframes_t time, const char *path, const char *fmt, lua_State *L)
-{
-	Midi_Client *midi_client = luaL_checkudata(L, lua_upvalueindex(2), "Fltr_Midi");
-
-	midi_client->double_precision = luaL_checkint(L, 4) != 0 ? 1 : 0;
+	midi_client->double_precision = midi_client->effect <= 0xd ? 1 : 0;
 
 	return 0;
 }
@@ -350,9 +341,6 @@ _func(lua_State *L)
 
 	else if(!strcmp(path, "/effect") && !strcmp(fmt, "i"))
 		return _effect(time, path, fmt, L);
-
-	else if(!strcmp(path, "/double_precision") && !strcmp(fmt, "i"))
-		return _double_precision(time, path, fmt, L);
 
 	else if(!strcmp(path, "/channel_offset") && !strcmp(fmt, "i"))
 		return _channel_offset(time, path, fmt, L);

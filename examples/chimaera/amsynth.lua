@@ -71,9 +71,7 @@ return {
 	bot = 2*12 - 0.5 - (n % 18 / 6),
 	range = n/3,
 	--effect = VOLUME,
-	--double_precision = true,
 	effect = SOUND_EFFECT_5,
-	double_precision = false,
 
 	on = function(self, time, sid, gid, pid, x, y)
 		local key, base, bend, eff

@@ -65,9 +65,7 @@ return {
 	bot = 3*12 - 0.5 - (n % 18 / 6),
 	range = n/3,
 	--effect = VOLUME,
-	--double_precision = true,
 	effect = SOUND_EFFECT_5,
-	double_precision = false,
 
 	on = function(self, time, sid, gid, pid, x, y)
 		local key, base, bend, eff
@@ -87,7 +85,7 @@ return {
 		raw[2][2] = bit32.band(bend, 0x7f)
 		raw[2][3] = bit32.rshift(bend, 7)
 
-		if self.double_precision then
+		if self.effect <= 0xd then
 			raw[3][0] = gid
 			raw[3][1] = CONTROLLER
 			raw[3][2] = bit32.bor(self.effect, 0x20)
@@ -139,7 +137,7 @@ return {
 		raw[1][2] = bit32.band(bend, 0x7f)
 		raw[1][3] = bit32.rshift(bend, 7)
 
-		if self.double_precision then
+		if self.effect <= 0xd then
 			raw[2][0] = gid
 			raw[2][1] = CONTROLLER
 			raw[2][2] = bit32.bor(self.effect, 0x20)

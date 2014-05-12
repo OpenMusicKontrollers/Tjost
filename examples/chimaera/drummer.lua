@@ -23,20 +23,56 @@
 --     distribution.
 --]]
 
+local ffi = require('ffi')
+midi_t = ffi.typeof('uint8_t *')
+
 beat = tjost.plugin('midi_out', 'drum')
+
+local m = tjost.midi()
+local raw = midi_t(m.raw)
 
 octave = 2
 base = octave*12
 
 tom = {
-	on = {0x02, 0x90, base+11, 0x7f},
-	off = {0x02, 0x80, base+11, 0x00}
+	on = tjost.midi(),
+	off = tjost.midi()
 }
 
-snare = {
-	on = {0x02, 0x90, base+20, 0x1f},
-	off = {0x02, 0x80, base+20, 0x00}
+tom_raw = {
+	on = midi_t(tom.on.raw),
+	off = midi_t(tom.off.raw)
 }
+
+tom_raw.on[0] = 0x02
+tom_raw.on[1] = 0x90
+tom_raw.on[2] = base+11
+tom_raw.on[3] = 0x7f
+
+tom_raw.off[0] = 0x02
+tom_raw.off[1] = 0x80
+tom_raw.off[2] = base+11
+tom_raw.off[3] = 0x00
+
+snare = {
+	on = tjost.midi(),
+	off = tjost.midi()
+}
+
+snare_raw = {
+	on = midi_t(snare.on.raw),
+	off = midi_t(snare.off.raw)
+}
+
+snare_raw.on[0] = 0x02
+snare_raw.on[1] = 0x90
+snare_raw.on[2] = base+20
+snare_raw.on[3] = 0x1f
+
+snare_raw.off[0] = 0x02
+snare_raw.off[1] = 0x80
+snare_raw.off[2] = base+20
+snare_raw.off[3] = 0x00
 
 counter = 0
 num = 4
