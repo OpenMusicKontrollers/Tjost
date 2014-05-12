@@ -54,9 +54,9 @@ add(Tjost_Module *module, int argc, const char **argv)
 
 	uv_loop_t *loop = uv_default_loop();
 
-	if(!strncmp(argv[0], "osc.udp://", 10))
+	if(!strncmp(argv[0], "osc.udp://", 10) || !strncmp(argv[0], "osc.udp4://", 11) || !strncmp(argv[0], "osc.udp6://", 11))
 		dat->net.type = SOCKET_UDP;
-	else if(!strncmp(argv[0], "osc.tcp://", 10))
+	else if(!strncmp(argv[0], "osc.tcp://", 10) || !strncmp(argv[0], "osc.tcp4://", 11) || !strncmp(argv[0], "osc.tcp6://", 11) || !strncmp(argv[0], "osc.slip.tcp://", 15) || !strncmp(argv[0], "osc.slip.tcp4://", 16) || !strncmp(argv[0], "osc.slip.tcp6://", 16))
 		dat->net.type = SOCKET_TCP;
 	else
 		fprintf(stderr, MOD_NAME": unknown protocol '%s'\n", argv[0]);

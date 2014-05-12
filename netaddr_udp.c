@@ -55,12 +55,26 @@ netaddr_udp_responder_init(NetAddr_UDP_Responder *netaddr, uv_loop_t *loop, cons
 	netaddr->dat = dat;
 	netaddr->recv_socket.data = netaddr;
 
-	if(strncmp(addr, "osc.udp://", 10))
+	if(!strncmp(addr, "osc.udp://", 10))
+	{
+		netaddr->version = NETADDR_IP_VERSION_4;
+		addr += 10;
+	}
+	else if(!strncmp(addr, "osc.udp4://", 11))
+	{
+		netaddr->version = NETADDR_IP_VERSION_4;
+		addr += 11;
+	}
+	else if(!strncmp(addr, "osc.udp6://", 11))
+	{
+		netaddr->version = NETADDR_IP_VERSION_6;
+		addr += 11;
+	}
+	else
 	{
 		fprintf(stderr, "unsupported protocol in address %s\n", addr);
 		return -1;
 	}
-	addr += 10;
 
 	char *colon = strchr(addr, ':');
 	if(!colon)
@@ -69,22 +83,41 @@ netaddr_udp_responder_init(NetAddr_UDP_Responder *netaddr, uv_loop_t *loop, cons
 		return -1;
 	}
 
-	const char *host = "0.0.0.0";
 	uint16_t port = atoi(colon+1);
 
 	int err;
-	struct sockaddr_in recv_addr;
+	const struct sockaddr *recv_addr = NULL;
+	struct sockaddr_in recv_addr4;
+	struct sockaddr_in6 recv_addr6;
+	unsigned int flags = 0;
+
 	if((err = uv_udp_init(loop, &netaddr->recv_socket)))
 	{
 		fprintf(stderr, "uv_udp_init: %s\n", uv_err_name(err));
 		return -1;
 	}
-	if((err = uv_ip4_addr(host, port, &recv_addr)))
+	if(netaddr->version == NETADDR_IP_VERSION_4)
 	{
-		fprintf(stderr, "uv_ip4_addr: %s\n", uv_err_name(err));
-		return -1;
+		const char *host = "0.0.0.0";
+		if((err = uv_ip4_addr(host, port, &recv_addr4)))
+		{
+			fprintf(stderr, "uv_ip4_addr: %s\n", uv_err_name(err));
+			return -1;
+		}
+		recv_addr = (const struct sockaddr *)&recv_addr4;
 	}
-	if((err = uv_udp_bind(&netaddr->recv_socket, (const struct sockaddr *)&recv_addr, 0)))
+	else // NETADDR_IP_VERSION_6
+	{
+		const char *host = "::1";
+		if((err = uv_ip6_addr(host, port, &recv_addr6)))
+		{
+			fprintf(stderr, "uv_ip6_addr: %s\n", uv_err_name(err));
+			return -1;
+		}
+		recv_addr = (const struct sockaddr *)&recv_addr6;
+		flags |= UV_UDP_IPV6ONLY; //TODO make this configurable
+	}
+	if((err = uv_udp_bind(&netaddr->recv_socket, recv_addr, flags)))
 	{
 		fprintf(stderr, "uv_udp_bind: %s\n", uv_err_name(err));
 		return -1;
@@ -113,12 +146,26 @@ netaddr_udp_sender_init(NetAddr_UDP_Sender *netaddr, uv_loop_t *loop, const char
 
 	netaddr->send_socket.data = netaddr;
 
-	if(strncmp(addr, "osc.udp://", 10))
+	if(!strncmp(addr, "osc.udp://", 10))
+	{
+		netaddr->version = NETADDR_IP_VERSION_4;
+		addr += 10;
+	}
+	else if(!strncmp(addr, "osc.udp4://", 11))
+	{
+		netaddr->version = NETADDR_IP_VERSION_4;
+		addr += 11;
+	}
+	else if(!strncmp(addr, "osc.udp6://", 11))
+	{
+		netaddr->version = NETADDR_IP_VERSION_6;
+		addr += 11;
+	}
+	else
 	{
 		fprintf(stderr, "unsupported protocol in address %s\n", addr);
 		return -1;
 	}
-	addr += 10;
 
 	char *colon = strchr(addr, ':');
 	if(!colon)
@@ -141,32 +188,53 @@ netaddr_udp_sender_init(NetAddr_UDP_Sender *netaddr, uv_loop_t *loop, const char
 	struct addrinfo hints;
 	struct addrinfo *ai;
 	memset(&hints, 0, sizeof(hints));
-	hints.ai_family = PF_INET;
+	hints.ai_family = netaddr->version == NETADDR_IP_VERSION_4 ? PF_INET : PF_INET6;
 	hints.ai_socktype = SOCK_DGRAM;
 	if(getaddrinfo(host, colon+1, &hints, &ai))
 	{
 		fprintf(stderr, "getaddrinfo: address could not be resolved\n");
 		return -1;
 	}
-	char remote [17] = {'\0'};
-	struct sockaddr_in *ptr = (struct sockaddr_in *)ai->ai_addr;
-	uint16_t port = ntohs(ptr->sin_port);
+	char remote [128] = {'\0'};
 
 	int err;
-	if((err = uv_ip4_name((struct sockaddr_in *)ai->ai_addr, remote, 16)))
+	if(netaddr->version == NETADDR_IP_VERSION_4)
 	{
-		fprintf(stderr, "up_ip4_name: %s\n", uv_err_name(err));
-		return -1;
+		struct sockaddr_in *ptr4 = (struct sockaddr_in *)ai->ai_addr;
+		if((err = uv_ip4_name(ptr4, remote, 127)))
+		{
+			fprintf(stderr, "up_ip4_name: %s\n", uv_err_name(err));
+			return -1;
+		}
+		if((err = uv_udp_init(loop, &netaddr->send_socket)))
+		{
+			fprintf(stderr, "uv_udp_init: %s\n", uv_err_name(err));
+			return -1;
+		}
+		if((err = uv_ip4_addr(remote, ntohs(ptr4->sin_port), &netaddr->send_addr.ipv4)))
+		{
+			fprintf(stderr, "uv_ip4_addr: %s\n", uv_err_name(err));
+			return -1;
+		}
 	}
-	if((err = uv_udp_init(loop, &netaddr->send_socket)))
+	else // NETADDR_IP_VERSION_6
 	{
-		fprintf(stderr, "uv_udp_init: %s\n", uv_err_name(err));
-		return -1;
-	}
-	if((err = uv_ip4_addr(remote, port, &netaddr->send_addr)))
-	{
-		fprintf(stderr, "uv_ip4_addr: %s\n", uv_err_name(err));
-		return -1;
+		struct sockaddr_in6 *ptr6 = (struct sockaddr_in6 *)ai->ai_addr;
+		if((err = uv_ip6_name(ptr6, remote, 127)))
+		{
+			fprintf(stderr, "up_ip6_name: %s\n", uv_err_name(err));
+			return -1;
+		}
+		if((err = uv_udp_init(loop, &netaddr->send_socket)))
+		{
+			fprintf(stderr, "uv_udp_init: %s\n", uv_err_name(err));
+			return -1;
+		}
+		if((err = uv_ip6_addr(remote, ntohs(ptr6->sin6_port), &netaddr->send_addr.ipv6)))
+		{
+			fprintf(stderr, "uv_ip6_addr: %s\n", uv_err_name(err));
+			return -1;
+		}
 	}
 
 	return 0;
@@ -198,6 +266,6 @@ netaddr_udp_sender_send(NetAddr_UDP_Sender *netaddr, uv_buf_t *bufs, int nbufs, 
 	netaddr->len = len; // message size without TCP preamble and OSC bundle header
 
 	int err;
-	if((err = uv_udp_send(&netaddr->req, &netaddr->send_socket, bufs, nbufs, (const struct sockaddr *)&netaddr->send_addr, _udp_send_cb)))
+	if((err = uv_udp_send(&netaddr->req, &netaddr->send_socket, bufs, nbufs, &netaddr->send_addr.ip, _udp_send_cb)))
 		fprintf(stderr, "uv_udp_send: %s", uv_err_name(err));
 }

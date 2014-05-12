@@ -39,10 +39,19 @@ typedef enum _NetAddr_TCP_Type {
 	NETADDR_TCP_RESPONDER, NETADDR_TCP_SENDER
 } NetAddr_TCP_Type;
 
+typedef enum _NetAddr_IP_Version {
+	NETADDR_IP_VERSION_4, NETADDR_IP_VERSION_6
+} NetAddr_IP_Version;
+
 struct _NetAddr_UDP_Sender {
 	uv_udp_t send_socket;
+	NetAddr_IP_Version version;
 
-	struct sockaddr_in send_addr;
+	union {
+		struct sockaddr ip;
+		struct sockaddr_in ipv4;
+		struct sockaddr_in6 ipv6;
+	} send_addr;
 
 	uv_udp_send_t req;
 	NetAddr_Send_Cb cb;
@@ -53,6 +62,7 @@ struct _NetAddr_UDP_Sender {
 struct _NetAddr_UDP_Responder {
 	uv_udp_t recv_socket;
 	NetAddr_Recv_Cb cb;
+	NetAddr_IP_Version version;
 
 	void *dat;
 	jack_osc_data_t buf [TJOST_BUF_SIZE];
@@ -60,6 +70,8 @@ struct _NetAddr_UDP_Responder {
 
 struct _NetAddr_TCP_Endpoint {
 	NetAddr_TCP_Type type;
+	NetAddr_IP_Version version;
+	int slip; // TODO actually implement 
 
 	union {
 		uv_tcp_t socket; // only used for responder
