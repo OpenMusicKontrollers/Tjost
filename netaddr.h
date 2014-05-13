@@ -107,9 +107,7 @@ int netaddr_tcp_endpoint_init(NetAddr_TCP_Endpoint *netaddr, NetAddr_TCP_Type ty
 void netaddr_tcp_endpoint_deinit(NetAddr_TCP_Endpoint *netaddr);
 void netaddr_tcp_endpoint_send(NetAddr_TCP_Endpoint *netaddr, uv_buf_t *bufs, int nbufs, size_t len, NetAddr_Send_Cb cb, void *dat);
 
-#if 0
 size_t slip_encode(uint8_t *buf, uv_buf_t *bufs, int nbufs);
 size_t slip_decode(uint8_t *buf, size_t len, size_t *size);
-#endif
 
 #endif

@@ -23,13 +23,12 @@
 
 #include <netaddr.h>
 
-#if 0
 #define SLIP_END					0300	// indicates end of packet
 #define SLIP_ESC					0333	// indicates byte stuffing
 #define SLIP_END_REPLACE	0334	// ESC ESC_END means END data byte
 #define SLIP_ESC_REPLACE	0335	// ESC ESC_ESC means ESC data byte
 
-// inline SLIP encoding
+// SLIP encoding
 size_t
 slip_encode(uint8_t *buf, uv_buf_t *bufs, int nbufs)
 {
@@ -88,7 +87,8 @@ slip_decode(uint8_t *buf, size_t len, size_t *size)
 		else if(*src == SLIP_END)
 		{
 			src++;
-			break;
+			*size = dst - buf;
+			return src - buf;
 		}
 		else
 		{
@@ -96,17 +96,14 @@ slip_decode(uint8_t *buf, size_t len, size_t *size)
 				*dst = *src;
 			src++;
 			dst++;
-			//TODO *dst++ = *src++;
 		}
 	}
-
-	*size = dst - buf;
-	return src - buf;
+	*size = 0;
+	return 0;
 }
-#endif
 
 static void
-_tcp_alloc(uv_handle_t *handle, size_t suggested_size, uv_buf_t *buf)
+_tcp_prefix_alloc(uv_handle_t *handle, size_t suggested_size, uv_buf_t *buf)
 {
 	NetAddr_TCP_Endpoint *netaddr = handle->data;
 
@@ -115,7 +112,7 @@ _tcp_alloc(uv_handle_t *handle, size_t suggested_size, uv_buf_t *buf)
 }
 
 static void
-_tcp_recv_cb(uv_stream_t *stream, ssize_t nread, const uv_buf_t *buf)
+_tcp_prefix_recv_cb(uv_stream_t *stream, ssize_t nread, const uv_buf_t *buf)
 {
 	NetAddr_TCP_Endpoint *netaddr = stream->data;
 
@@ -132,7 +129,7 @@ _tcp_recv_cb(uv_stream_t *stream, ssize_t nread, const uv_buf_t *buf)
 		{
 			//FIXME what should we do here?
 			netaddr->recv.nchunk = sizeof(int32_t);
-			fprintf(stderr, "_tcp_recv_cb: TCP packet size not matching\n");
+			fprintf(stderr, "_tcp_prefix_recv_cb: TCP packet size not matching\n");
 		}
 	}
 	else if (nread < 0)
@@ -141,7 +138,54 @@ _tcp_recv_cb(uv_stream_t *stream, ssize_t nread, const uv_buf_t *buf)
 		if((err = uv_read_stop((uv_stream_t *)&netaddr->stream)))
 			fprintf(stderr, "uv_read_stop: %s\n", uv_err_name(err));
 		uv_close((uv_handle_t *)&netaddr->stream, NULL);
-		fprintf(stderr, "_tcp_recv_cb: %s\n", uv_err_name(nread));
+		fprintf(stderr, "_tcp_prefix_recv_cb: %s\n", uv_err_name(nread));
+	}
+	else // nread == 0
+		;
+}
+
+static void
+_tcp_slip_alloc(uv_handle_t *handle, size_t suggested_size, uv_buf_t *buf)
+{
+	NetAddr_TCP_Endpoint *netaddr = handle->data;
+
+	buf->base = (char *)netaddr->recv.buf;
+	buf->base += netaddr->recv.nchunk; // is there remaining chunk from last call?
+	buf->len = TJOST_BUF_SIZE - netaddr->recv.nchunk;
+}
+
+static void
+_tcp_slip_recv_cb(uv_stream_t *stream, ssize_t nread, const uv_buf_t *buf)
+{
+	NetAddr_TCP_Endpoint *netaddr = stream->data;
+
+	if(nread > 0)
+	{
+		uint8_t *ptr = netaddr->recv.buf;
+		nread += netaddr->recv.nchunk; // is there remaining chunk from last call?
+		size_t size;
+		size_t parsed;
+		while( (parsed = slip_decode(ptr, nread, &size)) && (nread > 0) )
+		{
+			netaddr->recv.cb((jack_osc_data_t *)ptr, size, netaddr->recv.dat);
+			ptr += parsed;
+			nread -= parsed;
+		}
+		if(nread > 0) // is there remaining chunk for next call?
+		{
+			memmove(netaddr->recv.buf, ptr, nread);
+			netaddr->recv.nchunk = nread;
+		}
+		else
+			netaddr->recv.nchunk = 0;
+	}
+	else if (nread < 0)
+	{
+		int err;
+		if((err = uv_read_stop((uv_stream_t *)&netaddr->stream)))
+			fprintf(stderr, "uv_read_stop: %s\n", uv_err_name(err));
+		uv_close((uv_handle_t *)&netaddr->stream, NULL);
+		fprintf(stderr, "_tcp_slip_recv_cb: %s\n", uv_err_name(nread));
 	}
 	else // nread == 0
 		;
@@ -202,11 +246,23 @@ _responder_connect(uv_stream_t *responder, int status)
 		return;
 	}
 
-	netaddr->recv.nchunk = sizeof(int32_t); // packet size as TCP preamble
-	if((err = uv_read_start((uv_stream_t *)&netaddr->stream, _tcp_alloc, _tcp_recv_cb)))
+	if(!netaddr->slip)
 	{
-		fprintf(stderr, "uv_read_start: %s\n", uv_err_name(err));
-		return;
+		netaddr->recv.nchunk = sizeof(int32_t); // packet size as TCP preamble
+		if((err = uv_read_start((uv_stream_t *)&netaddr->stream, _tcp_prefix_alloc, _tcp_prefix_recv_cb)))
+		{
+			fprintf(stderr, "uv_read_start: %s\n", uv_err_name(err));
+			return;
+		}
+	}
+	else //netaddr->slip
+	{
+		netaddr->recv.nchunk = 0;
+		if((err = uv_read_start((uv_stream_t *)&netaddr->stream, _tcp_slip_alloc, _tcp_slip_recv_cb)))
+		{
+			fprintf(stderr, "uv_read_start: %s\n", uv_err_name(err));
+			return;
+		}
 	}
 }
 
@@ -335,11 +391,23 @@ _sender_connect(uv_connect_t *conn, int status)
 	fprintf(stderr, "connect to responder\n");
 
 	int err;
-	netaddr->recv.nchunk = sizeof(int32_t); // packet size as TCP preamble
-	if((err = uv_read_start((uv_stream_t *)&netaddr->stream, _tcp_alloc, _tcp_recv_cb)))
+	if(!netaddr->slip)
 	{
-		fprintf(stderr, "uv_read_start: %s\n", uv_err_name(err));
-		return;
+		netaddr->recv.nchunk = sizeof(int32_t); // packet size as TCP preamble
+		if((err = uv_read_start((uv_stream_t *)&netaddr->stream, _tcp_prefix_alloc, _tcp_prefix_recv_cb)))
+		{
+			fprintf(stderr, "uv_read_start: %s\n", uv_err_name(err));
+			return;
+		}
+	}
+	else //netaddr->slip
+	{
+		netaddr->recv.nchunk = 0;
+		if((err = uv_read_start((uv_stream_t *)&netaddr->stream, _tcp_slip_alloc, _tcp_slip_recv_cb)))
+		{
+			fprintf(stderr, "uv_read_start: %s\n", uv_err_name(err));
+			return;
+		}
 	}
 }
 
@@ -546,6 +614,17 @@ netaddr_tcp_endpoint_send(NetAddr_TCP_Endpoint *netaddr, uv_buf_t *bufs, int nbu
 	netaddr->send.cb = cb;
 	netaddr->send.dat = dat;
 	netaddr->send.len = len;
+
+	if(netaddr->slip)
+	{
+		static uint8_t bb [TJOST_BUF_SIZE];
+		static uv_buf_t bufa;
+		bufa.base = (char *)bb;
+		bufa.len = slip_encode(bb, &bufs[1], nbufs-1); // discard prefix size (int32_t)
+
+		bufs = &bufa;
+		nbufs = 1;
+	}
 
 	int err;
 	if((err =	uv_write(&netaddr->send.req, (uv_stream_t *)&netaddr->stream, bufs, nbufs, _tcp_send_cb)))
