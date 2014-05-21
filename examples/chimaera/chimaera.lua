@@ -59,7 +59,10 @@ function query(time, dest, json)
 			for k, w in pairs(v) do
 				message(time, '/json', 'iss', i, v.description, k)
 				if k == 'range' then
-					message(time, '/range', 'ff', w[1], w[2])
+					message(time, '/range', 'fff', w[1], w[2], w[3])
+				end
+				if k == 'values' then
+					--TODO
 				end
 			end
 		end
