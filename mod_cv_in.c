@@ -72,7 +72,7 @@ add(Tjost_Module *module, int argc, const char **argv)
 	if(!(port = jack_port_register(module->host->client, argv[0], JACK_DEFAULT_AUDIO_TYPE, JackPortIsInput, 0)))
 		fprintf(stderr, MOD_NAME": could not register jack port\n");
 	jack_uuid_t uuid = jack_port_uuid(port);
-	jack_set_property(module->host->client, uuid, JACKEY_SIGNAL_TYPE, "CV", NULL);
+	jack_set_property(module->host->client, uuid, JACKEY_SIGNAL_TYPE, "CV", "text/plain");
 
 	module->dat = port;
 

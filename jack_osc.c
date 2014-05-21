@@ -72,7 +72,7 @@ jack_osc_mark_port(jack_client_t *client, jack_port_t *port)
 {
 #ifdef HAS_METADATA_API
 	jack_uuid_t uuid = jack_port_uuid(port);
-	return jack_set_property(client, uuid, JACKEY_EVENT_TYPES, JACK_EVENT_TYPE__OSC, NULL);
+	return jack_set_property(client, uuid, JACKEY_EVENT_TYPES, JACK_EVENT_TYPE__OSC, "text/plain");
 #else
 	return 0;
 #endif // HAS_METADATA_API
@@ -155,8 +155,8 @@ jack_osc_method_match(Jack_OSC_Method *methods, const char *path, const char *fm
 	return 0;
 }
 
-void
-jack_osc_method_dispatch(jack_nframes_t time, jack_osc_data_t *buf, size_t size, Jack_OSC_Method *methods, void *dat)
+static void
+_jack_osc_method_dispatch_message(jack_nframes_t time, jack_osc_data_t *buf, size_t size, Jack_OSC_Method *methods, void *dat)
 {
 	jack_osc_data_t *ptr = buf;
 	jack_osc_data_t *end = buf + size;
@@ -172,6 +172,45 @@ jack_osc_method_dispatch(jack_nframes_t time, jack_osc_data_t *buf, size_t size,
 		if( (!meth->path || !strcmp(meth->path, path)) && (!meth->fmt || !strcmp(meth->fmt, fmt+1)) )
 			if(meth->cb(time, path, fmt+1, ptr, dat))
 				break;
+}
+
+static void
+_jack_osc_method_dispatch_bundle(jack_nframes_t time, jack_osc_data_t *buf, size_t size, Jack_OSC_Method *methods, void *dat)
+{
+	jack_osc_data_t *ptr = buf;
+	jack_osc_data_t *end = buf + size;
+
+	ptr += 16; // skip bundle header
+
+	while(ptr < end)
+	{
+		int32_t len = ntohl(*((int32_t *)ptr));
+		ptr += sizeof(int32_t);
+		switch(*ptr)
+		{
+			case '#':
+				_jack_osc_method_dispatch_bundle(time, ptr, len, methods, dat);
+				break;
+			case '/':
+				_jack_osc_method_dispatch_message(time, ptr, len, methods, dat);
+				break;
+		}
+		ptr += len;
+	}
+}
+
+void
+jack_osc_method_dispatch(jack_nframes_t time, jack_osc_data_t *buf, size_t size, Jack_OSC_Method *methods, void *dat)
+{
+	switch(*buf)
+	{
+		case '#':
+			_jack_osc_method_dispatch_bundle(time, buf, size, methods, dat);
+			break;
+		case '/':
+			_jack_osc_method_dispatch_message(time, buf, size, methods, dat);
+			break;
+	}
 }
 
 int
@@ -227,6 +266,63 @@ jack_osc_message_check(jack_osc_data_t *buf, size_t size)
 	}
 
 	return ptr == end;
+}
+
+int
+jack_osc_bundle_check(jack_osc_data_t *buf, size_t size)
+{
+	jack_osc_data_t *ptr = buf;
+	jack_osc_data_t *end = buf + size;
+	
+	if(strncmp((char *)ptr, "#bundle", 8)) // bundle header valid?
+		return 0;
+	ptr += 16; // skip bundle header
+
+	while(ptr < end)
+	{
+		int32_t *len = (int32_t *)ptr;
+		int32_t hlen = htonl(*len);
+		ptr += sizeof(int32_t);
+
+		switch(*ptr)
+		{
+			case '#':
+				if(!jack_osc_bundle_check(ptr, hlen))
+					return 0;
+				break;
+			case '/':
+				if(!jack_osc_message_check(ptr, hlen))
+					return 0;
+				break;
+			default:
+				return 0;
+		}
+		ptr += hlen;
+	}
+
+	return ptr == end;
+}
+
+int
+jack_osc_packet_check(jack_osc_data_t *buf, size_t size)
+{
+	jack_osc_data_t *ptr = buf;
+	
+	switch(*ptr)
+	{
+		case '#':
+			if(!jack_osc_bundle_check(ptr, size))
+				return 0;
+			break;
+		case '/':
+			if(!jack_osc_message_check(ptr, size))
+				return 0;
+			break;
+		default:
+			return 0;
+	}
+
+	return 1;
 }
 
 size_t

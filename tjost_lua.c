@@ -138,23 +138,15 @@ _push(Tjost_Host *host, char type, jack_osc_data_t *ptr)
 	}
 }
 
-void
-tjost_lua_deserialize(Tjost_Event *tev)
+static int
+_deserialize(jack_nframes_t time, const char *path, const char *fmt, jack_osc_data_t *buf, void *dat)
 {
-	//printf("deserialize\n");
-	Tjost_Module *module = tev->module;
+	Tjost_Module *module = dat;
 	Tjost_Host *host = module->host;
 	lua_State *L = host->L;
 
-	jack_osc_data_t *ptr = tev->buf;
-
-	const char *path;
-	const char *fmt;
-
-	ptr = jack_osc_get_path(ptr, &path);
-	ptr = jack_osc_get_fmt(ptr, &fmt);
-
-	int argc = 3 + strlen(fmt+1);
+	jack_osc_data_t *ptr = buf;
+	int argc = 3 + strlen(fmt);
 	
 	if(!lua_checkstack(L, argc + 32)) // ensure at least that many free slots on stack
 		tjost_host_message_push(host, "Lua: %s", "stack overflow");
@@ -162,17 +154,30 @@ tjost_lua_deserialize(Tjost_Event *tev)
 	lua_pushlightuserdata(L, module);
 	lua_rawget(L, LUA_REGISTRYINDEX); // responder function
 	{
-		lua_pushnumber(L, tev->time);
+		lua_pushnumber(L, time);
 		lua_pushstring(L, path);
-		lua_pushstring(L, fmt+1);
+		lua_pushstring(L, fmt);
 
 		const char *type;
-		for(type=fmt+1; *type!='\0'; type++)
+		for(type=fmt; *type!='\0'; type++)
 			ptr = _push(host, *type, ptr);
 
 		if(lua_pcall(L, argc, 0, 0))
 			tjost_host_message_push(host, "Lua: callback error '%s'", lua_tostring(L, -1));
 	}
+
+	return 1;
+}
+
+static Jack_OSC_Method methods [] = {
+	{NULL, NULL, _deserialize},
+	{NULL, NULL, NULL}
+};
+
+void
+tjost_lua_deserialize(Tjost_Event *tev)
+{
+	jack_osc_method_dispatch(tev->time, tev->buf, tev->size, methods, tev->module);
 }
 
 static inline int

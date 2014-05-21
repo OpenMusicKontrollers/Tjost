@@ -35,12 +35,14 @@
 	
 typedef struct _Mod_Net	Mod_Net;
 typedef enum _Socket_Type {SOCKET_UDP, SOCKET_TCP} Socket_Type;
+typedef enum _Unroll_Type {UNROLL_NONE, UNROLL_PARTIAL, UNROLL_FULL} Unroll_Type;
 
 struct _Mod_Net {
 	jack_ringbuffer_t *rb_out;
 	jack_ringbuffer_t *rb_in;
 
 	Socket_Type type;
+	Unroll_Type unroll;
 	
 	union {
 		NetAddr_UDP_Responder udp_rx;

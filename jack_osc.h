@@ -96,6 +96,8 @@ int jack_osc_check_fmt(const char *format, int offset);
 int jack_osc_method_match(Jack_OSC_Method *methods, const char *path, const char *fmt);
 void jack_osc_method_dispatch(jack_nframes_t time, jack_osc_data_t *buf, size_t size, Jack_OSC_Method *methods, void *dat);
 int jack_osc_message_check(jack_osc_data_t *buf, size_t size);
+int jack_osc_bundle_check(jack_osc_data_t *buf, size_t size);
+int jack_osc_packet_check(jack_osc_data_t *buf, size_t size);
 
 // OSC object lengths
 size_t jack_osc_strlen(const char *buf);

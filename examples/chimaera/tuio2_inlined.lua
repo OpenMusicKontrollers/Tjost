@@ -46,8 +46,8 @@ success = function(time, uuid, path, ...)
 
 			midi_fltr(time, '/bottom', 'f', bot)
 			midi_fltr(time, '/range', 'f', range)
-			--midi_fltr(time, '/effect', 'i', 0x4a)
-			midi_fltr(time, '/effect', 'i', 0x01)
+			midi_fltr(time, '/effect', 'i', 0x4a)
+			--midi_fltr(time, '/effect', 'i', 0x01)
 
 			message(time, '/number', 'iff', n, bot, range)
 		end,
@@ -86,7 +86,7 @@ end)
 midi_out = tjost.plugin('midi_out', 'midi')
 midi_fltr = midi(midi_out)
 tuio2_fltr = tuio2(midi_fltr)
-stream = tjost.plugin('net_in', 'osc.udp://:3333', '60', tuio2_fltr)
+stream = tjost.plugin('net_in', 'osc.udp://:3333', '60', 'partial', tuio2_fltr)
 
 id = coroutine.wrap(function()
 	local i = math.random(1024)

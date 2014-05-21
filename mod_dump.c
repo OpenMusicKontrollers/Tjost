@@ -34,7 +34,157 @@ struct _Data {
 	uv_async_t asio;
 	jack_osc_data_t buffer [TJOST_BUF_SIZE];
 };
-	
+
+static void
+_serialize_message(jack_osc_data_t *buffer, size_t len)
+{
+	const char *path;
+	const char *fmt;
+	jack_osc_data_t *ptr = buffer;
+	ptr = jack_osc_get_path(ptr, &path);
+	ptr = jack_osc_get_fmt(ptr, &fmt);
+	printf(" %s %s", path, fmt+1);
+	const char *type;
+	for(type=fmt+1; *type; type++)
+		switch(*type)
+		{
+			case 'i':
+			{
+				int32_t i;
+				ptr = jack_osc_get_int32(ptr, &i);
+				printf(" %"PRIi32, i);
+				break;
+			}
+			case 'f':
+			{
+				float f;
+				ptr = jack_osc_get_float(ptr, &f);
+				printf(" %f", f);
+				break;
+			}
+			case 's':
+			{
+				const char *s;
+				ptr = jack_osc_get_string(ptr, &s);
+				printf(" '%s'", s);
+				break;
+			}
+			case 'b':
+			{
+				Jack_OSC_Blob b;
+				ptr = jack_osc_get_blob(ptr, &b);
+				printf(" (%"PRIi32")", b.size);
+#if 0 //TODO
+				{
+					printf("[");
+					int32_t i;
+					uint8_t *bytes = b.payload;
+					for(i=0; i<b.size; i++)
+						printf("%02"PRIX8",", bytes[i]);
+					printf("\b]");
+				}
+#endif
+				break;
+			}
+
+			case 'h':
+			{
+				int64_t h;
+				ptr = jack_osc_get_int64(ptr, &h);
+					printf(" %"PRIi64, h);
+				break;
+			}
+			case 'd':
+			{
+				double d;
+				ptr = jack_osc_get_double(ptr, &d);
+				printf(" %f", d);
+				break;
+			}
+			case 't':
+			{
+				uint64_t t;
+				ptr = jack_osc_get_timetag(ptr, &t);
+				uint32_t sec = t >> 32;
+				uint32_t frac = t & 0xFFFFFFFF;
+				printf(" %08"PRIX32".%08"PRIX32, sec, frac);
+				break;
+			}
+			case 'S':
+			{
+				const char *S;
+				ptr = jack_osc_get_string(ptr, &S);
+				printf(" '%s'", S);
+				break;
+			}
+			case 'c':
+			{
+				char c;
+				ptr = jack_osc_get_char(ptr, &c);
+				printf(" %c", c);
+				break;
+			}
+			case 'm':
+			{
+				uint8_t *m;
+				ptr = jack_osc_get_midi(ptr, &m);
+				printf(" [%02"PRIX8",%02"PRIX8",%02"PRIX8",%02"PRIX8"]", m[0], m[1], m[2], m[3]);
+				break;
+			}
+
+			default:
+				ptr = jack_osc_skip(*type, ptr);
+				break;
+		}
+	printf("\n");
+}
+
+static void
+_serialize_bundle(jack_osc_data_t *buffer, size_t len, int indent)
+{
+	jack_osc_data_t *end = buffer + len;
+	jack_osc_data_t *ptr = buffer;
+
+	uint64_t timetag = ntohll(*(uint64_t *)(ptr + 8));
+
+	uint32_t sec = timetag >> 32;
+	uint32_t frac = timetag & 0xFFFFFFFF;
+	int i;
+	printf(" #bundle %08"PRIX32".%08"PRIX32"\n", sec, frac);
+	for(i=0; i<indent; i++) printf("\t");
+	printf("[\n");
+
+	ptr += 16; // skip bundle header
+	while(ptr < end)
+	{
+		int32_t *size = (int32_t *)ptr;
+		int32_t hsize = htonl(*size);
+		ptr += sizeof(int32_t);
+
+		char c = *(char *)ptr;
+		switch(c)
+		{
+			case '#':
+				for(i=0; i<indent+1; i++) printf("\t");
+				printf("%"PRIi32":", hsize);
+				_serialize_bundle(ptr, hsize, indent+1);
+				break;
+			case '/':
+				for(i=0; i<indent+1; i++) printf("\t");
+				printf("%"PRIi32":", hsize);
+				_serialize_message(ptr, hsize);
+				break;
+			default:
+				fprintf(stderr, MOD_NAME": not an OSC bundle item '%c'\n", c);
+				return;
+		}
+
+		ptr += hsize;
+	}
+
+	for(i=0; i<indent; i++) printf("\t");
+	printf("]\n");
+}
 
 static void
 _asio(uv_async_t *handle)
@@ -64,111 +214,26 @@ _asio(uv_async_t *handle)
 
 			assert((uintptr_t)buffer % sizeof(uint32_t) == 0);
 
-			if(jack_osc_message_check(buffer, tev.size))
+			printf("%08"PRIX32" %4zu:", tev.time, tev.size);
+
+			switch(*buffer)
 			{
-				const char *path;
-				const char *fmt;
-				jack_osc_data_t *ptr = buffer;
-				ptr = jack_osc_get_path(ptr, &path);
-				ptr = jack_osc_get_fmt(ptr, &fmt);
-				printf("%08"PRIX32" %4zu: %s %s", tev.time, tev.size, path, fmt+1);
-				const char *type;
-				for(type=fmt+1; *type; type++)
-					switch(*type)
-					{
-						case 'i':
-						{
-							int32_t i;
-							ptr = jack_osc_get_int32(ptr, &i);
-							printf(" %"PRIi32, i);
-							break;
-						}
-						case 'f':
-						{
-							float f;
-							ptr = jack_osc_get_float(ptr, &f);
-							printf(" %f", f);
-							break;
-						}
-						case 's':
-						{
-							const char *s;
-							ptr = jack_osc_get_string(ptr, &s);
-							printf(" '%s'", s);
-							break;
-						}
-						case 'b':
-						{
-							Jack_OSC_Blob b;
-							ptr = jack_osc_get_blob(ptr, &b);
-							printf(" (%"PRIi32")", b.size);
-#if 0 //TODO
-							{
-								printf("[");
-								int32_t i;
-								uint8_t *bytes = b.payload;
-								for(i=0; i<b.size; i++)
-									printf("%02"PRIX8",", bytes[i]);
-								printf("\b]");
-							}
-#endif
-							break;
-						}
-
-						case 'h':
-						{
-							int64_t h;
-							ptr = jack_osc_get_int64(ptr, &h);
-								printf(" %"PRIi64, h);
-							break;
-						}
-						case 'd':
-						{
-							double d;
-							ptr = jack_osc_get_double(ptr, &d);
-							printf(" %f", d);
-							break;
-						}
-						case 't':
-						{
-							uint64_t t;
-							ptr = jack_osc_get_timetag(ptr, &t);
-							uint32_t sec = t >> 32;
-							uint32_t frac = t & 0xFFFFFFFF;
-							printf(" %08"PRIX32".%08"PRIX32, sec, frac);
-							break;
-						}
-						case 'S':
-						{
-							const char *S;
-							ptr = jack_osc_get_string(ptr, &S);
-							printf(" '%s'", S);
-							break;
-						}
-						case 'c':
-						{
-							char c;
-							ptr = jack_osc_get_char(ptr, &c);
-							printf(" %c", c);
-							break;
-						}
-						case 'm':
-						{
-							uint8_t *m;
-							ptr = jack_osc_get_midi(ptr, &m);
-							printf(" [%02"PRIX8",%02"PRIX8",%02"PRIX8",%02"PRIX8"]", m[0], m[1], m[2], m[3]);
-							break;
-						}
-
-						default:
-							ptr = jack_osc_skip(*type, ptr);
-							break;
-					}
-				printf("\n");
-
+				case '#':
+					if(jack_osc_bundle_check(buffer, tev.size))
+						_serialize_bundle(buffer, tev.size, 0);
+					else
+						fprintf(stderr, MOD_NAME": tx OSC bundle invalid\n");
+					break;
+				case '/':
+					if(jack_osc_message_check(buffer, tev.size))
+						_serialize_message(buffer, tev.size);
+					else
+						fprintf(stderr, MOD_NAME": tx OSC message invalid\n");
+					break;
+				default:
+					fprintf(stderr, MOD_NAME": tx OSC packet invalid\n");
+					break;
 			}
-			else
-				fprintf(stderr, MOD_NAME": tx OSC message invalid\n");
 
 			if(vec[0].len >= tev.size)
 				jack_ringbuffer_read_advance(dat->rb, tev.size);

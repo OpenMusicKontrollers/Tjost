@@ -25,10 +25,11 @@
 
 host = argv[3]
 rtprio = argv[4] or '60'
+unroll = argv[5] or 'none'
 
 if host then
 	osc_out = tjost.plugin('osc_out', host)
-	net_io = tjost.plugin('net_in', host, rtprio, osc_out)
+	net_io = tjost.plugin('net_in', host, rtprio, unroll, osc_out)
 
 	if string.match(host, 'osc.tcp[46]*://') or string.match(host, 'osc.slip.tcp[46]*://') then
 		osc_in = tjost.plugin('osc_in', 'osc.net', net_io)
