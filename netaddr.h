@@ -71,7 +71,7 @@ struct _NetAddr_UDP_Responder {
 struct _NetAddr_TCP_Endpoint {
 	NetAddr_TCP_Type type;
 	NetAddr_IP_Version version;
-	int slip; // TODO actually implement 
+	int slip;
 
 	union {
 		uv_tcp_t socket; // only used for responder
@@ -79,7 +79,9 @@ struct _NetAddr_TCP_Endpoint {
 	} uni;
 
 	// used for both responder and sender
-	uv_tcp_t stream;
+	Eina_List *streams;
+	Eina_List *reqs;
+	int count;
 
 	struct {
 		NetAddr_Recv_Cb cb;
@@ -89,7 +91,6 @@ struct _NetAddr_TCP_Endpoint {
 	} recv;
 
 	struct {
-		uv_write_t req;
 		NetAddr_Send_Cb cb;
 		void *dat;
 		size_t len;
