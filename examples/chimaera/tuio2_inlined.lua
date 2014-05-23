@@ -46,8 +46,8 @@ success = function(time, uuid, path, ...)
 
 			midi_fltr(time, '/bottom', 'f', bot)
 			midi_fltr(time, '/range', 'f', range)
-			midi_fltr(time, '/effect', 'i', 0x4a)
-			--midi_fltr(time, '/effect', 'i', 0x01)
+			--midi_fltr(time, '/effect', 'i', 0x4a)
+			midi_fltr(time, '/effect', 'i', 0x07)
 
 			message(time, '/number', 'iff', n, bot, range)
 		end,

@@ -135,9 +135,11 @@ _tcp_prefix_recv_cb(uv_stream_t *stream, ssize_t nread, const uv_buf_t *buf)
 	else if (nread < 0)
 	{
 		int err;
-		if((err = uv_read_stop((uv_stream_t *)&netaddr->stream)))
+		if((err = uv_read_stop(stream)))
 			fprintf(stderr, "uv_read_stop: %s\n", uv_err_name(err));
-		uv_close((uv_handle_t *)&netaddr->stream, NULL);
+		uv_close((uv_handle_t *)stream, NULL);
+		netaddr->streams = eina_list_remove(netaddr->streams, stream);
+		free(stream);
 		fprintf(stderr, "_tcp_prefix_recv_cb: %s\n", uv_err_name(nread));
 	}
 	else // nread == 0
@@ -182,9 +184,11 @@ _tcp_slip_recv_cb(uv_stream_t *stream, ssize_t nread, const uv_buf_t *buf)
 	else if (nread < 0)
 	{
 		int err;
-		if((err = uv_read_stop((uv_stream_t *)&netaddr->stream)))
+		if((err = uv_read_stop(stream)))
 			fprintf(stderr, "uv_read_stop: %s\n", uv_err_name(err));
-		uv_close((uv_handle_t *)&netaddr->stream, NULL);
+		uv_close((uv_handle_t *)stream, NULL);
+		netaddr->streams = eina_list_remove(netaddr->streams, stream);
+		free(stream);
 		fprintf(stderr, "_tcp_slip_recv_cb: %s\n", uv_err_name(nread));
 	}
 	else // nread == 0
@@ -197,8 +201,13 @@ _tcp_send_cb(uv_write_t *req, int status)
 	uv_stream_t *stream = req->handle;
 	NetAddr_TCP_Endpoint *netaddr = stream->data;
 
+	netaddr->count--;
+
 	if(!status)
-		netaddr->send.cb(netaddr->send.len, netaddr->send.dat);
+	{
+		if(!netaddr->count)
+			netaddr->send.cb(netaddr->send.len, netaddr->send.dat);
+	}
 	else
 		fprintf(stderr, "_tcp_send_cb: %s\n", uv_err_name(status));
 }
@@ -216,31 +225,31 @@ _responder_connect(uv_stream_t *responder, int status)
 
 	NetAddr_TCP_Endpoint *netaddr = responder->data;
 
-	// only allow one connection for now
-	if(uv_is_active((uv_handle_t *)&netaddr->stream))
-	{
-		fprintf(stderr, "already connected to a sender\n");
-		return;
-	}
+	uv_tcp_t *stream = calloc(1, sizeof(uv_tcp_t));
+	stream->data = netaddr;
+	netaddr->streams = eina_list_append(netaddr->streams, stream);
+
+	uv_write_t *req = calloc(1, sizeof(uv_write_t));
+	netaddr->reqs = eina_list_append(netaddr->reqs, req);
 
 	int err;
-	if((err = uv_tcp_init(responder->loop, &netaddr->stream)))
+	if((err = uv_tcp_init(responder->loop, stream)))
 	{
 		fprintf(stderr, "uv_tcp_init: %s\n", uv_err_name(err));
 		return;
 	}
-	if((err = uv_tcp_nodelay(&netaddr->stream, 1))) // disable Nagle's algo
+	if((err = uv_tcp_nodelay(stream, 1))) // disable Nagle's algo
 	{
 		fprintf(stderr, "uv_tcp_nodelay: %s\n", uv_err_name(err));
 		return;
 	}
-	if((err = uv_tcp_keepalive(&netaddr->stream, 1, 5))) // keepalive after 5 seconds
+	if((err = uv_tcp_keepalive(stream, 1, 5))) // keepalive after 5 seconds
 	{
 		fprintf(stderr, "uv_tcp_keepalive: %s\n", uv_err_name(err));
 		return;
 	}
 
-	if((err = uv_accept((uv_stream_t *)&netaddr->uni.socket, (uv_stream_t *)&netaddr->stream)))
+	if((err = uv_accept((uv_stream_t *)&netaddr->uni.socket, (uv_stream_t *)stream)))
 	{
 		fprintf(stderr, "uv_accept: %s\n", uv_err_name(err));
 		return;
@@ -249,7 +258,7 @@ _responder_connect(uv_stream_t *responder, int status)
 	if(!netaddr->slip)
 	{
 		netaddr->recv.nchunk = sizeof(int32_t); // packet size as TCP preamble
-		if((err = uv_read_start((uv_stream_t *)&netaddr->stream, _tcp_prefix_alloc, _tcp_prefix_recv_cb)))
+		if((err = uv_read_start((uv_stream_t *)stream, _tcp_prefix_alloc, _tcp_prefix_recv_cb)))
 		{
 			fprintf(stderr, "uv_read_start: %s\n", uv_err_name(err));
 			return;
@@ -258,7 +267,7 @@ _responder_connect(uv_stream_t *responder, int status)
 	else //netaddr->slip
 	{
 		netaddr->recv.nchunk = 0;
-		if((err = uv_read_start((uv_stream_t *)&netaddr->stream, _tcp_slip_alloc, _tcp_slip_recv_cb)))
+		if((err = uv_read_start((uv_stream_t *)stream, _tcp_slip_alloc, _tcp_slip_recv_cb)))
 		{
 			fprintf(stderr, "uv_read_start: %s\n", uv_err_name(err));
 			return;
@@ -274,7 +283,6 @@ _netaddr_tcp_responder_init(NetAddr_TCP_Endpoint *netaddr, uv_loop_t *loop, cons
 	netaddr->type = NETADDR_TCP_RESPONDER;
 	
 	netaddr->uni.socket.data = netaddr;
-	netaddr->stream.data = netaddr;
 
 	netaddr->recv.cb = cb;
 	netaddr->recv.dat = dat;
@@ -380,7 +388,8 @@ static void
 _sender_connect(uv_connect_t *conn, int status)
 {
 	NetAddr_TCP_Endpoint *netaddr = conn->data;
-	uv_stream_t *stream = conn->handle;
+
+	uv_tcp_t *stream = eina_list_data_get(netaddr->streams);
 
 	if(status)
 	{
@@ -394,7 +403,7 @@ _sender_connect(uv_connect_t *conn, int status)
 	if(!netaddr->slip)
 	{
 		netaddr->recv.nchunk = sizeof(int32_t); // packet size as TCP preamble
-		if((err = uv_read_start((uv_stream_t *)&netaddr->stream, _tcp_prefix_alloc, _tcp_prefix_recv_cb)))
+		if((err = uv_read_start((uv_stream_t *)stream, _tcp_prefix_alloc, _tcp_prefix_recv_cb)))
 		{
 			fprintf(stderr, "uv_read_start: %s\n", uv_err_name(err));
 			return;
@@ -403,7 +412,7 @@ _sender_connect(uv_connect_t *conn, int status)
 	else //netaddr->slip
 	{
 		netaddr->recv.nchunk = 0;
-		if((err = uv_read_start((uv_stream_t *)&netaddr->stream, _tcp_slip_alloc, _tcp_slip_recv_cb)))
+		if((err = uv_read_start((uv_stream_t *)stream, _tcp_slip_alloc, _tcp_slip_recv_cb)))
 		{
 			fprintf(stderr, "uv_read_start: %s\n", uv_err_name(err));
 			return;
@@ -419,10 +428,16 @@ _netaddr_tcp_sender_init(NetAddr_TCP_Endpoint *netaddr, uv_loop_t *loop, const c
 	netaddr->type = NETADDR_TCP_SENDER;
 
 	netaddr->uni.conn.data = netaddr;
-	netaddr->stream.data = netaddr;
 
 	netaddr->recv.cb = cb;
 	netaddr->recv.dat = dat;
+	
+	uv_tcp_t *stream = calloc(1, sizeof(uv_tcp_t));
+	stream->data = netaddr;
+	netaddr->streams = eina_list_append(netaddr->streams, stream);
+
+	uv_write_t *req = calloc(1, sizeof(uv_write_t));
+	netaddr->reqs = eina_list_append(netaddr->reqs, req);
 
 	if(!strncmp(addr, "osc.tcp://", 10))
 	{
@@ -474,21 +489,15 @@ _netaddr_tcp_sender_init(NetAddr_TCP_Endpoint *netaddr, uv_loop_t *loop, const c
 	}
 
 	const char *host = NULL;
-
-	if(colon == addr)
-		host = "255.255.255.255"; //FIXME implement broadcast and multicast
-	else
-	{
-		*colon = '\0';
-		host = addr;
-	}
+	host = addr;
+	*colon = '\0';
 
 	// DNS resolve
 	struct addrinfo hints;
 	struct addrinfo *ai;
 	memset(&hints, 0, sizeof(hints));
 	hints.ai_family = netaddr->version == NETADDR_IP_VERSION_4 ? PF_INET : PF_INET6;
-	hints.ai_socktype = SOCK_DGRAM;
+	hints.ai_socktype = SOCK_STREAM;
 	if(getaddrinfo(host, colon+1, &hints, &ai))
 	{
 		fprintf(stderr, "address could not be resolved\n");
@@ -516,17 +525,17 @@ _netaddr_tcp_sender_init(NetAddr_TCP_Endpoint *netaddr, uv_loop_t *loop, const c
 			return -1;
 		}
 	}
-	if((err = uv_tcp_init(loop, &netaddr->stream)))
+	if((err = uv_tcp_init(loop, stream)))
 	{
 		fprintf(stderr, "uv_tcp_init: %s\n", uv_err_name(err));
 		return -1;
 	}
-	if((err = uv_tcp_nodelay(&netaddr->stream, 1))) // disable Nagle's algo
+	if((err = uv_tcp_nodelay(stream, 1))) // disable Nagle's algo
 	{
 		fprintf(stderr, "uv_tcp_nodelay: %s\n", uv_err_name(err));
 		return -1;
 	}
-	if((err = uv_tcp_keepalive(&netaddr->stream, 1, 5))) // keepalive after 5 seconds
+	if((err = uv_tcp_keepalive(stream, 1, 5))) // keepalive after 5 seconds
 	{
 		fprintf(stderr, "uv_tcp_keepalive: %s\n", uv_err_name(err));
 		return -1;
@@ -551,7 +560,7 @@ _netaddr_tcp_sender_init(NetAddr_TCP_Endpoint *netaddr, uv_loop_t *loop, const c
 		}
 		send_addr = (const struct sockaddr *)&send_addr6;
 	}
-	if((err = uv_tcp_connect(&netaddr->uni.conn, &netaddr->stream, send_addr, _sender_connect)))
+	if((err = uv_tcp_connect(&netaddr->uni.conn, stream, send_addr, _sender_connect)))
 	{
 		fprintf(stderr, "uv_tcp_connect: %s\n", uv_err_name(err));
 		return -1;
@@ -578,20 +587,46 @@ static void
 _netaddr_tcp_responder_deinit(NetAddr_TCP_Endpoint *netaddr)
 {
 	int err;
-	if((err = uv_read_stop((uv_stream_t *)&netaddr->stream)))
-		fprintf(stderr, "uv_read_stop: %s\n", uv_err_name(err));
-	uv_close((uv_handle_t *)&netaddr->stream, NULL);
+	uv_tcp_t *stream;
+	uv_write_t *req;
+
+	EINA_LIST_FREE(netaddr->streams,  stream)
+	{
+		if((err = uv_read_stop((uv_stream_t *)stream)))
+			fprintf(stderr, "uv_read_stop: %s\n", uv_err_name(err));
+		uv_close((uv_handle_t *)stream, NULL);
+		free(stream);
+	}
 	uv_close((uv_handle_t *)&netaddr->uni.socket, NULL);
+
+	EINA_LIST_FREE(netaddr->reqs, req)
+	{
+		uv_cancel((uv_req_t *)req);
+		free(req);
+	}
 }
 
 static void
 _netaddr_tcp_sender_deinit(NetAddr_TCP_Endpoint *netaddr)
 {
 	int err;
-	if((err = uv_read_stop((uv_stream_t *)&netaddr->stream)))
-		fprintf(stderr, "uv_read_stop: %s\n", uv_err_name(err));
-	uv_close((uv_handle_t *)&netaddr->stream, NULL);
+	uv_tcp_t *stream;
+	uv_write_t *req;
+
+	EINA_LIST_FREE(netaddr->streams, stream)
+	{
+		if((err = uv_read_stop((uv_stream_t *)stream)))
+			fprintf(stderr, "uv_read_stop: %s\n", uv_err_name(err));
+		uv_close((uv_handle_t *)stream, NULL);
+		free(stream);
+	}
 	//TODO close conn?
+
+	EINA_LIST_FREE(netaddr->reqs, req)
+	{
+		uv_cancel((uv_req_t *)req);
+		free(req);
+	}
 }
 
 void
@@ -627,6 +662,14 @@ netaddr_tcp_endpoint_send(NetAddr_TCP_Endpoint *netaddr, uv_buf_t *bufs, int nbu
 	}
 
 	int err;
-	if((err =	uv_write(&netaddr->send.req, (uv_stream_t *)&netaddr->stream, bufs, nbufs, _tcp_send_cb)))
-		fprintf(stderr, "uv_write: %s", uv_err_name(err));
+	netaddr->count = eina_list_count(netaddr->streams);
+	int i;
+	for(i=0; i<netaddr->count; i++)
+	{
+		uv_tcp_t *stream = eina_list_nth(netaddr->streams, i);
+		uv_write_t *req = eina_list_nth(netaddr->reqs, i);
+
+		if((err =	uv_write(req, (uv_stream_t *)stream, bufs, nbufs, _tcp_send_cb)))
+			fprintf(stderr, "uv_write: %s", uv_err_name(err));
+	}
 }
