@@ -187,6 +187,31 @@ _serialize_bundle(jack_osc_data_t *buffer, size_t len, int indent)
 }
 
 static void
+_serialize_packet(jack_nframes_t time, jack_osc_data_t *buffer, size_t size)
+{
+	printf("%08"PRIX32" %4zu:", time, size);
+
+	switch(*buffer)
+	{
+		case '#':
+			if(jack_osc_bundle_check(buffer, size))
+				_serialize_bundle(buffer, size, 0);
+			else
+				fprintf(stderr, MOD_NAME": tx OSC bundle invalid\n");
+			break;
+		case '/':
+			if(jack_osc_message_check(buffer, size))
+				_serialize_message(buffer, size);
+			else
+				fprintf(stderr, MOD_NAME": tx OSC message invalid\n");
+			break;
+		default:
+			fprintf(stderr, MOD_NAME": tx OSC packet invalid\n");
+			break;
+	}
+}
+
+static void
 _asio(uv_async_t *handle)
 {
 	Tjost_Module *module = handle->data;
@@ -214,26 +239,7 @@ _asio(uv_async_t *handle)
 
 			assert((uintptr_t)buffer % sizeof(uint32_t) == 0);
 
-			printf("%08"PRIX32" %4zu:", tev.time, tev.size);
-
-			switch(*buffer)
-			{
-				case '#':
-					if(jack_osc_bundle_check(buffer, tev.size))
-						_serialize_bundle(buffer, tev.size, 0);
-					else
-						fprintf(stderr, MOD_NAME": tx OSC bundle invalid\n");
-					break;
-				case '/':
-					if(jack_osc_message_check(buffer, tev.size))
-						_serialize_message(buffer, tev.size);
-					else
-						fprintf(stderr, MOD_NAME": tx OSC message invalid\n");
-					break;
-				default:
-					fprintf(stderr, MOD_NAME": tx OSC packet invalid\n");
-					break;
-			}
+			_serialize_packet(tev.time, buffer, tev.size);
 
 			if(vec[0].len >= tev.size)
 				jack_ringbuffer_read_advance(dat->rb, tev.size);
@@ -297,10 +303,10 @@ add(Tjost_Module *module, int argc, const char **argv)
 {
 	Data *dat = tjost_alloc(module->host, sizeof(Data));
 
+	uv_loop_t *loop = uv_default_loop();
+
 	if(!(dat->rb = jack_ringbuffer_create(TJOST_RINGBUF_SIZE)))
 		fprintf(stderr, MOD_NAME": could not initialize ringbuffer\n");
-	
-	uv_loop_t *loop = uv_default_loop();
 
 	dat->asio.data = module;
 	int err;

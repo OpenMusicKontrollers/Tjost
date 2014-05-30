@@ -23,11 +23,13 @@ set(LIBS ${LIBS} ${JACK_LDFLAGS})
 
 # metadata
 CHECK_INCLUDE_FILES("jack/metadata.h" HAS_METADATA_API)
-configure_file(${CMAKE_CURRENT_SOURCE_DIR}/tjost_config.h.in ${CMAKE_CURRENT_BINARY_DIR}/tjost_config.h @ONLY)
 
 # alsa
-pkg_search_module(ALSA REQUIRED alsa)
-include_directories(${ALSA_INCLUDE_DIRS})
+option(USE_ALSA "use ALSA" ON)
+if(USE_ALSA)
+	pkg_search_module(ALSA REQUIRED alsa)
+	include_directories(${ALSA_INCLUDE_DIRS})
+endif()
 
 # lua
 option(USE_LUAJIT "use LuaJIT" ON)
@@ -40,6 +42,9 @@ else(USE_LUAJIT)
 	include_directories(${LUA_INCLUDE_DIRS})
 	set(LIBS ${LIBS} ${LUA_LDFLAGS})
 endif(USE_LUAJIT)
+
+# configure file
+configure_file(${PROJECT_SOURCE_DIR}/tjost_config.h.in ${PROJECT_BINARY_DIR}/tjost_config.h @ONLY)
 
 # eina
 pkg_search_module(EINA REQUIRED eina)
@@ -59,8 +64,8 @@ set(prefix ${CMAKE_INSTALL_PREFIX})
 set(exec_prefix ${CMAKE_INSTALL_PREFIX})
 set(libdir ${CMAKE_INSTALL_PREFIX}/lib)
 set(includedir ${CMAKE_INSTALL_PREFIX}/include)
-configure_file(${CMAKE_CURRENT_SOURCE_DIR}/jack_osc.pc.in ${CMAKE_CURRENT_BINARY_DIR}/jack_osc.pc @ONLY)
-install(FILES ${CMAKE_CURRENT_BINARY_DIR}/jack_osc.pc DESTINATION lib/pkgconfig)
+configure_file(${PROJECT_SOURCE_DIR}/jack_osc.pc.in ${PROJECT_BINARY_DIR}/jack_osc.pc @ONLY)
+install(FILES ${PROJECT_BINARY_DIR}/jack_osc.pc DESTINATION lib/pkgconfig)
 
 # tjost
 add_executable(tjost tjost.c tjost_lua.c tjost_uplink.c tlsf-3.0/tlsf.c)
@@ -113,28 +118,36 @@ set_target_properties(midi_out PROPERTIES PREFIX "")
 install(TARGETS midi_out DESTINATION lib/tjost)
 
 # mod_raw_in
-add_library(raw_in MODULE mod_raw_in.c)
-set_target_properties(raw_in PROPERTIES PREFIX "")
-target_link_libraries(raw_in ${ALSA_LDFLAGS})
-install(TARGETS raw_in DESTINATION lib/tjost)
+if(USE_ALSA)
+	add_library(raw_in MODULE mod_raw_in.c)
+	set_target_properties(raw_in PROPERTIES PREFIX "")
+	target_link_libraries(raw_in ${ALSA_LDFLAGS})
+	install(TARGETS raw_in DESTINATION lib/tjost)
+endif()
 
 # mod_raw_out
-add_library(raw_out MODULE mod_raw_out.c)
-set_target_properties(raw_out PROPERTIES PREFIX "")
-target_link_libraries(raw_out ${ALSA_LDFLAGS})
-install(TARGETS raw_out DESTINATION lib/tjost)
+if(USE_ALSA)
+	add_library(raw_out MODULE mod_raw_out.c)
+	set_target_properties(raw_out PROPERTIES PREFIX "")
+	target_link_libraries(raw_out ${ALSA_LDFLAGS})
+	install(TARGETS raw_out DESTINATION lib/tjost)
+endif()
 
 # mod_seq_in
-add_library(seq_in MODULE mod_seq_in.c)
-set_target_properties(seq_in PROPERTIES PREFIX "")
-target_link_libraries(seq_in ${ALSA_LDFLAGS})
-install(TARGETS seq_in DESTINATION lib/tjost)
+if(USE_ALSA)
+	add_library(seq_in MODULE mod_seq_in.c)
+	set_target_properties(seq_in PROPERTIES PREFIX "")
+	target_link_libraries(seq_in ${ALSA_LDFLAGS})
+	install(TARGETS seq_in DESTINATION lib/tjost)
+endif()
 
 # mod_seq_out
-add_library(seq_out MODULE mod_seq_out.c)
-set_target_properties(seq_out PROPERTIES PREFIX "")
-target_link_libraries(seq_out ${ALSA_LDFLAGS})
-install(TARGETS seq_out DESTINATION lib/tjost)
+if(USE_ALSA)
+	add_library(seq_out MODULE mod_seq_out.c)
+	set_target_properties(seq_out PROPERTIES PREFIX "")
+	target_link_libraries(seq_out ${ALSA_LDFLAGS})
+	install(TARGETS seq_out DESTINATION lib/tjost)
+endif()
 
 # mod_audio_in
 add_library(audio_in MODULE mod_audio_in.c)

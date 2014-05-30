@@ -175,14 +175,8 @@ netaddr_udp_sender_init(NetAddr_UDP_Sender *netaddr, uv_loop_t *loop, const char
 	}
 
 	const char *host = NULL;
-
-	if(colon == addr)
-		host = "255.255.255.255"; //FIXME implement broadcast and multicast
-	else
-	{
-		*colon = '\0';
-		host = addr;
-	}
+	host = addr;
+	*colon = '\0';
 
 	// DNS resolve
 	struct addrinfo hints;

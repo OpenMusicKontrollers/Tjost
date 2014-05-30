@@ -1,1 +1,4 @@
+#cmakedefine USE_JACK
 #cmakedefine HAS_METADATA_API
+#cmakedefine USE_ALSA
+#cmakedefine USE_LUAJIT

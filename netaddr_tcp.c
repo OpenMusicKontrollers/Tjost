@@ -489,21 +489,15 @@ _netaddr_tcp_sender_init(NetAddr_TCP_Endpoint *netaddr, uv_loop_t *loop, const c
 	}
 
 	const char *host = NULL;
-
-	if(colon == addr)
-		host = "255.255.255.255"; //FIXME implement broadcast and multicast
-	else
-	{
-		*colon = '\0';
-		host = addr;
-	}
+	host = addr;
+	*colon = '\0';
 
 	// DNS resolve
 	struct addrinfo hints;
 	struct addrinfo *ai;
 	memset(&hints, 0, sizeof(hints));
 	hints.ai_family = netaddr->version == NETADDR_IP_VERSION_4 ? PF_INET : PF_INET6;
-	hints.ai_socktype = SOCK_DGRAM;
+	hints.ai_socktype = SOCK_STREAM;
 	if(getaddrinfo(host, colon+1, &hints, &ai))
 	{
 		fprintf(stderr, "address could not be resolved\n");

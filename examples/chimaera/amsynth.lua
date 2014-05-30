@@ -70,8 +70,8 @@ local lv2 = {
 return {
 	bot = 2*12 - 0.5 - (n % 18 / 6),
 	range = n/3,
-	--effect = VOLUME,
-	effect = SOUND_EFFECT_5,
+	effect = VOLUME,
+	--effect = SOUND_EFFECT_5,
 
 	on = function(self, time, sid, gid, pid, x, y)
 		local key, base, bend, eff

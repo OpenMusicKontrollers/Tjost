@@ -48,10 +48,10 @@ extern "C" {
 
 #include <tjost_config.h>
 
-#ifdef HAS_METADATA_API
-#include <jack/metadata.h>
 #include <jack/ringbuffer.h>
-#include <jack/uuid.h>
+#ifdef HAS_METADATA_API
+#	include <jack/metadata.h>
+#	include <jack/uuid.h>
 #endif // HAS_METADATA_API
 
 typedef struct _Tjost_Midi Tjost_Midi;

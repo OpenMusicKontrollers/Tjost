@@ -54,7 +54,8 @@ success = function(time, uuid, path, ...)
 			chim(0, '/engines/offset', 'if', id(), 0.002)
 			chim(0, '/engines/reset', 'i', id())
 			chim(0, '/engines/oscmidi/enabled', 'ii', id(), 1)
-			chim(0, '/engines/oscmidi/effect', 'ii', id(), 0x4a)
+			--chim(0, '/engines/oscmidi/effect', 'ii', id(), 0x4a)
+			chim(0, '/engines/oscmidi/effect', 'ii', id(), 0x07)
 		end
 	}
 
