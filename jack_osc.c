@@ -525,6 +525,28 @@ jack_osc_get(Jack_OSC_Type type, jack_osc_data_t *buf, Jack_OSC_Argument *arg)
 }
 
 jack_osc_data_t *
+jack_osc_start_bundle(jack_osc_data_t *buf, uint64_t t)
+{
+	strncpy((char *)buf, "#bundle", 8);
+	jack_osc_set_timetag(buf + 8, t);
+	return buf + 16;
+}
+
+jack_osc_data_t *
+jack_osc_start_bundle_item(jack_osc_data_t *buf, jack_osc_data_t **itm)
+{
+	*itm = buf;
+	return buf + 4;
+}
+
+jack_osc_data_t *
+jack_osc_end_bundle_item(jack_osc_data_t *buf, jack_osc_data_t *itm)
+{
+	jack_osc_set_int32(itm, buf - (itm + 4));
+	return buf;
+}
+
+jack_osc_data_t *
 jack_osc_set_path(jack_osc_data_t *buf, const char *path)
 {
 	size_t len = jack_osc_strlen(path);

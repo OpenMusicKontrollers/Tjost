@@ -126,6 +126,10 @@ jack_osc_data_t *jack_osc_skip(Jack_OSC_Type type, jack_osc_data_t *buf);
 jack_osc_data_t *jack_osc_get(Jack_OSC_Type type, jack_osc_data_t *buf, Jack_OSC_Argument *arg);
 
 // write OSC argument to raw buffer
+jack_osc_data_t *jack_osc_start_bundle(jack_osc_data_t *buf, uint64_t t);
+jack_osc_data_t *jack_osc_start_bundle_item(jack_osc_data_t *buf, jack_osc_data_t **itm);
+jack_osc_data_t *jack_osc_end_bundle_item(jack_osc_data_t *buf, jack_osc_data_t *itm);
+
 jack_osc_data_t *jack_osc_set_path(jack_osc_data_t *buf, const char *path);
 jack_osc_data_t *jack_osc_set_fmt(jack_osc_data_t *buf, const char *fmt);
 
