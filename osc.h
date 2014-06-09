@@ -398,6 +398,7 @@ osc_set_midi_inline(osc_data_t *buf, uint8_t **m)
 __always_inline osc_data_t *
 osc_start_bundle(osc_data_t *buf, uint64_t t, osc_data_t **bndl)
 {
+	*bndl = buf;
 	strncpy((char *)buf, "#bundle", 8);
 	osc_set_timetag(buf + 8, t);
 	return buf + 16;
