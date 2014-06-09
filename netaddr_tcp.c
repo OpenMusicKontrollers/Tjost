@@ -122,7 +122,7 @@ _tcp_prefix_recv_cb(uv_stream_t *stream, ssize_t nread, const uv_buf_t *buf)
 			netaddr->recv.nchunk = ntohl(*(int32_t *)buf->base);
 		else if(nread == netaddr->recv.nchunk)
 		{
-			netaddr->recv.cb((jack_osc_data_t *)buf->base, nread, netaddr->recv.dat);
+			netaddr->recv.cb((osc_data_t *)buf->base, nread, netaddr->recv.dat);
 			netaddr->recv.nchunk = sizeof(int32_t);
 		}
 		else // nread != sizeof(int32_t) && nread != nchunk
@@ -169,7 +169,7 @@ _tcp_slip_recv_cb(uv_stream_t *stream, ssize_t nread, const uv_buf_t *buf)
 		size_t parsed;
 		while( (parsed = slip_decode(ptr, nread, &size)) && (nread > 0) )
 		{
-			netaddr->recv.cb((jack_osc_data_t *)ptr, size, netaddr->recv.dat);
+			netaddr->recv.cb((osc_data_t *)ptr, size, netaddr->recv.dat);
 			ptr += parsed;
 			nread -= parsed;
 		}

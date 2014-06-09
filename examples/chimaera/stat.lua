@@ -23,9 +23,8 @@
 --     distribution.
 --]]
 
-if argv[3] == 'verbose' then
-	dump = tjost.plugin('dump', 'verbose')
-else
-	dump = tjost.plugin('dump')
-end
-osc_in = tjost.plugin('osc_in', 'osc.dump', dump)
+write = tjost.plugin('write', 'chim.osc')
+stream = tjost.plugin('net_in', 'osc.udp://:3333', '60', 'full', write)
+			
+chim = tjost.plugin('net_out', 'osc.udp://chimaera.local:4444')
+chim(0, '/engines/dump/enabled', 'ii', math.random(), 1)

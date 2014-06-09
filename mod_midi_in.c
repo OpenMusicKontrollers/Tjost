@@ -23,6 +23,8 @@
 
 #include <tjost.h>
 
+#include <jack/midiport.h>
+
 #define MOD_NAME "midi_in"
 
 static const char *midi_path = "/midi";
@@ -64,10 +66,10 @@ process_in(jack_nframes_t nframes, void *arg)
 
 			uint32_t N = i-last_i;
 
-			size_t len = jack_osc_strlen(midi_path) + (quads(N+2) + N)*sizeof(uint32_t);
-			jack_osc_data_t *ptr = tjost_host_schedule_inline(module->host, module, mev.time + last, len);
+			size_t len = osc_strlen(midi_path) + (quads(N+2) + N)*sizeof(uint32_t);
+			osc_data_t *ptr = tjost_host_schedule_inline(module->host, module, mev.time + last, len);
 
-			ptr = jack_osc_set_path(ptr, midi_path);
+			ptr = osc_set_path(ptr, midi_path);
 
 			char *fmt = (char *)ptr;
 			char *fmt_ptr = fmt;
@@ -78,7 +80,7 @@ process_in(jack_nframes_t nframes, void *arg)
 			while( (fmt_ptr-fmt) % 4)
 				*fmt_ptr++ = '\0';
 
-			ptr = (jack_osc_data_t *)fmt_ptr;
+			ptr = (osc_data_t *)fmt_ptr;
 
 			uint32_t j;
 			for(j=last_i; j<i; j++)
@@ -92,7 +94,7 @@ process_in(jack_nframes_t nframes, void *arg)
 				m[2] = mev.buffer[1];
 				m[3] = mev.buffer[2];
 
-				ptr = jack_osc_set_midi(ptr, m);
+				ptr = osc_set_midi(ptr, m);
 			}
 		
 			last_i = i;

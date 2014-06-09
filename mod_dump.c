@@ -32,17 +32,18 @@ typedef struct _Data Data;
 struct _Data {
 	jack_ringbuffer_t *rb;
 	uv_async_t asio;
-	jack_osc_data_t buffer [TJOST_BUF_SIZE];
+	osc_data_t buffer [TJOST_BUF_SIZE];
+	int verbose;
 };
 
 static void
-_serialize_message(jack_osc_data_t *buffer, size_t len)
+_serialize_message(osc_data_t *buffer, size_t len, int verbose)
 {
 	const char *path;
 	const char *fmt;
-	jack_osc_data_t *ptr = buffer;
-	ptr = jack_osc_get_path(ptr, &path);
-	ptr = jack_osc_get_fmt(ptr, &fmt);
+	osc_data_t *ptr = buffer;
+	ptr = osc_get_path(ptr, &path);
+	ptr = osc_get_fmt(ptr, &fmt);
 	printf(" %s %s", path, fmt+1);
 	const char *type;
 	for(type=fmt+1; *type; type++)
@@ -51,30 +52,30 @@ _serialize_message(jack_osc_data_t *buffer, size_t len)
 			case 'i':
 			{
 				int32_t i;
-				ptr = jack_osc_get_int32(ptr, &i);
+				ptr = osc_get_int32(ptr, &i);
 				printf(" %"PRIi32, i);
 				break;
 			}
 			case 'f':
 			{
 				float f;
-				ptr = jack_osc_get_float(ptr, &f);
+				ptr = osc_get_float(ptr, &f);
 				printf(" %f", f);
 				break;
 			}
 			case 's':
 			{
 				const char *s;
-				ptr = jack_osc_get_string(ptr, &s);
+				ptr = osc_get_string(ptr, &s);
 				printf(" '%s'", s);
 				break;
 			}
 			case 'b':
 			{
-				Jack_OSC_Blob b;
-				ptr = jack_osc_get_blob(ptr, &b);
+				OSC_Blob b;
+				ptr = osc_get_blob(ptr, &b);
 				printf(" (%"PRIi32")", b.size);
-#if 0 //TODO
+				if(verbose)
 				{
 					printf("[");
 					int32_t i;
@@ -83,28 +84,27 @@ _serialize_message(jack_osc_data_t *buffer, size_t len)
 						printf("%02"PRIX8",", bytes[i]);
 					printf("\b]");
 				}
-#endif
 				break;
 			}
 
 			case 'h':
 			{
 				int64_t h;
-				ptr = jack_osc_get_int64(ptr, &h);
+				ptr = osc_get_int64(ptr, &h);
 					printf(" %"PRIi64, h);
 				break;
 			}
 			case 'd':
 			{
 				double d;
-				ptr = jack_osc_get_double(ptr, &d);
+				ptr = osc_get_double(ptr, &d);
 				printf(" %f", d);
 				break;
 			}
 			case 't':
 			{
 				uint64_t t;
-				ptr = jack_osc_get_timetag(ptr, &t);
+				ptr = osc_get_timetag(ptr, &t);
 				uint32_t sec = t >> 32;
 				uint32_t frac = t & 0xFFFFFFFF;
 				printf(" %08"PRIX32".%08"PRIX32, sec, frac);
@@ -113,37 +113,37 @@ _serialize_message(jack_osc_data_t *buffer, size_t len)
 			case 'S':
 			{
 				const char *S;
-				ptr = jack_osc_get_string(ptr, &S);
+				ptr = osc_get_string(ptr, &S);
 				printf(" '%s'", S);
 				break;
 			}
 			case 'c':
 			{
 				char c;
-				ptr = jack_osc_get_char(ptr, &c);
+				ptr = osc_get_char(ptr, &c);
 				printf(" %c", c);
 				break;
 			}
 			case 'm':
 			{
 				uint8_t *m;
-				ptr = jack_osc_get_midi(ptr, &m);
+				ptr = osc_get_midi(ptr, &m);
 				printf(" [%02"PRIX8",%02"PRIX8",%02"PRIX8",%02"PRIX8"]", m[0], m[1], m[2], m[3]);
 				break;
 			}
 
 			default:
-				ptr = jack_osc_skip(*type, ptr);
+				ptr = osc_skip(*type, ptr);
 				break;
 		}
 	printf("\n");
 }
 
 static void
-_serialize_bundle(jack_osc_data_t *buffer, size_t len, int indent)
+_serialize_bundle(osc_data_t *buffer, size_t len, int indent, int verbose)
 {
-	jack_osc_data_t *end = buffer + len;
-	jack_osc_data_t *ptr = buffer;
+	osc_data_t *end = buffer + len;
+	osc_data_t *ptr = buffer;
 
 	uint64_t timetag = ntohll(*(uint64_t *)(ptr + 8));
 
@@ -167,12 +167,12 @@ _serialize_bundle(jack_osc_data_t *buffer, size_t len, int indent)
 			case '#':
 				for(i=0; i<indent+1; i++) printf("\t");
 				printf("%"PRIi32":", hsize);
-				_serialize_bundle(ptr, hsize, indent+1);
+				_serialize_bundle(ptr, hsize, indent+1, verbose);
 				break;
 			case '/':
 				for(i=0; i<indent+1; i++) printf("\t");
 				printf("%"PRIi32":", hsize);
-				_serialize_message(ptr, hsize);
+				_serialize_message(ptr, hsize, verbose);
 				break;
 			default:
 				fprintf(stderr, MOD_NAME": not an OSC bundle item '%c'\n", c);
@@ -187,21 +187,21 @@ _serialize_bundle(jack_osc_data_t *buffer, size_t len, int indent)
 }
 
 static void
-_serialize_packet(jack_nframes_t time, jack_osc_data_t *buffer, size_t size)
+_serialize_packet(jack_nframes_t time, osc_data_t *buffer, size_t size, int verbose)
 {
 	printf("%08"PRIX32" %4zu:", time, size);
 
 	switch(*buffer)
 	{
 		case '#':
-			if(jack_osc_bundle_check(buffer, size))
-				_serialize_bundle(buffer, size, 0);
+			if(osc_bundle_check(buffer, size))
+				_serialize_bundle(buffer, size, 0, verbose);
 			else
 				fprintf(stderr, MOD_NAME": tx OSC bundle invalid\n");
 			break;
 		case '/':
-			if(jack_osc_message_check(buffer, size))
-				_serialize_message(buffer, size);
+			if(osc_message_check(buffer, size))
+				_serialize_message(buffer, size, verbose);
 			else
 				fprintf(stderr, MOD_NAME": tx OSC message invalid\n");
 			break;
@@ -228,9 +228,9 @@ _asio(uv_async_t *handle)
 			jack_ringbuffer_data_t vec [2];
 			jack_ringbuffer_get_read_vector(dat->rb, vec);
 
-			jack_osc_data_t *buffer;
+			osc_data_t *buffer;
 			if(vec[0].len >= tev.size)
-				buffer = (jack_osc_data_t *)vec[0].buf;
+				buffer = (osc_data_t *)vec[0].buf;
 			else
 			{
 				buffer = dat->buffer;
@@ -239,7 +239,7 @@ _asio(uv_async_t *handle)
 
 			assert((uintptr_t)buffer % sizeof(uint32_t) == 0);
 
-			_serialize_packet(tev.time, buffer, tev.size);
+			_serialize_packet(tev.time, buffer, tev.size, dat->verbose);
 
 			if(vec[0].len >= tev.size)
 				jack_ringbuffer_read_advance(dat->rb, tev.size);
@@ -304,6 +304,11 @@ add(Tjost_Module *module, int argc, const char **argv)
 	Data *dat = tjost_alloc(module->host, sizeof(Data));
 
 	uv_loop_t *loop = uv_default_loop();
+
+	if( (argc > 0) && argv[0])
+		dat->verbose = !strcmp(argv[0], "verbose") ? 1 : 0;
+	else
+		dat->verbose = 0;
 
 	if(!(dat->rb = jack_ringbuffer_create(TJOST_RINGBUF_SIZE)))
 		fprintf(stderr, MOD_NAME": could not initialize ringbuffer\n");

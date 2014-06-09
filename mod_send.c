@@ -34,7 +34,7 @@ struct _Data {
 
 	uv_tty_t recv_client;
 	char line [1024];
-	jack_osc_data_t buffer [TJOST_BUF_SIZE] __attribute__((aligned (8)));
+	osc_data_t buffer [TJOST_BUF_SIZE] __attribute__((aligned (8)));
 };
 
 static void
@@ -57,7 +57,7 @@ _tty_recv_cb(uv_stream_t *stream, ssize_t nread, const uv_buf_t *buf)
 	{
 		char *s = buf->base;
 
-		jack_osc_data_t *ptr = dat->buffer;
+		osc_data_t *ptr = dat->buffer;
 		char *cur;
 		char *end;
 		char *path;
@@ -69,12 +69,12 @@ _tty_recv_cb(uv_stream_t *stream, ssize_t nread, const uv_buf_t *buf)
 			end++;
 		*end++ = '\0';
 		path = cur;
-		if(!jack_osc_check_path(path))
+		if(!osc_check_path(path))
 		{
 			fprintf(stderr, MOD_NAME": invalid path: %s\n", path);
 			return;
 		}
-		ptr = jack_osc_set_path(ptr, path);
+		ptr = osc_set_path(ptr, path);
 
 		// skip whitespace
 		while( (end < s+nread) && isspace(*end))
@@ -91,12 +91,12 @@ _tty_recv_cb(uv_stream_t *stream, ssize_t nread, const uv_buf_t *buf)
 		}
 		else
 			fmt = "";
-		if(!jack_osc_check_fmt(fmt, 0))
+		if(!osc_check_fmt(fmt, 0))
 		{
 			fprintf(stderr, MOD_NAME": invalid format: %s\n", fmt);
 			return;
 		}
-		ptr = jack_osc_set_fmt(ptr, fmt);
+		ptr = osc_set_fmt(ptr, fmt);
 
 		// skip whitespace
 		while( (end < s+nread) && isspace(*end))
@@ -129,7 +129,7 @@ _tty_recv_cb(uv_stream_t *stream, ssize_t nread, const uv_buf_t *buf)
 				{
 					int32_t i;
 					if(sscanf(cur, "%"SCNi32, &i))
-						ptr = jack_osc_set_int32(ptr, i);
+						ptr = osc_set_int32(ptr, i);
 					else
 						fprintf(stderr, MOD_NAME": type mismatch at '%c'\n", *type);
 					break;
@@ -138,7 +138,7 @@ _tty_recv_cb(uv_stream_t *stream, ssize_t nread, const uv_buf_t *buf)
 				{
 					float f;
 					if(sscanf(cur, "%f", &f))
-						ptr = jack_osc_set_float(ptr, f);
+						ptr = osc_set_float(ptr, f);
 					else
 						fprintf(stderr, MOD_NAME": type mismatch at '%c'\n", *type);
 					break;
@@ -146,7 +146,7 @@ _tty_recv_cb(uv_stream_t *stream, ssize_t nread, const uv_buf_t *buf)
 				case 's':
 				{
 					char *s = cur;
-					ptr = jack_osc_set_string(ptr, s);
+					ptr = osc_set_string(ptr, s);
 					break;
 				}
 				case 'b':
@@ -157,7 +157,7 @@ _tty_recv_cb(uv_stream_t *stream, ssize_t nread, const uv_buf_t *buf)
 					for(i=0; i<size; i++)
 						if(!sscanf(cur+i*2, "%02"SCNx8, payload+i))
 							fprintf(stderr, MOD_NAME": type mismatch at '%c'\n", *type);
-					ptr = jack_osc_set_blob(ptr, size, payload);
+					ptr = osc_set_blob(ptr, size, payload);
 					free(payload);
 					break;
 				}
@@ -172,7 +172,7 @@ _tty_recv_cb(uv_stream_t *stream, ssize_t nread, const uv_buf_t *buf)
 				{
 					int64_t h;
 					if(sscanf(cur, "%"SCNi64, &h))
-						ptr = jack_osc_set_int64(ptr, h);
+						ptr = osc_set_int64(ptr, h);
 					else
 						fprintf(stderr, MOD_NAME": type mismatch at '%c'\n", *type);
 					break;
@@ -181,7 +181,7 @@ _tty_recv_cb(uv_stream_t *stream, ssize_t nread, const uv_buf_t *buf)
 				{
 					double d;
 					if(sscanf(cur, "%lf", &d))
-						ptr = jack_osc_set_double(ptr, d);
+						ptr = osc_set_double(ptr, d);
 					else
 						fprintf(stderr, MOD_NAME": type mismatch at '%c'\n", *type);
 					break;
@@ -193,7 +193,7 @@ _tty_recv_cb(uv_stream_t *stream, ssize_t nread, const uv_buf_t *buf)
 					if(sscanf(cur, "%"SCNx32".%"SCNx32, &sec, &frac))
 					{
 						t = (((uint64_t)sec<<32)) | frac;
-						ptr = jack_osc_set_timetag(ptr, t);
+						ptr = osc_set_timetag(ptr, t);
 					}
 					else
 						fprintf(stderr, MOD_NAME": type mismatch at '%c'\n", *type);
@@ -203,20 +203,20 @@ _tty_recv_cb(uv_stream_t *stream, ssize_t nread, const uv_buf_t *buf)
 				case 'S':
 				{
 					char *S = cur;
-					ptr = jack_osc_set_symbol(ptr, S);
+					ptr = osc_set_symbol(ptr, S);
 					break;
 				}
 				case 'c':
 				{
 					char c = *cur;
-					ptr = jack_osc_set_char(ptr, c);
+					ptr = osc_set_char(ptr, c);
 					break;
 				}
 				case 'm':
 				{
 					uint8_t m [4];
 					if(sscanf(cur, "%02"SCNx8"%02"SCNx8"%02"SCNx8"%02"SCNx8, m, m+1, m+2, m+3))
-						ptr = jack_osc_set_midi(ptr, m);
+						ptr = osc_set_midi(ptr, m);
 					else
 						fprintf(stderr, MOD_NAME": type mismatch at '%c'\n", *type);
 					break;
@@ -230,7 +230,7 @@ _tty_recv_cb(uv_stream_t *stream, ssize_t nread, const uv_buf_t *buf)
 		Tjost_Event tev;
 		tev.time = 0; // immediate execution
 		tev.size = ptr - dat->buffer;
-		if(jack_osc_message_check(dat->buffer, tev.size))
+		if(osc_message_check(dat->buffer, tev.size))
 		{
 			if(jack_ringbuffer_write_space(dat->rb) < sizeof(Tjost_Event) + tev.size)
 				fprintf(stderr, MOD_NAME": ringbuffer overflow\n");
@@ -272,7 +272,7 @@ process_in(jack_nframes_t nframes, void *arg)
 		{
 			jack_ringbuffer_read_advance(dat->rb, sizeof(Tjost_Event));
 
-			jack_osc_data_t *bf = tjost_host_schedule_inline(host, module, tev.time, tev.size);
+			osc_data_t *bf = tjost_host_schedule_inline(host, module, tev.time, tev.size);
 			if(jack_ringbuffer_read(dat->rb, (char *)bf, tev.size) != tev.size)
 				tjost_host_message_push(host, MOD_NAME": %s", "ringbuffer read error");
 		}

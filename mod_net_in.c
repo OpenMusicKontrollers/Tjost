@@ -21,7 +21,6 @@
  *     distribution.
  */
 
-#include <math.h>
 #include <sched.h>
 
 #define MOD_NAME "net_in"

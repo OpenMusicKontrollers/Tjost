@@ -52,24 +52,24 @@ include_directories(${EINA_INCLUDE_DIRS})
 set(LIBS ${LIBS} ${EINA_LDFLAGS})
 
 # shared lib
-add_library(jack_osc SHARED jack_osc.c)
-target_link_libraries(jack_osc ${JACK_LDFLAGS})
-install(TARGETS jack_osc DESTINATION lib)
+add_library(osc SHARED osc.c)
+target_link_libraries(osc ${JACK_LDFLAGS})
+install(TARGETS osc DESTINATION lib)
 
 # lib header
-install(FILES jack_osc.h DESTINATION include)
+install(FILES osc.h DESTINATION include)
 
 # pkg config file
 set(prefix ${CMAKE_INSTALL_PREFIX})
 set(exec_prefix ${CMAKE_INSTALL_PREFIX})
 set(libdir ${CMAKE_INSTALL_PREFIX}/lib)
 set(includedir ${CMAKE_INSTALL_PREFIX}/include)
-configure_file(${PROJECT_SOURCE_DIR}/jack_osc.pc.in ${PROJECT_BINARY_DIR}/jack_osc.pc @ONLY)
-install(FILES ${PROJECT_BINARY_DIR}/jack_osc.pc DESTINATION lib/pkgconfig)
+configure_file(${PROJECT_SOURCE_DIR}/osc.pc.in ${PROJECT_BINARY_DIR}/osc.pc @ONLY)
+install(FILES ${PROJECT_BINARY_DIR}/osc.pc DESTINATION lib/pkgconfig)
 
 # tjost
 add_executable(tjost tjost.c tjost_lua.c tjost_uplink.c tlsf-3.0/tlsf.c)
-target_link_libraries(tjost jack_osc ${LIBS})
+target_link_libraries(tjost osc ${LIBS})
 install(TARGETS tjost DESTINATION bin)
 
 # mod_uplink
@@ -106,6 +106,11 @@ install(TARGETS dump DESTINATION lib/tjost)
 add_library(send MODULE mod_send.c)
 set_target_properties(send PROPERTIES PREFIX "")
 install(TARGETS send DESTINATION lib/tjost)
+
+# mod_write
+add_library(write MODULE mod_write.c)
+set_target_properties(write PROPERTIES PREFIX "")
+install(TARGETS write DESTINATION lib/tjost)
 
 # mod_midi_in
 add_library(midi_in MODULE mod_midi_in.c)

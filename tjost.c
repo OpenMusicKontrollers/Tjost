@@ -105,7 +105,7 @@ tjost_host_schedule(Tjost_Host *host, Tjost_Module *module, jack_nframes_t time,
 	host->queue = eina_inlist_sorted_insert(host->queue, EINA_INLIST_GET(tev), _tjost_schedule_sort);
 }
 
-jack_osc_data_t *
+osc_data_t *
 tjost_host_schedule_inline(Tjost_Host *host, Tjost_Module *module, jack_nframes_t time, size_t len)
 {
 	Tjost_Event *tev = tjost_alloc(host, sizeof(Tjost_Event) + len);

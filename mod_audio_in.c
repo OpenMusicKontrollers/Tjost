@@ -88,16 +88,16 @@ process_in(jack_nframes_t nframes, void *arg)
 
 	void *payload;
 
-	size_t len = jack_osc_strlen(AUDIO_PATH)
-						 + jack_osc_fmtlen(AUDIO_FMT)
+	size_t len = osc_strlen(AUDIO_PATH)
+						 + osc_fmtlen(AUDIO_FMT)
 						 + 3 * sizeof(int32_t)
 						 + round_to_four_bytes(size);
-	jack_osc_data_t *ptr = tjost_host_schedule_inline(host, module, last, len);
-	ptr = jack_osc_set_path(ptr, AUDIO_PATH);
-	ptr = jack_osc_set_fmt(ptr, AUDIO_FMT);
-	ptr = jack_osc_set_int32(ptr, last);
-	ptr = jack_osc_set_int32(ptr, sample_type);
-	ptr = jack_osc_set_blob_inline(ptr, size, &payload);
+	osc_data_t *ptr = tjost_host_schedule_inline(host, module, last, len);
+	ptr = osc_set_path(ptr, AUDIO_PATH);
+	ptr = osc_set_fmt(ptr, AUDIO_FMT);
+	ptr = osc_set_int32(ptr, last);
+	ptr = osc_set_int32(ptr, sample_type);
+	ptr = osc_set_blob_inline(ptr, size, &payload);
 
 	switch(sample_type)
 	{

@@ -3,8 +3,8 @@ exec_prefix=@exec_prefix@
 libdir=@libdir@
 includedir=@includedir@
 
-Name: jack_osc
-Description: JACKified Open Sound Control
+Name: osc
+Description: Open Sound Control
 Version: @JACK_OSC_VERSION@
-Libs: -L${libdir} -ljack_osc
+Libs: -L${libdir} -losc
 Cflags: -I${includedir}

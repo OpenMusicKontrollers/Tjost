@@ -23,6 +23,8 @@
 
 #include <tjost.h>
 
+#include <jack/midiport.h>
+
 #include <alsa/asoundlib.h>
 
 #define MOD_NAME "raw_out"
@@ -33,11 +35,11 @@ struct _Data {
 	snd_rawmidi_t *dev;
 	jack_ringbuffer_t *rb;
 	uv_async_t asio;
-	jack_osc_data_t buffer [TJOST_BUF_SIZE] __attribute__((aligned (8)));
+	osc_data_t buffer [TJOST_BUF_SIZE] __attribute__((aligned (8)));
 };
 
 static int
-_midi(jack_nframes_t time, const char *path, const char *fmt, jack_osc_data_t *buf, void *arg)
+_midi(jack_nframes_t time, const char *path, const char *fmt, osc_data_t *buf, void *arg)
 {
 	Tjost_Module *module = arg;
 	Data *dat = module->dat;
@@ -46,13 +48,13 @@ _midi(jack_nframes_t time, const char *path, const char *fmt, jack_osc_data_t *b
 	uint8_t m [3];
 	uint8_t *M;
 
-	jack_osc_data_t *ptr = buf;
+	osc_data_t *ptr = buf;
 	const char *type;
 	for(type=fmt; *type!='\0'; type++)
 		switch(*type)
 		{
 			case 'm':
-				ptr = jack_osc_get_midi(ptr, &M);
+				ptr = osc_get_midi(ptr, &M);
 				m[0] = M[0] | M[1];
 				m[1] = M[2];
 				m[2] = M[3];
@@ -62,14 +64,14 @@ _midi(jack_nframes_t time, const char *path, const char *fmt, jack_osc_data_t *b
 				if(snd_rawmidi_drain(dat->dev))
 					fprintf(stderr, MOD_NAME": draining MIDI failed\n");
 			default:
-				ptr = jack_osc_skip(*type, ptr);
+				ptr = osc_skip(*type, ptr);
 				break;
 		}
 
 	return 1;
 }
 
-static Jack_OSC_Method methods [] = {
+static OSC_Method methods [] = {
 	{NULL, NULL, _midi},
 	{NULL, NULL, NULL}
 };
@@ -91,9 +93,9 @@ _asio(uv_async_t *handle)
 			jack_ringbuffer_data_t vec [2];
 			jack_ringbuffer_get_read_vector(dat->rb, vec);
 			
-			jack_osc_data_t *buffer;
+			osc_data_t *buffer;
 			if(vec[0].len >= tev.size)
-				buffer = (jack_osc_data_t *)vec[0].buf;
+				buffer = (osc_data_t *)vec[0].buf;
 			else
 			{
 				buffer = dat->buffer;
@@ -102,7 +104,7 @@ _asio(uv_async_t *handle)
 			
 			assert((uintptr_t)buffer % sizeof(uint32_t) == 0);
 
-			jack_osc_method_dispatch(tev.time, buffer, tev.size, methods, module);
+			osc_method_dispatch(tev.time, buffer, tev.size, methods, module);
 			
 			if(vec[0].len >= tev.size)
 				jack_ringbuffer_read_advance(dat->rb, tev.size);

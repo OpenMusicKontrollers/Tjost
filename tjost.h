@@ -44,7 +44,7 @@ extern "C" {
 #include <tlsf.h>
 
 // JACKified OpenSoundControl
-#include <jack_osc.h>
+#include <osc.h>
 
 #include <tjost_config.h>
 
@@ -86,7 +86,7 @@ struct _Tjost_Event {
 
 	jack_nframes_t time;
 	size_t size;
-	jack_osc_data_t buf [0];
+	osc_data_t buf [0];
 };
 
 struct _Tjost_Module {
@@ -162,7 +162,7 @@ void *tjost_realloc(Tjost_Host *host, size_t len, void *buf);
 void tjost_free(Tjost_Host *host, void *buf);
 
 void tjost_host_schedule(Tjost_Host *host, Tjost_Module *module, jack_nframes_t time, size_t len, void *buf);
-jack_osc_data_t *tjost_host_schedule_inline(Tjost_Host *host, Tjost_Module *module, jack_nframes_t time, size_t len);
+osc_data_t *tjost_host_schedule_inline(Tjost_Host *host, Tjost_Module *module, jack_nframes_t time, size_t len);
 void tjost_module_schedule(Tjost_Module *module, jack_nframes_t time, size_t len, void *buf);
 
 void tjost_host_message_push(Tjost_Host *host, const char *fmt, ...);

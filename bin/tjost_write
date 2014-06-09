@@ -23,9 +23,11 @@
 --     distribution.
 --]]
 
-if argv[3] == 'verbose' then
-	dump = tjost.plugin('dump', 'verbose')
+file = argv[3]
+
+if file then
+	write = tjost.plugin('write', file)
+	osc_in = tjost.plugin('osc_in', 'osc.in', write)
 else
-	dump = tjost.plugin('dump')
+	print('no file given')
 end
-osc_in = tjost.plugin('osc_in', 'osc.dump', dump)
