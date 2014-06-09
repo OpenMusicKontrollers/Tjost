@@ -396,11 +396,21 @@ osc_set_midi_inline(osc_data_t *buf, uint8_t **m)
 }
 
 __always_inline osc_data_t *
-osc_start_bundle(osc_data_t *buf, uint64_t t)
+osc_start_bundle(osc_data_t *buf, uint64_t t, osc_data_t **bndl)
 {
 	strncpy((char *)buf, "#bundle", 8);
 	osc_set_timetag(buf + 8, t);
 	return buf + 16;
+}
+
+__always_inline osc_data_t *
+osc_end_bundle(osc_data_t *buf, osc_data_t *bndl)
+{
+	size_t len =  buf - (bndl + 16);
+	if(len > 0)
+		return buf;
+	else // empty bundle
+		return bndl;
 }
 
 __always_inline osc_data_t *
@@ -413,8 +423,14 @@ osc_start_bundle_item(osc_data_t *buf, osc_data_t **itm)
 __always_inline osc_data_t *
 osc_end_bundle_item(osc_data_t *buf, osc_data_t *itm)
 {
-	osc_set_int32(itm, buf - (itm + 4));
-	return buf;
+	size_t len = buf - (itm + 4);
+	if(len > 0)
+	{
+		osc_set_int32(itm, len);
+		return buf;
+	}
+	else // empty item
+		return itm;
 }
 
 osc_data_t *osc_set(OSC_Type type, osc_data_t *buf, OSC_Argument *arg);

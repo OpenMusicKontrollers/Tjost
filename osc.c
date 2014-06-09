@@ -486,7 +486,8 @@ extern osc_data_t *osc_set_char(osc_data_t *buf, char c);
 extern osc_data_t *osc_set_midi(osc_data_t *buf, uint8_t *m);
 extern osc_data_t *osc_set_midi_inline(osc_data_t *buf, uint8_t **m);
 
-extern osc_data_t *osc_start_bundle(osc_data_t *buf, uint64_t t);
+extern osc_data_t *osc_start_bundle(osc_data_t *buf, uint64_t t, osc_data_t **bndl);
+extern osc_data_t *osc_end_bundle(osc_data_t *buf, osc_data_t *bndl);
 extern osc_data_t *osc_start_bundle_item(osc_data_t *buf, osc_data_t **itm);
 extern osc_data_t *osc_end_bundle_item(osc_data_t *buf, osc_data_t *itm);
 
