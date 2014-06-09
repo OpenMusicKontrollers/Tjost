@@ -23,6 +23,8 @@
 
 #include <tjost.h>
 
+#include <jack_osc/jack_osc.h>
+
 #define MOD_NAME "osc_in"
 
 int
@@ -58,7 +60,7 @@ add(Tjost_Module *module, int argc, const char **argv)
 	if(!(port = jack_port_register(module->host->client, argv[0], JACK_DEFAULT_OSC_TYPE, JackPortIsInput, 0)))
 		fprintf(stderr, MOD_NAME": could not register jack port\n");
 
-	if(jack_osc_mark_port(module->host->client, port))
+	if(osc_mark_port(module->host->client, port))
 		fprintf(stderr, MOD_NAME": could not set event type\n");
 
 	module->dat = port;
@@ -72,7 +74,7 @@ del(Tjost_Module *module)
 
 	if(port)
 	{
-		jack_osc_unmark_port(module->host->client, port);
+		osc_unmark_port(module->host->client, port);
 		jack_port_unregister(module->host->client, port);
 	}
 }

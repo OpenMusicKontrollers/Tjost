@@ -49,7 +49,7 @@ process_in(jack_nframes_t nframes, void *arg)
 		{
 			jack_ringbuffer_read_advance(dat->rb, sizeof(Tjost_Event));
 
-			jack_osc_data_t *bf = tjost_host_schedule_inline(host, module, tev.time, tev.size);
+			osc_data_t *bf = tjost_host_schedule_inline(host, module, tev.time, tev.size);
 			if(jack_ringbuffer_read(dat->rb, (char *)bf, tev.size) != tev.size)
 				tjost_host_message_push(host, MOD_NAME": %s", "ringbuffer read error");
 		}
@@ -66,16 +66,16 @@ _timeup(uv_timer_t *handle)
 	Tjost_Module *module = handle->data;
 	Data *dat = module->dat;
 
-	jack_osc_data_t buf [12];
-	jack_osc_data_t *ptr = buf;
-	ptr = jack_osc_set_path(ptr, "/timeup");
-	ptr = jack_osc_set_fmt(ptr, "");
+	osc_data_t buf [12];
+	osc_data_t *ptr = buf;
+	ptr = osc_set_path(ptr, "/timeup");
+	ptr = osc_set_fmt(ptr, "");
 	size_t len = ptr - buf;
 
 	Tjost_Event tev;
 	tev.time = 0; // immediate execution
 	tev.size = len;
-	if(jack_osc_message_check(buf, tev.size))
+	if(osc_message_check(buf, tev.size))
 	{
 		if(jack_ringbuffer_write_space(dat->rb) < sizeof(Tjost_Event) + tev.size)
 			fprintf(stderr, MOD_NAME": ringbuffer overflow\n");

@@ -36,16 +36,16 @@ struct _Data {
 };
 
 static int
-_cv(jack_nframes_t time, const char *path, const char *fmt, jack_osc_data_t *buf, void *dat)
+_cv(jack_nframes_t time, const char *path, const char *fmt, osc_data_t *buf, void *dat)
 {
 	Data *data = dat;
 
-	Jack_OSC_Blob b;
+	OSC_Blob b;
 	jack_nframes_t last;
 
-	jack_osc_data_t *ptr = buf;
-	ptr = jack_osc_get_int32(ptr, (int32_t *)&last); //TODO needs to be checked
-	ptr = jack_osc_get_blob(ptr, &b);
+	osc_data_t *ptr = buf;
+	ptr = osc_get_int32(ptr, (int32_t *)&last); //TODO needs to be checked
+	ptr = osc_get_blob(ptr, &b);
 
 	jack_default_audio_sample_t *port_buf_out = data->port_buf;
 
@@ -57,7 +57,7 @@ _cv(jack_nframes_t time, const char *path, const char *fmt, jack_osc_data_t *buf
 	return 1;
 }
 
-static Jack_OSC_Method methods [] = {
+static OSC_Method methods [] = {
 	{CV_PATH, CV_FMT, _cv},
 	{NULL, NULL, NULL}
 };
@@ -96,7 +96,7 @@ process_out(jack_nframes_t nframes, void *arg)
 			tev->time = last;
 		}
 
-		jack_osc_method_dispatch(tev->time - last, tev->buf, tev->size, methods, &data);
+		osc_method_dispatch(tev->time - last, tev->buf, tev->size, methods, &data);
 
 		module->queue = eina_inlist_remove(module->queue, EINA_INLIST_GET(tev));
 		tjost_free(host, tev);

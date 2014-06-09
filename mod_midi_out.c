@@ -23,6 +23,8 @@
 
 #include <tjost.h>
 
+#include <jack/midiport.h>
+
 #define MOD_NAME "midi_out"
 
 typedef struct _Data Data;
@@ -33,7 +35,7 @@ struct _Data {
 };
 
 static int
-_midi(jack_nframes_t time, const char *path, const char *fmt, jack_osc_data_t *buf, void *dat)
+_midi(jack_nframes_t time, const char *path, const char *fmt, osc_data_t *buf, void *dat)
 {
 	Data *data = dat;
 
@@ -41,13 +43,13 @@ _midi(jack_nframes_t time, const char *path, const char *fmt, jack_osc_data_t *b
 	uint8_t m [3];
 	uint8_t *M;
 
-	jack_osc_data_t *ptr = buf;
+	osc_data_t *ptr = buf;
 	const char *type;
 	for(type=fmt; *type!='\0'; type++)
 		switch(*type)
 		{
 			case 'm':
-				ptr = jack_osc_get_midi(ptr, &M);
+				ptr = osc_get_midi(ptr, &M);
 				m[0] = M[0] | M[1];
 				m[1] = M[2];
 				m[2] = M[3];
@@ -59,14 +61,14 @@ _midi(jack_nframes_t time, const char *path, const char *fmt, jack_osc_data_t *b
 				break;
 
 			default:
-				ptr = jack_osc_skip(*type, ptr);
+				ptr = osc_skip(*type, ptr);
 				break;
 		}
 
 	return 1;
 }
 
-static Jack_OSC_Method methods [] = {
+static OSC_Method methods [] = {
 	{NULL, NULL, _midi},
 	{NULL, NULL, NULL}
 };
@@ -106,7 +108,7 @@ process_out(jack_nframes_t nframes, void *arg)
 			tev->time = last;
 		}
 
-		jack_osc_method_dispatch(tev->time - last, tev->buf, tev->size, methods, &data);
+		osc_method_dispatch(tev->time - last, tev->buf, tev->size, methods, &data);
 
 		module->queue = eina_inlist_remove(module->queue, EINA_INLIST_GET(tev));
 		tjost_free(host, tev);

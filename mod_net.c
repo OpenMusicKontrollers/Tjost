@@ -64,11 +64,11 @@ _update_tstamp(Tjost_Module *module, uint64_t tstamp)
 }
 
 static void
-_inject_message(Tjost_Module *module, jack_nframes_t tstamp, jack_osc_data_t *buf, size_t len)
+_inject_message(Tjost_Module *module, jack_nframes_t tstamp, osc_data_t *buf, size_t len)
 {
 	Mod_Net *net = module->dat;
 
-	if(jack_osc_message_check(buf, len))
+	if(osc_message_check(buf, len))
 	{
 		Tjost_Event tev;
 		tev.module = module;
@@ -91,11 +91,11 @@ _inject_message(Tjost_Module *module, jack_nframes_t tstamp, jack_osc_data_t *bu
 
 // inject whole bundle as-is
 static void
-_inject_bundle(Tjost_Module *module, jack_osc_data_t *buf, size_t len)
+_inject_bundle(Tjost_Module *module, osc_data_t *buf, size_t len)
 {
 	Mod_Net *net = module->dat;
 	
-	if(jack_osc_bundle_check(buf, len))
+	if(osc_bundle_check(buf, len))
 	{
 		uint64_t timetag = ntohll(*(uint64_t *)(buf + 8));
 		jack_nframes_t tstamp = _update_tstamp(module, timetag);
@@ -121,13 +121,13 @@ _inject_bundle(Tjost_Module *module, jack_osc_data_t *buf, size_t len)
 
 // extract nested bundles with non-matching timestamps
 static void
-_unroll_partial(Tjost_Module *module, jack_osc_data_t *buf, size_t len)
+_unroll_partial(Tjost_Module *module, osc_data_t *buf, size_t len)
 {
 	if(strncmp((char *)buf, bundle_str, 8)) // bundle header valid?
 		return;
 
-	jack_osc_data_t *end = buf + len;
-	jack_osc_data_t *ptr = buf;
+	osc_data_t *end = buf + len;
+	osc_data_t *ptr = buf;
 
 	uint64_t timetag = ntohll(*(uint64_t *)(buf + 8));
 	jack_nframes_t tstamp = _update_tstamp(module, timetag);
@@ -174,7 +174,7 @@ _unroll_partial(Tjost_Module *module, jack_osc_data_t *buf, size_t len)
 
 	// repack bundle with messages only, ignoring nested bundles
 	ptr = buf + 16; // skip bundle header
-	jack_osc_data_t *dst = ptr;
+	osc_data_t *dst = ptr;
 	if(has_messages)
 		while(ptr < end)
 		{
@@ -198,13 +198,13 @@ _unroll_partial(Tjost_Module *module, jack_osc_data_t *buf, size_t len)
 
 // fully unroll bundle into single messages
 static void
-_unroll_full(Tjost_Module *module, jack_osc_data_t *buf, size_t len)
+_unroll_full(Tjost_Module *module, osc_data_t *buf, size_t len)
 {
 	if(strncmp((char *)buf, bundle_str, 8)) // bundle header valid?
 		return;
 
-	jack_osc_data_t *end = buf + len;
-	jack_osc_data_t *ptr = buf;
+	osc_data_t *end = buf + len;
+	osc_data_t *ptr = buf;
 
 	uint64_t timetag = ntohll(*(uint64_t *)(buf + 8));
 	jack_nframes_t tstamp = _update_tstamp(module, timetag);
@@ -255,7 +255,7 @@ _unroll_full(Tjost_Module *module, jack_osc_data_t *buf, size_t len)
 }
 
 void
-mod_net_recv_cb(jack_osc_data_t *buf, size_t len, void *data)
+mod_net_recv_cb(osc_data_t *buf, size_t len, void *data)
 {
 	Tjost_Module *module = data;
 	Mod_Net *net = module->dat;
@@ -478,7 +478,7 @@ mod_net_process_in(Tjost_Module *module, jack_nframes_t nframes)
 		{
 			jack_ringbuffer_read_advance(net->rb_in, sizeof(Tjost_Event));
 
-			jack_osc_data_t *bf = tjost_host_schedule_inline(host, module, tev.time, tev.size);
+			osc_data_t *bf = tjost_host_schedule_inline(host, module, tev.time, tev.size);
 			if(jack_ringbuffer_read(net->rb_in, (char *)bf, tev.size) != tev.size)
 				tjost_host_message_push(host, MOD_NAME": %s", "ringbuffer read error");
 		}

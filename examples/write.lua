@@ -23,9 +23,28 @@
 --     distribution.
 --]]
 
-if argv[3] == 'verbose' then
-	dump = tjost.plugin('dump', 'verbose')
-else
-	dump = tjost.plugin('dump')
+local ffi = require('ffi')
+ffi.cdef('int16_t htons(int16_t)')
+buf_t = ffi.typeof('int16_t *')
+
+n = 16
+b = tjost.blob(2*n)
+buf = buf_t(b.raw)
+
+dump = tjost.plugin('dump', 'verbose')
+write = tjost.plugin('write', 'bin.osc')
+
+function newblob()
+	for i=1, n do
+		buf[i-1] = ffi.C.htons(math.random(1024))
+	end
+	loopback(0, '/blob', 'b', b)
 end
-osc_in = tjost.plugin('osc_in', 'osc.dump', dump)
+
+loopback = tjost.plugin('loopback', function(time, ...)
+	dump(time, ...)
+	write(time, ...)
+	newblob()
+end)
+
+newblob()

@@ -23,10 +23,10 @@
 
 #include <tjost.h>
 
-static jack_osc_data_t buffer [TJOST_BUF_SIZE] __attribute__((aligned (8)));
+static osc_data_t buffer [TJOST_BUF_SIZE] __attribute__((aligned (8)));
 
-static jack_osc_data_t *
-_push(Tjost_Host *host, char type, jack_osc_data_t *ptr)
+static osc_data_t *
+_push(Tjost_Host *host, char type, osc_data_t *ptr)
 {
 	lua_State *L = host->L;
 
@@ -35,28 +35,28 @@ _push(Tjost_Host *host, char type, jack_osc_data_t *ptr)
 		case 'i':
 		{
 			int32_t i;
-			ptr = jack_osc_get_int32(ptr, &i);
+			ptr = osc_get_int32(ptr, &i);
 			lua_pushnumber(L, i);
 			return ptr;
 		}
 		case 'f':
 		{
 			float f;
-			ptr = jack_osc_get_float(ptr, &f);
+			ptr = osc_get_float(ptr, &f);
 			lua_pushnumber(L, f);
 			return ptr;
 		}
 		case 's':
 		{
 			const char *s;
-			ptr = jack_osc_get_string(ptr, &s);
+			ptr = osc_get_string(ptr, &s);
 			lua_pushstring(L, s);
 			return ptr;
 		}
 		case 'b':
 		{
-			Jack_OSC_Blob b;
-			ptr = jack_osc_get_blob(ptr, &b);
+			OSC_Blob b;
+			ptr = osc_get_blob(ptr, &b);
 
 			Tjost_Blob *tb = lua_newuserdata(L, sizeof(Tjost_Blob) + b.size);
 			luaL_getmetatable(L, "Tjost_Blob");
@@ -70,21 +70,21 @@ _push(Tjost_Host *host, char type, jack_osc_data_t *ptr)
 		case 'h':
 		{
 			int64_t h;
-			ptr = jack_osc_get_int64(ptr, &h);
+			ptr = osc_get_int64(ptr, &h);
 			lua_pushnumber(L, h);
 			return ptr;
 		}
 		case 'd':
 		{
 			double d;
-			ptr = jack_osc_get_double(ptr, &d);
+			ptr = osc_get_double(ptr, &d);
 			lua_pushnumber(L, d);
 			return ptr;
 		}
 		case 't':
 		{
 			uint64_t t;
-			ptr = jack_osc_get_timetag(ptr, &t);
+			ptr = osc_get_timetag(ptr, &t);
 			lua_pushnumber(L, t);
 			return ptr;
 		}
@@ -105,21 +105,21 @@ _push(Tjost_Host *host, char type, jack_osc_data_t *ptr)
 		case 'S':
 		{
 			const char *S;
-			ptr = jack_osc_get_symbol(ptr, &S);
+			ptr = osc_get_symbol(ptr, &S);
 			lua_pushstring(L, S);
 			return ptr;
 		}
 		case 'c':
 		{
 			char c;
-			ptr = jack_osc_get_char(ptr, &c);
+			ptr = osc_get_char(ptr, &c);
 			lua_pushnumber(L, c);
 			return ptr;
 		}
 		case 'm':
 		{
 			uint8_t *m;
-			ptr = jack_osc_get_midi(ptr, &m);
+			ptr = osc_get_midi(ptr, &m);
 
 			Tjost_Midi *tm = lua_newuserdata(L, sizeof(Tjost_Midi));
 			luaL_getmetatable(L, "Tjost_Midi");
@@ -139,13 +139,13 @@ _push(Tjost_Host *host, char type, jack_osc_data_t *ptr)
 }
 
 static int
-_deserialize(jack_nframes_t time, const char *path, const char *fmt, jack_osc_data_t *buf, void *dat)
+_deserialize(jack_nframes_t time, const char *path, const char *fmt, osc_data_t *buf, void *dat)
 {
 	Tjost_Module *module = dat;
 	Tjost_Host *host = module->host;
 	lua_State *L = host->L;
 
-	jack_osc_data_t *ptr = buf;
+	osc_data_t *ptr = buf;
 	int argc = 3 + strlen(fmt);
 	
 	if(!lua_checkstack(L, argc + 32)) // ensure at least that many free slots on stack
@@ -169,7 +169,7 @@ _deserialize(jack_nframes_t time, const char *path, const char *fmt, jack_osc_da
 	return 1;
 }
 
-static Jack_OSC_Method methods [] = {
+static OSC_Method methods [] = {
 	{NULL, NULL, _deserialize},
 	{NULL, NULL, NULL}
 };
@@ -177,7 +177,7 @@ static Jack_OSC_Method methods [] = {
 void
 tjost_lua_deserialize(Tjost_Event *tev)
 {
-	jack_osc_method_dispatch(tev->time, tev->buf, tev->size, methods, tev->module);
+	osc_method_dispatch(tev->time, tev->buf, tev->size, methods, tev->module);
 }
 
 static inline int
@@ -191,21 +191,21 @@ _serialize(lua_State *L, Tjost_Module *module)
 
 	size_t len;
 
-	jack_osc_data_t *ptr = buffer;
+	osc_data_t *ptr = buffer;
 
-	if(!jack_osc_check_path(path))
+	if(!osc_check_path(path))
 	{
 		tjost_host_message_push(host, "Lua: invalid OSC path %s", path);
 		return 0;
 	}
-	ptr = jack_osc_set_path(ptr, path);
+	ptr = osc_set_path(ptr, path);
 
-	if(!jack_osc_check_fmt(fmt, 0))
+	if(!osc_check_fmt(fmt, 0))
 	{
 		tjost_host_message_push(host, "Lua: invalid OSC format %s", fmt);
 		return 0;
 	}
-	ptr = jack_osc_set_fmt(ptr, fmt);
+	ptr = osc_set_fmt(ptr, fmt);
 
 	int p = 5;
 	const char *type;
@@ -213,29 +213,29 @@ _serialize(lua_State *L, Tjost_Module *module)
 		switch(*type)
 		{
 			case 'i':
-				ptr = jack_osc_set_int32(ptr, luaL_checkinteger(L, p));
+				ptr = osc_set_int32(ptr, luaL_checkinteger(L, p));
 				break;
 			case 'f':
-				ptr = jack_osc_set_float(ptr, luaL_checknumber(L, p));
+				ptr = osc_set_float(ptr, luaL_checknumber(L, p));
 				break;
 			case 's':
-				ptr = jack_osc_set_string(ptr, luaL_checkstring(L, p));
+				ptr = osc_set_string(ptr, luaL_checkstring(L, p));
 				break;
 			case 'b':
 				{
 					Tjost_Blob *tb = luaL_checkudata(L, p, "Tjost_Blob");
-					ptr = jack_osc_set_blob(ptr, tb->size, tb->buf);
+					ptr = osc_set_blob(ptr, tb->size, tb->buf);
 				}
 				break;
 
 			case 'h':
-				ptr = jack_osc_set_int64(ptr, luaL_checknumber(L, p));
+				ptr = osc_set_int64(ptr, luaL_checknumber(L, p));
 				break;
 			case 'd':
-				ptr = jack_osc_set_double(ptr, luaL_checknumber(L, p));
+				ptr = osc_set_double(ptr, luaL_checknumber(L, p));
 				break;
 			case 't':
-				ptr = jack_osc_set_timetag(ptr, luaL_checknumber(L, p));
+				ptr = osc_set_timetag(ptr, luaL_checknumber(L, p));
 				break;
 
 			case 'T':
@@ -245,16 +245,16 @@ _serialize(lua_State *L, Tjost_Module *module)
 				break;
 
 			case 'S':
-				ptr = jack_osc_set_symbol(ptr, luaL_checkstring(L, p));
+				ptr = osc_set_symbol(ptr, luaL_checkstring(L, p));
 				break;
 			case 'm':
 				{
 					Tjost_Midi *tm = luaL_checkudata(L, p, "Tjost_Midi");
-					ptr = jack_osc_set_midi(ptr, tm->buf);
+					ptr = osc_set_midi(ptr, tm->buf);
 				}
 				break;
 			case 'c':
-				ptr = jack_osc_set_char(ptr, luaL_checknumber(L, p));
+				ptr = osc_set_char(ptr, luaL_checknumber(L, p));
 				break;
 
 			default:

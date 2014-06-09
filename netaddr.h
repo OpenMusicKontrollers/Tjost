@@ -32,7 +32,7 @@
 typedef struct _NetAddr_UDP_Sender NetAddr_UDP_Sender;
 typedef struct _NetAddr_UDP_Responder NetAddr_UDP_Responder;
 typedef struct _NetAddr_TCP_Endpoint NetAddr_TCP_Endpoint;
-typedef void (*NetAddr_Recv_Cb) (jack_osc_data_t *buf, size_t len, void *dat);
+typedef void (*NetAddr_Recv_Cb) (osc_data_t *buf, size_t len, void *dat);
 typedef void (*NetAddr_Send_Cb) (size_t len, void *dat);
 
 typedef enum _NetAddr_TCP_Type {
@@ -65,7 +65,7 @@ struct _NetAddr_UDP_Responder {
 	NetAddr_IP_Version version;
 
 	void *dat;
-	jack_osc_data_t buf [TJOST_BUF_SIZE];
+	osc_data_t buf [TJOST_BUF_SIZE];
 };
 
 struct _NetAddr_TCP_Endpoint {
@@ -86,7 +86,7 @@ struct _NetAddr_TCP_Endpoint {
 	struct {
 		NetAddr_Recv_Cb cb;
 		void *dat;
-		jack_osc_data_t buf [TJOST_BUF_SIZE];
+		osc_data_t buf [TJOST_BUF_SIZE];
 		size_t nchunk;
 	} recv;
 
