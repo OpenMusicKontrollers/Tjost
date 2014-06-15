@@ -158,10 +158,13 @@ _osc_method_dispatch_message(jack_nframes_t time, osc_data_t *buf, size_t size, 
 }
 
 static void
-_osc_method_dispatch_bundle(jack_nframes_t time, osc_data_t *buf, size_t size, OSC_Method *methods, void *dat)
+_osc_method_dispatch_bundle(jack_nframes_t time, osc_data_t *buf, size_t size, OSC_Method *methods, OSC_Bundle_In bundle_in, OSC_Bundle_Out bundle_out, void *dat)
 {
 	osc_data_t *ptr = buf;
 	osc_data_t *end = buf + size;
+
+	if(bundle_in)
+		bundle_in(time, dat);
 
 	ptr += 16; // skip bundle header
 
@@ -172,7 +175,7 @@ _osc_method_dispatch_bundle(jack_nframes_t time, osc_data_t *buf, size_t size, O
 		switch(*ptr)
 		{
 			case '#':
-				_osc_method_dispatch_bundle(time, ptr, len, methods, dat);
+				_osc_method_dispatch_bundle(time, ptr, len, methods, bundle_in, bundle_out, dat);
 				break;
 			case '/':
 				_osc_method_dispatch_message(time, ptr, len, methods, dat);
@@ -180,15 +183,18 @@ _osc_method_dispatch_bundle(jack_nframes_t time, osc_data_t *buf, size_t size, O
 		}
 		ptr += len;
 	}
+
+	if(bundle_out)
+		bundle_out(dat);
 }
 
 void
-osc_method_dispatch(jack_nframes_t time, osc_data_t *buf, size_t size, OSC_Method *methods, void *dat)
+osc_method_dispatch(jack_nframes_t time, osc_data_t *buf, size_t size, OSC_Method *methods, OSC_Bundle_In bundle_in, OSC_Bundle_Out bundle_out, void *dat)
 {
 	switch(*buf)
 	{
 		case '#':
-			_osc_method_dispatch_bundle(time, buf, size, methods, dat);
+			_osc_method_dispatch_bundle(time, buf, size, methods, bundle_in, bundle_out, dat);
 			break;
 		case '/':
 			_osc_method_dispatch_message(time, buf, size, methods, dat);

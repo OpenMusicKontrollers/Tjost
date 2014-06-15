@@ -51,10 +51,14 @@ extern "C" {
 #	define ntohll htonll
 #endif
 
+#define OSC_IMMEDIATE 1ULL
+
 typedef uint8_t osc_data_t;
 typedef union _swap32_t swap32_t;
 typedef union _swap64_t swap64_t;
 typedef int (*OSC_Callback) (jack_nframes_t time, const char *path, const char *fmt, osc_data_t *arg, void *dat);
+typedef void (*OSC_Bundle_In) (jack_nframes_t time, void *dat);
+typedef void (*OSC_Bundle_Out) (void *dat);
 typedef struct _OSC_Method OSC_Method;
 typedef struct _OSC_Blob OSC_Blob;
 typedef union _OSC_Argument OSC_Argument;
@@ -130,7 +134,7 @@ int osc_check_path(const char *path);
 int osc_check_fmt(const char *format, int offset);
 
 int osc_method_match(OSC_Method *methods, const char *path, const char *fmt);
-void osc_method_dispatch(jack_nframes_t time, osc_data_t *buf, size_t size, OSC_Method *methods, void *dat);
+void osc_method_dispatch(jack_nframes_t time, osc_data_t *buf, size_t size, OSC_Method *methods, OSC_Bundle_In bundle_in, OSC_Bundle_Out bundle_out, void *dat);
 int osc_message_check(osc_data_t *buf, size_t size);
 int osc_bundle_check(osc_data_t *buf, size_t size);
 int osc_packet_check(osc_data_t *buf, size_t size);

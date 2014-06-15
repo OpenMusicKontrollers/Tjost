@@ -148,7 +148,6 @@ _unroll_partial(Tjost_Module *module, osc_data_t *buf, size_t len)
 			case '#':
 				has_nested_bundles = 1;
 				_unroll_partial(module, ptr, hsize);
-				// ignore for now, messages are handled first
 				break;
 			case '/':
 				has_messages = 1;
@@ -175,22 +174,21 @@ _unroll_partial(Tjost_Module *module, osc_data_t *buf, size_t len)
 	// repack bundle with messages only, ignoring nested bundles
 	ptr = buf + 16; // skip bundle header
 	osc_data_t *dst = ptr;
-	if(has_messages)
-		while(ptr < end)
+	while(ptr < end)
+	{
+		int32_t *size = (int32_t *)ptr;
+		int32_t hsize = htonl(*size);
+		ptr += sizeof(int32_t);
+
+		char *c = (char *)ptr;
+		if(*c == '/')
 		{
-			int32_t *size = (int32_t *)ptr;
-			int32_t hsize = htonl(*size);
-			ptr += sizeof(int32_t);
-
-			char c = *(char *)ptr;
-			if(c == '/')
-			{
-				memmove(dst, ptr - sizeof(int32_t), sizeof(int32_t) + hsize);
-				dst += hsize;
-			}
-
-			ptr += hsize;
+			memmove(dst, ptr - sizeof(int32_t), sizeof(int32_t) + hsize);
+			dst += sizeof(int32_t) + hsize;
 		}
+
+		ptr += hsize;
+	}
 
 	size_t nlen = dst - buf; 
 	_inject_bundle(module, buf, nlen);
@@ -246,8 +244,8 @@ _unroll_full(Tjost_Module *module, osc_data_t *buf, size_t len)
 		int32_t hsize = htonl(*size);
 		ptr += sizeof(int32_t);
 
-		char c = *(char *)ptr;
-		if(c == '#')
+		char *c = (char *)ptr;
+		if(*c == '#')
 			_unroll_full(module, ptr, hsize);
 
 		ptr += hsize;

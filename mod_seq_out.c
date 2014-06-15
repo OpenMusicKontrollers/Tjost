@@ -119,7 +119,7 @@ _asio(uv_async_t *handle)
 			
 			assert((uintptr_t)buffer % sizeof(uint32_t) == 0);
 
-			osc_method_dispatch(tev.time, buffer, tev.size, methods, module);
+			osc_method_dispatch(tev.time, buffer, tev.size, methods, NULL, NULL, module);
 			
 			if(vec[0].len >= tev.size)
 				jack_ringbuffer_read_advance(dat->rb, tev.size);

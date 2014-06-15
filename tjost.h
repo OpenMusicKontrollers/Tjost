@@ -56,6 +56,7 @@ extern "C" {
 
 typedef struct _Tjost_Midi Tjost_Midi;
 typedef struct _Tjost_Blob Tjost_Blob;
+typedef struct _Tjost_Bundle Tjost_Bundle;
 typedef struct _Tjost_Event Tjost_Event;
 typedef struct _Tjost_Module Tjost_Module;
 typedef struct _Tjost_Child Tjost_Child;
@@ -70,6 +71,10 @@ typedef void (*Tjost_Module_Del_Cb)(Tjost_Module *module);
 #define TJOST_MODULE_IN_OUT (TJOST_MODULE_INPUT | TJOST_MODULE_OUTPUT)
 #define TJOST_MODULE_UPLINK 0b100
 
+#define TJOST_MODULE_BROADCAST NULL
+#define TJOST_BUF_SIZE (0x4000)
+#define TJOST_RINGBUF_SIZE (0x10000)
+
 struct _Tjost_Midi {
 	uint8_t buf[4];
 };
@@ -77,6 +82,13 @@ struct _Tjost_Midi {
 struct _Tjost_Blob {
 	int32_t size;
 	uint8_t buf[0];
+};
+
+struct _Tjost_Bundle {
+	EINA_INLIST;
+
+	jack_nframes_t time;
+	osc_data_t *ptr;
 };
 
 struct _Tjost_Event {
@@ -104,6 +116,12 @@ struct _Tjost_Module {
 	Eina_Inlist *queue; // module output event queue
 	Eina_Inlist *children; // child modules for direct mode
 	int has_lua_callback;
+
+	osc_data_t buffer [TJOST_BUF_SIZE];
+	osc_data_t *buf_ptr;
+	osc_data_t *itm;
+	Eina_Inlist *bndls;
+	int nest;
 };
 
 struct _Tjost_Child {
@@ -111,10 +129,6 @@ struct _Tjost_Child {
 
 	Tjost_Module *module;
 };
-
-#define TJOST_MODULE_BROADCAST NULL
-#define TJOST_BUF_SIZE (0x4000)
-#define TJOST_RINGBUF_SIZE (0x10000)
 
 struct _Tjost_Mem_Chunk {
 	EINA_INLIST;

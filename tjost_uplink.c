@@ -208,7 +208,7 @@ tjost_uplink_tx_drain(uv_async_t *handle)
 			jack_ringbuffer_read_advance(host->rb_uplink_tx, sizeof(Tjost_Event));
 			jack_ringbuffer_read(host->rb_uplink_tx, (char *)buf_tx, tev.size);
 
-			osc_method_dispatch(tev.time, buf_tx, tev.size, methods, &tev);
+			osc_method_dispatch(tev.time, buf_tx, tev.size, methods, NULL, NULL, &tev);
 		}
 		else
 			break;

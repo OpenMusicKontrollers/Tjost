@@ -23,8 +23,6 @@
 
 #include <tjost.h>
 
-static osc_data_t buffer [TJOST_BUF_SIZE] __attribute__((aligned (8)));
-
 static osc_data_t *
 _push(Tjost_Host *host, char type, osc_data_t *ptr)
 {
@@ -154,7 +152,10 @@ _deserialize(jack_nframes_t time, const char *path, const char *fmt, osc_data_t 
 	lua_pushlightuserdata(L, module);
 	lua_rawget(L, LUA_REGISTRYINDEX); // responder function
 	{
-		lua_pushnumber(L, time);
+		if(module->nest == 0)
+			lua_pushnumber(L, time);
+		else
+			argc--;
 		lua_pushstring(L, path);
 		lua_pushstring(L, fmt);
 
@@ -174,97 +175,181 @@ static OSC_Method methods [] = {
 	{NULL, NULL, NULL}
 };
 
+static void
+_bundle_in(jack_nframes_t time, void *dat)
+{
+	Tjost_Module *module = dat;
+	Tjost_Host *host = module->host;
+	lua_State *L = host->L;
+	
+	lua_pushlightuserdata(L, module);
+	lua_rawget(L, LUA_REGISTRYINDEX); // responder function
+	{
+		lua_pushnumber(L, time);
+
+		if(lua_pcall(L, 1, 0, 0))
+			tjost_host_message_push(host, "Lua: callback error '%s'", lua_tostring(L, -1));
+	}
+
+	module->nest++;
+}
+
+static void
+_bundle_out(void *dat)
+{
+	Tjost_Module *module = dat;
+	Tjost_Host *host = module->host;
+	lua_State *L = host->L;
+	
+	lua_pushlightuserdata(L, module);
+	lua_rawget(L, LUA_REGISTRYINDEX); // responder function
+	{
+		if(lua_pcall(L, 0, 0, 0))
+			tjost_host_message_push(host, "Lua: callback error '%s'", lua_tostring(L, -1));
+	}
+	
+	module->nest--;
+}
+
 void
 tjost_lua_deserialize(Tjost_Event *tev)
 {
-	osc_method_dispatch(tev->time, tev->buf, tev->size, methods, tev->module);
+	tev->module->nest = 0;
+	osc_method_dispatch(tev->time, tev->buf, tev->size, methods, _bundle_in, _bundle_out, tev->module);
 }
 
 static inline int
-_serialize(lua_State *L, Tjost_Module *module)
+_serialize_packet(lua_State *L, Tjost_Module *module)
 {
 	Tjost_Host *host = module->host;
+	osc_data_t *buf_ptr = module->buf_ptr;
 
-	jack_nframes_t time = luaL_checkinteger(L, 2);
-	const char *path = luaL_checkstring(L, 3);
-	const char *fmt = luaL_checkstring(L, 4);
-
-	size_t len;
-
-	osc_data_t *ptr = buffer;
-
-	if(!osc_check_path(path))
+	if(lua_gettop(L) > 1)
 	{
-		tjost_host_message_push(host, "Lua: invalid OSC path %s", path);
-		return 0;
-	}
-	ptr = osc_set_path(ptr, path);
-
-	if(!osc_check_fmt(fmt, 0))
-	{
-		tjost_host_message_push(host, "Lua: invalid OSC format %s", fmt);
-		return 0;
-	}
-	ptr = osc_set_fmt(ptr, fmt);
-
-	int p = 5;
-	const char *type;
-	for(type=fmt; *type!='\0'; type++, p++)
-		switch(*type)
+		if(lua_gettop(L) == 2)
 		{
-			case 'i':
-				ptr = osc_set_int32(ptr, luaL_checkinteger(L, p));
-				break;
-			case 'f':
-				ptr = osc_set_float(ptr, luaL_checknumber(L, p));
-				break;
-			case 's':
-				ptr = osc_set_string(ptr, luaL_checkstring(L, p));
-				break;
-			case 'b':
-				{
-					Tjost_Blob *tb = luaL_checkudata(L, p, "Tjost_Blob");
-					ptr = osc_set_blob(ptr, tb->size, tb->buf);
-				}
-				break;
-
-			case 'h':
-				ptr = osc_set_int64(ptr, luaL_checknumber(L, p));
-				break;
-			case 'd':
-				ptr = osc_set_double(ptr, luaL_checknumber(L, p));
-				break;
-			case 't':
-				ptr = osc_set_timetag(ptr, luaL_checknumber(L, p));
-				break;
-
-			case 'T':
-			case 'F':
-			case 'N':
-			case 'I':
-				break;
-
-			case 'S':
-				ptr = osc_set_symbol(ptr, luaL_checkstring(L, p));
-				break;
-			case 'm':
-				{
-					Tjost_Midi *tm = luaL_checkudata(L, p, "Tjost_Midi");
-					ptr = osc_set_midi(ptr, tm->buf);
-				}
-				break;
-			case 'c':
-				ptr = osc_set_char(ptr, luaL_checknumber(L, p));
-				break;
-
-			default:
-				tjost_host_message_push(host, "Lua: invalid argument type '%c'", *type);
-				break;
+			if(eina_inlist_count(module->bndls) == 0)
+				buf_ptr = module->buffer;
+			else
+				buf_ptr = osc_start_bundle_item(buf_ptr, &module->itm);
+			Tjost_Bundle *bndl = tjost_alloc(host, sizeof(Tjost_Bundle));
+			module->bndls = eina_inlist_prepend(module->bndls, EINA_INLIST_GET(bndl));
+			bndl->time = luaL_checkinteger(L, 2);
+			buf_ptr = osc_start_bundle(buf_ptr, OSC_IMMEDIATE, &bndl->ptr);
 		}
+		else
+		{
+			osc_data_t *itm;
+			int has_timestamp = lua_isnumber(L, 2);
+			int pos = 2 + has_timestamp;
 
-	size_t size = ptr - buffer;
+			if(has_timestamp)
+				buf_ptr = module->buffer;
+			else
+				buf_ptr = osc_start_bundle_item(buf_ptr, &itm);
 
-	tjost_module_schedule(module, time, size, buffer);
+			const char *path = luaL_checkstring(L, pos);
+			const char *fmt = luaL_checkstring(L, pos+1);
+
+			if(!osc_check_path(path))
+			{
+				tjost_host_message_push(host, "Lua: invalid OSC path %s", path);
+				return 0;
+			}
+			buf_ptr = osc_set_path(buf_ptr, path);
+
+			if(!osc_check_fmt(fmt, 0))
+			{
+				tjost_host_message_push(host, "Lua: invalid OSC format %s", fmt);
+				return 0;
+			}
+			buf_ptr = osc_set_fmt(buf_ptr, fmt);
+
+			int p = pos+2;
+			const char *type;
+			for(type=fmt; *type!='\0'; type++, p++)
+				switch(*type)
+				{
+					case 'i':
+						buf_ptr = osc_set_int32(buf_ptr, luaL_checkinteger(L, p));
+						break;
+					case 'f':
+						buf_ptr = osc_set_float(buf_ptr, luaL_checknumber(L, p));
+						break;
+					case 's':
+						buf_ptr = osc_set_string(buf_ptr, luaL_checkstring(L, p));
+						break;
+					case 'b':
+						{
+							Tjost_Blob *tb = luaL_checkudata(L, p, "Tjost_Blob");
+							buf_ptr = osc_set_blob(buf_ptr, tb->size, tb->buf);
+						}
+						break;
+
+					case 'h':
+						buf_ptr = osc_set_int64(buf_ptr, luaL_checknumber(L, p));
+						break;
+					case 'd':
+						buf_ptr = osc_set_double(buf_ptr, luaL_checknumber(L, p));
+						break;
+					case 't':
+						buf_ptr = osc_set_timetag(buf_ptr, luaL_checknumber(L, p));
+						break;
+
+					case 'T':
+					case 'F':
+					case 'N':
+					case 'I':
+						break;
+
+					case 'S':
+						buf_ptr = osc_set_symbol(buf_ptr, luaL_checkstring(L, p));
+						break;
+					case 'm':
+						{
+							Tjost_Midi *tm = luaL_checkudata(L, p, "Tjost_Midi");
+							buf_ptr = osc_set_midi(buf_ptr, tm->buf);
+						}
+						break;
+					case 'c':
+						buf_ptr = osc_set_char(buf_ptr, luaL_checknumber(L, p));
+						break;
+
+					default:
+						tjost_host_message_push(host, "Lua: invalid argument type '%c'", *type);
+						break;
+				}
+
+			if(has_timestamp)
+			{
+				jack_nframes_t time = luaL_checkinteger(L, 2);
+				size_t size = buf_ptr - module->buffer;
+				if(size > 0)
+					tjost_module_schedule(module, time, size, module->buffer);
+			}
+			else
+				buf_ptr = osc_end_bundle_item(buf_ptr, itm);
+		}
+	}
+	else
+	{
+		Tjost_Bundle *bndl = EINA_INLIST_CONTAINER_GET(module->bndls, Tjost_Bundle);
+		module->bndls = eina_inlist_remove(module->bndls, EINA_INLIST_GET(bndl));
+		buf_ptr = osc_end_bundle(buf_ptr, bndl->ptr);
+
+		if(eina_inlist_count(module->bndls) == 0)
+		{
+			size_t size = buf_ptr - module->buffer;
+			if(size > 0)
+				tjost_module_schedule(module, bndl->time, size, module->buffer);
+		}
+		else
+			buf_ptr = osc_end_bundle_item(buf_ptr, module->itm);
+
+		tjost_free(host, bndl);
+	}
+	
+	module->buf_ptr = buf_ptr;
 
 	return 0;
 }
@@ -273,21 +358,21 @@ static int
 _call_output(lua_State *L)
 {
 	Tjost_Module *module = luaL_checkudata(L, 1, "Tjost_Output");
-	return _serialize(L, module);
+	return _serialize_packet(L, module);
 }
 
 static int
 _call_in_out(lua_State *L)
 {
 	Tjost_Module *module = luaL_checkudata(L, 1, "Tjost_In_Out");
-	return _serialize(L, module);
+	return _serialize_packet(L, module);
 }
 
 static int
 _call_uplink(lua_State *L)
 {
 	Tjost_Module *module = luaL_checkudata(L, 1, "Tjost_Uplink");
-	return _serialize(L, module);
+	return _serialize_packet(L, module);
 }
 
 static inline void

@@ -108,7 +108,7 @@ process_out(jack_nframes_t nframes, void *arg)
 			tev->time = last;
 		}
 
-		osc_method_dispatch(tev->time - last, tev->buf, tev->size, methods, &data);
+		osc_method_dispatch(tev->time - last, tev->buf, tev->size, methods, NULL, NULL, &data);
 
 		module->queue = eina_inlist_remove(module->queue, EINA_INLIST_GET(tev));
 		tjost_free(host, tev);
