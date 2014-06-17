@@ -107,36 +107,39 @@ _poll(uv_poll_t *handle, int status, int events)
 		fprintf(stderr, MOD_NAME": rx OSC message invalid\n");
 }
 
-void
+int
 add(Tjost_Module *module, int argc, const char **argv)
 {
 	Data *dat = tjost_alloc(module->host, sizeof(Data));
+	memset(dat, 0, sizeof(Data));
 	
 	const char *device = "virtual";
 	if( (argc > 0) && argv[0] )
 		device = argv[0];
 	if(snd_rawmidi_open(&dat->dev, NULL, device, 0))
-		fprintf(stderr, MOD_NAME": opening MIDI failed\n");
+		MOD_ADD_ERR(module->host, MOD_NAME, "could not open MIDI device");
 
 	struct pollfd pfds;
 	int count = snd_rawmidi_poll_descriptors_count(dat->dev); //TODO check count
 	if(snd_rawmidi_poll_descriptors(dat->dev, &pfds, 1) != 1)
-		fprintf(stderr, MOD_NAME": polling MIDI descriptors failed\n");
+		MOD_ADD_ERR(module->host, MOD_NAME, "could not poll MIDI descriptors");
 
 	if(!(dat->rb = jack_ringbuffer_create(TJOST_RINGBUF_SIZE)))
-		fprintf(stderr, MOD_NAME": could not initialize ringbuffer\n");
+		MOD_ADD_ERR(module->host, MOD_NAME, "could not initialize ringbuffer");
 	
 	uv_loop_t *loop = uv_default_loop();
 
 	int err;
 	dat->poll.data = module;
 	if((err = uv_poll_init(loop, &dat->poll, pfds.fd)))
-		fprintf(stderr, MOD_NAME": %s\n", uv_err_name(err));
+		MOD_ADD_ERR(module->host, MOD_NAME, uv_err_name(err));
 	if((err = uv_poll_start(&dat->poll, UV_READABLE, _poll)))
-		fprintf(stderr, MOD_NAME": %s\n", uv_err_name(err));
+		MOD_ADD_ERR(module->host, MOD_NAME, uv_err_name(err));
 
 	module->dat = dat;
 	module->type = TJOST_MODULE_INPUT;
+
+	return 0;
 }
 
 void

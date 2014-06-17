@@ -77,6 +77,7 @@ static int
 _on(jack_nframes_t time, const char *path, const char *fmt, lua_State *L)
 {
 	Midi_Client *midi_client = luaL_checkudata(L, lua_upvalueindex(2), "Fltr_Midi");
+	Tjost_Host *host = lua_touserdata(L, lua_upvalueindex(3));
 
 	int i;
 	uint32_t sid = luaL_checkint(L, 4);
@@ -139,7 +140,7 @@ _on(jack_nframes_t time, const char *path, const char *fmt, lua_State *L)
 			lua_setmetatable(L, -2);
 		}
 		if(lua_pcall(L, midi_client->double_precision ? 7 : 6, 0, 0))
-			fprintf(stderr, "Midi_Client 'on' error: %s\n", lua_tostring(L, -1));
+			tjost_host_message_push(host, "Midi_Client 'on' error: %s", lua_tostring(L, -1));
 	}
 
 	Midi_Blob *b = blob_alloc(midi_client->used, midi_client->pool, MAX_BLOB);
@@ -154,6 +155,7 @@ static int
 _off(jack_nframes_t time, const char *path, const char *fmt, lua_State *L)
 {
 	Midi_Client *midi_client = luaL_checkudata(L, lua_upvalueindex(2), "Fltr_Midi");
+	Tjost_Host *host = lua_touserdata(L, lua_upvalueindex(3));
 
 	int i;
 	uint32_t sid = luaL_checkint(L, 4);
@@ -185,7 +187,7 @@ _off(jack_nframes_t time, const char *path, const char *fmt, lua_State *L)
 			lua_setmetatable(L, -2);
 		}
 		if(lua_pcall(L, 4, 0, 0))
-			fprintf(stderr, "Midi_Client 'off' error: %s\n", lua_tostring(L, -1));
+			tjost_host_message_push(host, "Midi_Client 'off' error: %s", lua_tostring(L, -1));
 	}
 	
 	midi_client->blobs = eina_inlist_remove(midi_client->blobs, EINA_INLIST_GET(b));
@@ -198,6 +200,7 @@ static int
 _set(jack_nframes_t time, const char *path, const char *fmt, lua_State *L)
 {
 	Midi_Client *midi_client = luaL_checkudata(L, lua_upvalueindex(2), "Fltr_Midi");
+	Tjost_Host *host = lua_touserdata(L, lua_upvalueindex(3));
 
 	int i;
 	uint32_t sid = luaL_checkint(L, 4);
@@ -258,7 +261,7 @@ _set(jack_nframes_t time, const char *path, const char *fmt, lua_State *L)
 			lua_setmetatable(L, -2);
 		}
 		if(lua_pcall(L, midi_client->double_precision ? 6 : 5, 0, 0))
-			fprintf(stderr, "Midi_Client 'set' error: %s\n", lua_tostring(L, -1));
+			tjost_host_message_push(host, "Midi_Client 'set' error: %s", lua_tostring(L, -1));
 	}
 
 	return 0;
@@ -268,6 +271,7 @@ static int
 _idle(jack_nframes_t time, const char *path, const char *fmt, lua_State *L)
 {
 	Midi_Client *midi_client = luaL_checkudata(L, lua_upvalueindex(2), "Fltr_Midi");
+	Tjost_Host *host = lua_touserdata(L, lua_upvalueindex(3));
 	// do nothing
 
 	return 0;
@@ -366,7 +370,8 @@ _new(lua_State *L)
 		midi_client->range = n/3.f;
 		midi_client->channel_offset = 0;
 
-		lua_pushcclosure(L, _func, 2);
+		lua_pushvalue(L, lua_upvalueindex(1)); // Host
+		lua_pushcclosure(L, _func, 3);
 	}
 	else
 		lua_pushnil(L);
@@ -394,6 +399,7 @@ luaopen_midi(lua_State *L)
 	luaL_register(L, NULL, fltr_midi_mt);
 	lua_pop(L, 1); // mt
 
-	lua_pushcclosure(L, _new, 0);
+	lua_getglobal(L, "_H");
+	lua_pushcclosure(L, _new, 1);
 	return 1;
 }

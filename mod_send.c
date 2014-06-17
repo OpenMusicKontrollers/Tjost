@@ -283,25 +283,28 @@ process_in(jack_nframes_t nframes, void *arg)
 	return 0;
 }
 
-void
+int
 add(Tjost_Module *module, int argc, const char **argv)
 {
 	Data *dat = tjost_alloc(module->host, sizeof(Data));
+	memset(dat, 0, sizeof(Data));
 
 	if(!(dat->rb = jack_ringbuffer_create(TJOST_RINGBUF_SIZE)))
-		fprintf(stderr, MOD_NAME": could not initialize ringbuffer\n");
+		MOD_ADD_ERR(module->host, MOD_NAME, "could not initialize ringbuffer");
 	
 	uv_loop_t *loop = uv_default_loop();
 
 	dat->recv_client.data = module;
 	int err;
 	if((err = uv_tty_init(loop, &dat->recv_client, 0, 1)))
-		fprintf(stderr, MOD_NAME": %s\n", uv_err_name(err));
+		MOD_ADD_ERR(module->host, MOD_NAME, uv_err_name(err));
 	if((err = uv_read_start((uv_stream_t *)&dat->recv_client, _tty_alloc, _tty_recv_cb)))
-		fprintf(stderr, MOD_NAME": %s\n", uv_err_name(err));
+		MOD_ADD_ERR(module->host, MOD_NAME, uv_err_name(err));
 
 	module->dat = dat;
 	module->type = TJOST_MODULE_INPUT;
+
+	return 0;
 }
 
 void

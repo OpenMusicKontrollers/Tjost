@@ -84,9 +84,9 @@ _thread(void *arg)
 	DWORD dummy = 0;
 	HANDLE task = AvSetMmThreadCharacteristics("Games", &dummy);
 	if(!task)
-		fprintf(stderr, "AvSetMmThreadCharacteristics error: %d\n", GetLastError());
+		fprintf(stderr, "AvSetMmThreadCharacteristics error: %d\n", GetLastError()); //FIXME tjost_message
 	else if(!AvSetMmThreadPriority(task, dat->mcss_sched_priority))
-		fprintf(stderr, "AvSetMmThreadPriority error: %d\n", GetLastError());
+		fprintf(stderr, "AvSetMmThreadPriority error: %d\n", GetLastError()); //FIXME tjost_message
 
 	/*
 	Audio
@@ -109,39 +109,40 @@ _thread(void *arg)
 	uv_run(&dat->loop, UV_RUN_DEFAULT);
 }
 
-void
+int
 add(Tjost_Module *module, int argc, const char **argv)
 {
 	Data *dat = tjost_alloc(module->host, sizeof(Data));
+	memset(dat, 0, sizeof(Data));
 
 	if(!(dat->net.rb_out = jack_ringbuffer_create(TJOST_RINGBUF_SIZE)))
-		fprintf(stderr, MOD_NAME": could not initialize ringbuffer\n");
+		MOD_ADD_ERR(module->host, MOD_NAME, "could not initialize ringbuffer");
 	if(!(dat->net.rb_in = jack_ringbuffer_create(TJOST_RINGBUF_SIZE)))
-		fprintf(stderr, MOD_NAME": could not initialize ringbuffer\n");
+		MOD_ADD_ERR(module->host, MOD_NAME, "could not initialize ringbuffer");
 
 	int err;
 	if((err = uv_loop_init(&dat->loop)))
-		fprintf(stderr, MOD_NAME": uv_loop_init failed\n");
+		MOD_ADD_ERR(module->host, MOD_NAME, "uv_loop_init failed");
 
 	if((err = uv_async_init(&dat->loop, &dat->quit, _quit)))
-		fprintf(stderr, MOD_NAME": %s\n", uv_err_name(err));
+		MOD_ADD_ERR(module->host, MOD_NAME, uv_err_name(err));
 
 	dat->net.asio.data = module;
 	if((err = uv_async_init(&dat->loop, &dat->net.asio, mod_net_asio)))
-		fprintf(stderr, MOD_NAME": %s\n", uv_err_name(err));
+		MOD_ADD_ERR(module->host, MOD_NAME, uv_err_name(err));
 
 	dat->net.sync.data = module;
 	if((err = uv_timer_init(&dat->loop, &dat->net.sync)))
-		fprintf(stderr, MOD_NAME": %s\n", uv_err_name(err));
+		MOD_ADD_ERR(module->host, MOD_NAME, uv_err_name(err));
 	if((err = uv_timer_start(&dat->net.sync, mod_net_sync, 0, 1000))) // ms
-		fprintf(stderr, MOD_NAME": %s\n", uv_err_name(err));
+		MOD_ADD_ERR(module->host, MOD_NAME, uv_err_name(err));
 
 	if(!strncmp(argv[0], "osc.udp://", 10) || !strncmp(argv[0], "osc.udp4://", 11) || !strncmp(argv[0], "osc.udp6://", 11))
 		dat->net.type = SOCKET_UDP;
 	else if(!strncmp(argv[0], "osc.tcp://", 10) || !strncmp(argv[0], "osc.tcp4://", 11) || !strncmp(argv[0], "osc.tcp6://", 11) || !strncmp(argv[0], "osc.slip.tcp://", 15) || !strncmp(argv[0], "osc.slip.tcp4://", 16) || !strncmp(argv[0], "osc.slip.tcp6://", 16))
 		dat->net.type = SOCKET_TCP;
 	else
-		fprintf(stderr, MOD_NAME": unknown protocol '%s'\n", argv[0]);
+		MOD_ADD_ERR(module->host, MOD_NAME, "unknown OSC protocol layer");
 
 	module->dat = dat;
 
@@ -149,12 +150,12 @@ add(Tjost_Module *module, int argc, const char **argv)
 	{
 		case SOCKET_UDP:
 			if(netaddr_udp_responder_init(&dat->net.handle.udp_rx, &dat->loop, argv[0], mod_net_recv_cb, module))
-				fprintf(stderr, MOD_NAME": could not initialize socket\n");
+				MOD_ADD_ERR(module->host, MOD_NAME, "could not initialize socket");
 			module->type = TJOST_MODULE_INPUT;
 			break;
 		case SOCKET_TCP:
 			if(netaddr_tcp_endpoint_init(&dat->net.handle.tcp, NETADDR_TCP_RESPONDER, &dat->loop, argv[0], mod_net_recv_cb, module))
-				fprintf(stderr, MOD_NAME": could not initialize socket\n");
+				MOD_ADD_ERR(module->host, MOD_NAME, "could not initialize socket");
 			module->type = TJOST_MODULE_IN_OUT;
 			break;
 	}
@@ -178,7 +179,9 @@ add(Tjost_Module *module, int argc, const char **argv)
 	}
 
 	if((err = uv_thread_create(&dat->thread, _thread, dat)))
-		fprintf(stderr, MOD_NAME": %s\n", uv_err_name(err));
+		MOD_ADD_ERR(module->host, MOD_NAME, uv_err_name(err));
+
+	return 0;
 }
 
 void

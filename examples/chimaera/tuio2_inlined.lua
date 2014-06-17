@@ -71,7 +71,7 @@ success = function(time, uuid, path, ...)
 	end
 end
 
-conf = tjost.plugin('net_in', 'osc.udp://:4444', function(time, path, fmt, ...)
+conf = tjost.plugin('net_in', 'osc.udp://:4444', '50', 'full', function(time, path, fmt, ...)
 	status(time, path, fmt, ...)
 	message(time, path, fmt, ...)
 	if path == '/success' then
@@ -79,14 +79,14 @@ conf = tjost.plugin('net_in', 'osc.udp://:4444', function(time, path, fmt, ...)
 	end
 end)
 
-debug = tjost.plugin('net_in', 'osc.udp://:6666', function(...)
+debug = tjost.plugin('net_in', 'osc.udp://:6666', '50', 'full', function(...)
 	status(...)
 end)
 
 midi_out = tjost.plugin('midi_out', 'midi')
 midi_fltr = midi(midi_out)
 tuio2_fltr = tuio2(midi_fltr)
-stream = tjost.plugin('net_in', 'osc.udp://:3333', '60', 'partial', tuio2_fltr)
+stream = tjost.plugin('net_in', 'osc.udp://:3333', '60', 'full', tuio2_fltr)
 
 id = coroutine.wrap(function()
 	local i = math.random(1024)
@@ -96,8 +96,5 @@ id = coroutine.wrap(function()
 	end
 end)
 
-f = io.popen('hostname')
-hostname = f:read('*l')
-f:close()
-
+hostname = tjost.hostname()
 chim(0, '/comm/address', 'is', id(), hostname..'.local')

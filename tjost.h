@@ -63,7 +63,7 @@ typedef struct _Tjost_Child Tjost_Child;
 typedef struct _Tjost_Mem_Chunk Tjost_Mem_Chunk;
 typedef struct _Tjost_Host Tjost_Host;
 
-typedef void (*Tjost_Module_Add_Cb)(Tjost_Module *module, int argc, const char **argv);
+typedef int (*Tjost_Module_Add_Cb)(Tjost_Module *module, int argc, const char **argv);
 typedef void (*Tjost_Module_Del_Cb)(Tjost_Module *module);
 
 #define TJOST_MODULE_INPUT	0b001
@@ -74,6 +74,12 @@ typedef void (*Tjost_Module_Del_Cb)(Tjost_Module *module);
 #define TJOST_MODULE_BROADCAST NULL
 #define TJOST_BUF_SIZE (0x4000)
 #define TJOST_RINGBUF_SIZE (0x10000)
+
+#define MOD_ADD_ERR(HOST, NAME, MSG) \
+({ \
+	tjost_host_message_push(HOST, "%s: %s", NAME, MSG); \
+	return -1; \
+})
 
 struct _Tjost_Midi {
 	uint8_t buf[4];

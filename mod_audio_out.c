@@ -239,16 +239,18 @@ process_out(jack_nframes_t nframes, void *arg)
 	return 0;
 }
 
-void
+int
 add(Tjost_Module *module, int argc, const char **argv)
 {
 	jack_port_t *port = NULL;
 
 	if(!(port = jack_port_register(module->host->client, argv[0], JACK_DEFAULT_AUDIO_TYPE, JackPortIsOutput, 0)))
-		fprintf(stderr, MOD_NAME": could not register jack port\n");
+		MOD_ADD_ERR(module->host, MOD_NAME, "could not register jack port");
 
 	module->dat = port;
 	module->type = TJOST_MODULE_OUTPUT;
+
+	return 0;
 }
 
 void

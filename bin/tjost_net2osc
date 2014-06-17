@@ -35,5 +35,5 @@ if host then
 		osc_in = tjost.plugin('osc_in', 'osc.net', net_io)
 	end
 else
-	print('no address given (osc.tcp://:3333)')
+	error('no address given (osc.tcp://:3333)')
 end

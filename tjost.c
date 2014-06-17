@@ -380,11 +380,20 @@ _process(jack_nframes_t nframes, void *arg)
 	// write uplink events to rinbbuffer
 	int err;
 	if((err = uv_async_send(&host->uplink_tx))) //TODO check if needed
-		fprintf(stderr, "process_direct: %s\n", uv_err_name(err));
+		tjost_host_message_push(host, "%s", uv_err_name(err));
 
 	// run garbage collection step
 	lua_gc(host->L, LUA_GCSTEP, 0); //TODO check if needed
 	
+	return 0;
+}
+
+static int
+_print(lua_State *L)
+{
+	Tjost_Host *host = lua_touserdata(L, lua_upvalueindex(1));
+	tjost_host_message_push(host, "Lua print redirect: %s", lua_tostring(L, 1));
+
 	return 0;
 }
 
@@ -461,10 +470,65 @@ main(int argc, const char **argv)
 	if(host.arr)
 		eina_module_list_load(host.arr);
 
+	uv_loop_t *loop = uv_default_loop();
+
+	// init libuv
+	int err;
+	if((err = uv_signal_init(loop, &host.sigterm)))
+		FAIL("uv error: %s\n", uv_err_name(err));
+	if((err = uv_signal_start(&host.sigterm, _sig, SIGTERM)))
+		FAIL("uv error: %s\n", uv_err_name(err));
+
+	if((err = uv_signal_init(loop, &host.sigquit)))
+		FAIL("uv error: %s\n", uv_err_name(err));
+	if((err = uv_signal_start(&host.sigquit, _sig, SIGQUIT)))
+		FAIL("uv error: %s\n", uv_err_name(err));
+
+	if((err = uv_signal_init(loop, &host.sigint)))
+		FAIL("uv error: %s\n", uv_err_name(err));
+	if((err = uv_signal_start(&host.sigint, _sig, SIGINT)))
+		FAIL("uv error: %s\n", uv_err_name(err));
+
+	if((err = uv_async_init(loop, &host.quit, _quit)))
+		FAIL("uv error: %s\n", uv_err_name(err));
+
+	host.msg.data = &host;
+	if((err = uv_async_init(loop, &host.msg, _msg)))
+		FAIL("uv error: %s\n", uv_err_name(err));
+
+	host.uplink_tx.data = &host;
+	if((err = uv_async_init(loop, &host.uplink_tx, tjost_uplink_tx_drain)))
+		FAIL("uv error: %s\n", uv_err_name(err));
+
+	host.rtmem.data = &host;
+	if((err = uv_async_init(loop, &host.rtmem, tjost_request_memory)))
+		FAIL("uv error: %s\n", uv_err_name(err));
+
 	// init Lua
 	if(!(host.L = lua_newstate(_alloc, &host)))
 		FAIL("could not initialize Lua\n");
 	luaL_openlibs(host.L);
+
+	// disable libs that are not rt safe.
+	lua_pushnil(host.L);
+		lua_setglobal(host.L, "io");
+	lua_pushnil(host.L);
+		lua_setglobal(host.L, "os");
+	lua_pushnil(host.L);
+		lua_setglobal(host.L, "debug");
+
+	// disable/overwrite funcs that are not rt safe.
+	lua_pushnil(host.L);
+		lua_setglobal(host.L, "loadfile");
+	lua_pushnil(host.L);
+		lua_setglobal(host.L, "dofile");
+	lua_pushlightuserdata(host.L, &host);
+	lua_pushcclosure(host.L, _print, 1);
+		lua_setglobal(host.L, "print");
+
+	// create global reference for host
+	lua_pushlightuserdata(host.L, &host);
+		lua_setglobal(host.L, "_H");
 
 	// register Tjost methods
 	lua_pushlightuserdata(host.L, &host);
@@ -524,40 +588,11 @@ main(int argc, const char **argv)
 	if(luaL_dofile(host.L, argv[1]))
 		FAIL("error loading file: %s\n", lua_tostring(host.L, -1));
 	lua_gc(host.L, LUA_GCSTOP, 0); // disable automatic garbage collection
-
-	uv_loop_t *loop = uv_default_loop();
-
-	// init libuv
-	int err;
-	if((err = uv_signal_init(loop, &host.sigterm)))
-		fprintf(stderr, "main: %s\n", uv_err_name(err));
-	if((err = uv_signal_start(&host.sigterm, _sig, SIGTERM)))
-		fprintf(stderr, "main: %s\n", uv_err_name(err));
-
-	if((err = uv_signal_init(loop, &host.sigquit)))
-		fprintf(stderr, "main: %s\n", uv_err_name(err));
-	if((err = uv_signal_start(&host.sigquit, _sig, SIGQUIT)))
-		fprintf(stderr, "main: %s\n", uv_err_name(err));
-
-	if((err = uv_signal_init(loop, &host.sigint)))
-		fprintf(stderr, "main: %s\n", uv_err_name(err));
-	if((err = uv_signal_start(&host.sigint, _sig, SIGINT)))
-		fprintf(stderr, "main: %s\n", uv_err_name(err));
-
-	if((err = uv_async_init(loop, &host.quit, _quit)))
-		fprintf(stderr, "main: %s\n", uv_err_name(err));
-
-	host.msg.data = &host;
-	if((err = uv_async_init(loop, &host.msg, _msg)))
-		fprintf(stderr, "main: %s\n", uv_err_name(err));
-
-	host.uplink_tx.data = &host;
-	if((err = uv_async_init(loop, &host.uplink_tx, tjost_uplink_tx_drain)))
-		fprintf(stderr, "main: %s\n", uv_err_name(err));
-
-	host.rtmem.data = &host;
-	if((err = uv_async_init(loop, &host.rtmem, tjost_request_memory)))
-		fprintf(stderr, "main: %s\n", uv_err_name(err));
+	
+	// deregister Tjost methods which are not rt safe
+	lua_getglobal(host.L, "tjost");
+	lua_pushnil(host.L);
+		lua_setfield(host.L, -2, "plugin");
 
 	// activate JACK
 	if(jack_activate(host.client))
@@ -567,7 +602,6 @@ main(int argc, const char **argv)
 	uv_run(loop, UV_RUN_DEFAULT);
 
 cleanup:
-	fprintf(stderr, "cleaning up\n");
 
 	// deinit libuv
 	uv_close((uv_handle_t *)&host.rtmem, NULL);
@@ -576,11 +610,11 @@ cleanup:
 	uv_close((uv_handle_t *)&host.quit, NULL);
 
 	if((err = uv_signal_stop(&host.sigterm)))
-		fprintf(stderr, "main: %s\n", uv_err_name(err));
+		fprintf(stderr, "uv error: %s\n", uv_err_name(err));
 	if((err = uv_signal_stop(&host.sigquit)))
-		fprintf(stderr, "main: %s\n", uv_err_name(err));
+		fprintf(stderr, "uv error: %s\n", uv_err_name(err));
 	if((err = uv_signal_stop(&host.sigint)))
-		fprintf(stderr, "main: %s\n", uv_err_name(err));
+		fprintf(stderr, "uv error: %s\n", uv_err_name(err));
 	
 	if(host.client)
 		jack_deactivate(host.client);

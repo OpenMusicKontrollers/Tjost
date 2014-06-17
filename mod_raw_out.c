@@ -163,29 +163,32 @@ process_out(jack_nframes_t nframes, void *arg)
 	return 0;
 }
 
-void
+int
 add(Tjost_Module *module, int argc, const char **argv)
 {
 	Data *dat = tjost_alloc(module->host, sizeof(Data));
+	memset(dat, 0, sizeof(Data));
 
 	const char *device = "virtual";
 	if( (argc > 0) && argv[0] )
 		device = argv[0];
 	if(snd_rawmidi_open(NULL, &dat->dev, device, 0))
-		fprintf(stderr, MOD_NAME": opening MIDI failed\n");
+		MOD_ADD_ERR(module->host, MOD_NAME, "could not open MIDI device");
 
 	if(!(dat->rb = jack_ringbuffer_create(TJOST_RINGBUF_SIZE)))
-		fprintf(stderr, MOD_NAME": could not initialize ringbuffer\n");
+		MOD_ADD_ERR(module->host, MOD_NAME, "could not initialize ringbuffer");
 	
 	uv_loop_t *loop = uv_default_loop();
 
 	dat->asio.data = module;
 	int err;
 	if((err = uv_async_init(loop, &dat->asio, _asio)))
-		fprintf(stderr, MOD_NAME": %s\n", uv_err_name(err));
+		MOD_ADD_ERR(module->host, MOD_NAME, uv_err_name(err));
 
 	module->dat = dat;
 	module->type = TJOST_MODULE_OUTPUT;
+
+	return 0;
 }
 
 void

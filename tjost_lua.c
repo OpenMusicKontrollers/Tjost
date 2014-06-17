@@ -23,6 +23,8 @@
 
 #include <tjost.h>
 
+#include <unistd.h> // gethostname
+
 static osc_data_t *
 _push(Tjost_Host *host, char type, osc_data_t *ptr)
 {
@@ -620,7 +622,6 @@ const luaL_Reg tjost_midi_mt [] = {
 	{NULL, NULL}
 };
 
-//TODO deactivate while running
 static int
 _plugin(lua_State *L)
 {
@@ -680,7 +681,11 @@ _plugin(lua_State *L)
 			break;
 	}
 
-	module->add(module, argc-1-has_callback, argv+1);
+	if(module->add(module, argc-1-has_callback, argv+1))
+	{
+		lua_pop(L, 1);
+		lua_pushnil(L);
+	}
 	free(argv);
 
 	switch(module->type)
@@ -774,10 +779,23 @@ _midi(lua_State *L)
 	return 1;
 }
 
+static int
+_hostname(lua_State *L)
+{
+	char hostname [256];
+	gethostname(hostname, 256);
+	if(hostname)
+		lua_pushstring(L, hostname);
+	else
+		lua_pushnil(L);
+	return 1;
+}
+
 const luaL_Reg tjost_globals [] = {
 	{"plugin", _plugin},
 	{"chain", _chain},
 	{"blob", _blob},
 	{"midi", _midi},
+	{"hostname", _hostname},
 	{NULL, NULL}
 };

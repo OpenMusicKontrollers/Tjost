@@ -178,46 +178,49 @@ process_out(jack_nframes_t nframes, void *arg)
 	return 0;
 }
 
-void
+int
 add(Tjost_Module *module, int argc, const char **argv)
 {
 	Data *dat = tjost_alloc(module->host, sizeof(Data));
+	memset(dat, 0, sizeof(Data));
 
 	const char *device = "midi.seq";
 	if( (argc > 0) && argv[0] )
 		device = argv[0];
 	if(snd_seq_open(&dat->seq, "hw", SND_SEQ_OPEN_OUTPUT, 0))
-		fprintf(stderr, MOD_NAME": creating sequencer failed\n");
+		MOD_ADD_ERR(module->host, MOD_NAME, "could not create sequencer");
 	if(snd_seq_set_client_name(dat->seq, jack_get_client_name(module->host->client)))
-		fprintf(stderr, MOD_NAME": setting name failed\n");
+		MOD_ADD_ERR(module->host, MOD_NAME, "could not set name");
 	dat->port = snd_seq_create_simple_port(dat->seq, device,
 		SND_SEQ_PORT_CAP_READ | SND_SEQ_PORT_CAP_SUBS_READ,
 		SND_SEQ_PORT_TYPE_HARDWARE);
 	if(!dat->port < 0)
-		fprintf(stderr, MOD_NAME": creating port failed\n");
+		MOD_ADD_ERR(module->host, MOD_NAME, "could not create port");
 	dat->queue = snd_seq_alloc_queue(dat->seq);
 	if(dat->queue < 0)
-		fprintf(stderr, MOD_NAME": allocating queue failed\n");
+		MOD_ADD_ERR(module->host, MOD_NAME, "could not allocate queue");
 	snd_seq_start_queue(dat->seq, dat->queue, NULL);
 
 	if(snd_midi_event_new(0x10, &dat->trans))
-		fprintf(stderr, MOD_NAME": creating event failed\n");
+		MOD_ADD_ERR(module->host, MOD_NAME, "could not create event");
 	snd_midi_event_init(dat->trans);
 	snd_midi_event_reset_decode(dat->trans);
 	snd_midi_event_no_status(dat->trans, 1);
 
 	if(!(dat->rb = jack_ringbuffer_create(TJOST_RINGBUF_SIZE)))
-		fprintf(stderr, MOD_NAME": could not initialize ringbuffer\n");
+		MOD_ADD_ERR(module->host, MOD_NAME, "could not initialize ringbuffer");
 	
 	uv_loop_t *loop = uv_default_loop();
 
 	dat->asio.data = module;
 	int err;
 	if((err = uv_async_init(loop, &dat->asio, _asio)))
-		fprintf(stderr, MOD_NAME": %s\n", uv_err_name(err));
+		MOD_ADD_ERR(module->host, MOD_NAME, uv_err_name(err));
 
 	module->dat = dat;
 	module->type = TJOST_MODULE_OUTPUT;
+
+	return 0;
 }
 
 void

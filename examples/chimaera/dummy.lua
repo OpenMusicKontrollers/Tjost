@@ -72,7 +72,7 @@ success = function(time, uuid, path, ...)
 	end
 end
 
-conf = tjost.plugin('net_in', 'osc.udp://:4444', function(time, path, fmt, ...)
+conf = tjost.plugin('net_in', 'osc.udp://:4444', '50', 'full', function(time, path, fmt, ...)
 	status(time, path, fmt, ...)
 	message(time, path, fmt, ...)
 	if path == '/success' then
@@ -80,7 +80,7 @@ conf = tjost.plugin('net_in', 'osc.udp://:4444', function(time, path, fmt, ...)
 	end
 end)
 
-debug = tjost.plugin('net_in', 'osc.udp://:6666', function(...)
+debug = tjost.plugin('net_in', 'osc.udp://:6666', '50', 'full', function(...)
 	status(...)
 end)
 
@@ -102,7 +102,7 @@ methods = {
 	end
 }
 
-stream = tjost.plugin('net_in', 'osc.tcp://:3333', '60', function(time, path, ...)
+stream = tjost.plugin('net_in', 'osc.tcp://:3333', '60', 'full', function(time, path, ...)
 	--data(time, path, ...)
 
 	local cb = methods[path]
@@ -119,8 +119,5 @@ id = coroutine.wrap(function()
 	end
 end)
 
-f = io.popen('hostname')
-hostname = f:read('*l')
-f:close()
-
+hostname = tjost.hostname()
 chim(0, '/comm/address', 'is', id(), hostname..'.local')

@@ -35,5 +35,5 @@ if host then
 		tjost.chain(net_io, osc_out)
 	end
 else
-	print('no address given (osc.tcp://localhost:4444)')
+	error('no address given (osc.tcp://localhost:4444)')
 end

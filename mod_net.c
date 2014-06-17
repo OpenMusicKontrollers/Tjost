@@ -528,7 +528,7 @@ mod_net_process_out(Tjost_Module *module, jack_nframes_t nframes)
 	{
 		int err;
 		if((err = uv_async_send(&net->asio)))
-			fprintf(stderr, MOD_NAME": %s\n", uv_err_name(err));
+			tjost_host_message_push(host, MOD_NAME": %s", uv_err_name(err));
 	}
 
 	return 0;

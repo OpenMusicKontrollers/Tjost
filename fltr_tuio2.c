@@ -84,6 +84,7 @@ static int
 _frm(jack_nframes_t time, const char *path, const char *fmt, lua_State *L)
 {
 	Tuio2_Client *tuio2_client = luaL_checkudata(L, lua_upvalueindex(2), "Fltr_Tuio2");
+	Tjost_Host *host = lua_touserdata(L, lua_upvalueindex(3));
 
 	uint32_t fid = luaL_checkint(L, 4);
 	uint64_t timestamp = luaL_checknumber(L, 5);
@@ -98,26 +99,24 @@ _frm(jack_nframes_t time, const char *path, const char *fmt, lua_State *L)
 		tuio2_client->blobs = NULL;
 		tuio2_client->missing = 0;
 		tuio2_client->fid = FIRST_FRAME;
-		fprintf(stderr, "chimaera has been reset, memux Tuio2_Client is being reset, too\n");
+		tjost_host_message_push(host, "Chimaera has been reset, Tuio2_Client is being reset, too");
 	}
 	else if( (fid < tuio2_client->fid) && (tuio2_client->missing > 0))
 	{
 		tuio2_client->ignore = 1; // ignore this bundle
 		tuio2_client->missing -= 1;
-		//fprintf(stderr, "found missing bundle #%u, total missing bundles: %u\n", fid, tuio2_client->missing);
+		tjost_host_message_push(host, "found missing bundle #%u, total missing bundle: %u", fid, tuio2_client->missing);
 
 		return 0;
 	}
 	else if( (tuio2_client->fid != FIRST_FRAME) && (fid > tuio2_client->fid + 1))
 	{
 		tuio2_client->missing += fid - tuio2_client->fid - 1;
-		/*
-		fprintf(stderr, "%u bundles (#%u-#%u) were just found to be missing, total missing bundles: %u\n",
+		tjost_host_message_push(host, "%u bundles (#%u-#%u) were just found to be missing, total missing bundles: %u",
 			fid - tuio2_client->fid - 1,
 			tuio2_client->fid,
 			fid - 1,
 			tuio2_client->missing);
-		*/
 	}
 
 	tuio2_client->fid = fid;
@@ -129,6 +128,7 @@ static int
 _tok(jack_nframes_t time, const char *path, const char *fmt, lua_State *L)
 {
 	Tuio2_Client *tuio2_client = luaL_checkudata(L, lua_upvalueindex(2), "Fltr_Tuio2");
+	Tjost_Host *host = lua_touserdata(L, lua_upvalueindex(3));
 
 	if(tuio2_client->ignore)
 		return 0;
@@ -175,6 +175,7 @@ static int
 _alv(jack_nframes_t time, const char *path, const char *fmt, lua_State *L)
 {
 	Tuio2_Client *tuio2_client = luaL_checkudata(L, lua_upvalueindex(2), "Fltr_Tuio2");
+	Tjost_Host *host = lua_touserdata(L, lua_upvalueindex(3));
 
 	if(tuio2_client->ignore)
 		return 0;
@@ -189,7 +190,7 @@ _alv(jack_nframes_t time, const char *path, const char *fmt, lua_State *L)
 			lua_pushstring(L, "/idle");
 			lua_pushstring(L, "");
 			if(lua_pcall(L, 3, 0, 0))
-				fprintf(stderr, "Tuio2_Client 'idle' error: %s\n", lua_tostring(L, -1)); //TODO tjost_message
+				tjost_host_message_push(host, "Tuio2_Client 'idle' error: %s", lua_tostring(L, -1));
 		}
 		return 0;
 	}
@@ -222,7 +223,7 @@ _alv(jack_nframes_t time, const char *path, const char *fmt, lua_State *L)
 				lua_pushnumber(L, ptr->gid);
 				lua_pushnumber(L, ptr->tid);
 				if(lua_pcall(L, 6, 0, 0))
-					fprintf(stderr, "Tuio2_Client 'off' error: %s\n", lua_tostring(L, -1)); //TODO tjost_message
+					tjost_host_message_push(host, "Tuio2_Client 'off' error: %s", lua_tostring(L, -1));
 			}
 
 			tuio2_client->blobs = eina_inlist_remove(tuio2_client->blobs, EINA_INLIST_GET(ptr));
@@ -248,7 +249,7 @@ _alv(jack_nframes_t time, const char *path, const char *fmt, lua_State *L)
 				lua_pushnumber(L, ptr->x);
 				lua_pushnumber(L, ptr->z);
 				if(lua_pcall(L, 8, 0, 0))
-					fprintf(stderr, "Tuio2_Client 'on' error: %s\n", lua_tostring(L, -1)); //TODO tjost_message
+					tjost_host_message_push(host, "Tuio2_Client 'on' error: %s", lua_tostring(L, -1));
 			}
 		}
 		else // update the state
@@ -264,7 +265,7 @@ _alv(jack_nframes_t time, const char *path, const char *fmt, lua_State *L)
 				lua_pushnumber(L, ptr->x);
 				lua_pushnumber(L, ptr->z);
 				if(lua_pcall(L, 8, 0, 0))
-					fprintf(stderr, "Tuio2_Client 'set' error: %s\n", lua_tostring(L, -1)); //TODO tjost_message
+					tjost_host_message_push(host, "Tuio2_Client 'set' error: %s", lua_tostring(L, -1));
 			}
 		}
 	}
@@ -301,7 +302,8 @@ _new(lua_State *L)
 		luaL_getmetatable(L, "Fltr_Tuio2");
 		lua_setmetatable(L, -2);
 
-		lua_pushcclosure(L, _func, 2);
+		lua_pushvalue(L, lua_upvalueindex(1)); // Host
+		lua_pushcclosure(L, _func, 3);
 	}
 	else
 		lua_pushnil(L);
@@ -329,6 +331,7 @@ luaopen_tuio2(lua_State *L)
 	luaL_register(L, NULL, fltr_tuio2_mt);
 	lua_pop(L, 1); // mt
 
-	lua_pushcclosure(L, _new, 0);
+	lua_getglobal(L, "_H");
+	lua_pushcclosure(L, _new, 1);
 	return 1;
 }

@@ -29,5 +29,5 @@ if file then
 	write = tjost.plugin('write', file)
 	osc_in = tjost.plugin('osc_in', 'osc.in', write)
 else
-	print('no file given')
+	error('no file given')
 end

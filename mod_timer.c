@@ -91,13 +91,14 @@ _timeup(uv_timer_t *handle)
 		fprintf(stderr, MOD_NAME": rx OSC message invalid\n");
 }
 
-void
+int
 add(Tjost_Module *module, int argc, const char **argv)
 {
 	Data *dat = tjost_alloc(module->host, sizeof(Data));
+	memset(dat, 0, sizeof(Data));
 	
 	if(!(dat->rb = jack_ringbuffer_create(TJOST_RINGBUF_SIZE)))
-		fprintf(stderr, MOD_NAME": could not initialize ringbuffer\n");
+		MOD_ADD_ERR(module->host, MOD_NAME, "could not initialize ringbuffer");
 
 	int msec = 1000;
 	if( (argc > 0) && argv[0] )
@@ -108,12 +109,14 @@ add(Tjost_Module *module, int argc, const char **argv)
 	int err;
 	dat->timer.data = module;
 	if((err = uv_timer_init(loop, &dat->timer)))
-		fprintf(stderr, MOD_NAME": %s\n", uv_err_name(err));
+		MOD_ADD_ERR(module->host, MOD_NAME, uv_err_name(err));
 	if((err = uv_timer_start(&dat->timer, _timeup, 0, msec))) // ms
-		fprintf(stderr, MOD_NAME": %s\n", uv_err_name(err));
+		MOD_ADD_ERR(module->host, MOD_NAME, uv_err_name(err));
 
 	module->dat = dat;
 	module->type = TJOST_MODULE_INPUT;
+
+	return 0;
 }
 
 void

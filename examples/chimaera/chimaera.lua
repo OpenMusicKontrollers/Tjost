@@ -73,7 +73,7 @@ function config(time, ...)
 	--TODO
 end
 
-conf = tjost.plugin('net_in', 'osc.udp://:4444', function(time, path, fmt, uuid, dest, ...)
+conf = tjost.plugin('net_in', 'osc.udp://:4444', '50', 'full', function(time, path, fmt, uuid, dest, ...)
 	if path == '/success' then
 		if calls[dest] then
 			if dest:find('!') then
