@@ -37,7 +37,7 @@ return {
 	on = function(self, time, sid, gid, pid, x, y)
 		sid = sid + self.sid_offset
 		self.serv(0, '/s_new', 'siiisisi',
-			self.inst[gid+1], sid, gid+self.gid_offset, 0, 'out', gid, 'gate', 0)
+			self.inst[gid+1], sid, 0, gid+self.gid_offset, 'out', gid, 'gate', 0)
 		self.serv(time, '/n_set', 'iififsi',
 			sid, 0, x, 1, y, 'gate', 1)
 	end,

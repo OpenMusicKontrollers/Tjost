@@ -25,7 +25,7 @@
 
 message = tjost.plugin('dump')
 status = tjost.plugin('osc_out', 'status')
---data = tjost.plugin('osc_out', 'data')
+data = tjost.plugin('osc_out', 'data')
 chim = tjost.plugin('net_out', 'osc.udp://chimaera.local:4444')
 
 midi = require('midi_explicit')
@@ -115,6 +115,8 @@ stream = tjost.plugin('net_in', 'osc.tcp://:3333', '60', 'full', function(time, 
 		cb(time, ...)
 	end
 end)
+
+tjost.chain(stream, data)
 
 id = coroutine.wrap(function()
 	local i = math.random(1024)
