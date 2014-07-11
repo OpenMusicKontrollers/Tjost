@@ -29,6 +29,7 @@ status = tjost.plugin('osc_out', 'status')
 chim = tjost.plugin('net_out', 'osc.udp://chimaera.local:4444')
 
 midi = require('midi_explicit')
+scsynth = require('scsynth_explicit')
 
 rate = 3000
 
@@ -87,18 +88,22 @@ end)
 methods = {
 	['/on'] = function(time, fmt, ...)
 		midi:on(time, ...)
+		scsynth:on(time, ...)
 	end,
 
 	['/off'] = function(time, fmt, ...)
 		midi:off(time, ...)
+		scsynth:off(time, ...)
 	end,
 
 	['/set'] = function(time, fmt, ...)
 		midi:set(time, ...)
+		scsynth:set(time, ...)
 	end,
 
 	['/idle'] = function(time, fmt)
 		midi:idle(time)
+		scsynth:idle(time)
 	end
 }
 
