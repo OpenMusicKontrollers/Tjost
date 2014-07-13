@@ -27,6 +27,8 @@ message = tjost.plugin('dump')
 status = tjost.plugin('osc_out', 'status')
 chim = tjost.plugin('net_out', 'osc.udp://chimaera.local:4444')
 
+id = require('id')
+
 rate = 3000
 
 success = function(time, uuid, path, ...)
@@ -74,20 +76,9 @@ conf = tjost.plugin('net_in', 'osc.udp://:4444', '50', 'full', function(time, pa
 	end
 end)
 
-debug = tjost.plugin('net_in', 'osc.udp://:6666', '50', 'full', function(...)
-	status(...)
-end)
-
+debug = tjost.plugin('net_in', 'osc.udp://:6666', '50', 'full', status)
 midi_out = tjost.plugin('midi_out', 'midi.out')
 stream = tjost.plugin('net_in', 'osc.tcp://:3333', '60', 'full', midi_out)
-
-id = coroutine.wrap(function()
-	local i = math.random(1024)
-	while true do
-		i = i + 1
-		coroutine.yield(i)
-	end
-end)
 
 hostname = tjost.hostname()
 chim(0, '/comm/address', 'is', id(), hostname..'.local')

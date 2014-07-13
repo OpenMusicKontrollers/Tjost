@@ -30,13 +30,7 @@ chim = tjost.plugin('net_out', 'osc.udp://chimaera.local:4444')
 
 calls = {}
 
-id = coroutine.wrap(function()
-	local i = math.random(1024)
-	while true do
-		i = i + 1
-		coroutine.yield(i)
-	end
-end)
+id = require('id')
 
 function query(time, dest, json)
 	local sub = dest:sub(0, dest:find('!')-1)

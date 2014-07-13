@@ -25,11 +25,12 @@
 
 message = tjost.plugin('dump')
 status = tjost.plugin('osc_out', 'status')
-data = tjost.plugin('osc_out', 'data')
+--data = tjost.plugin('osc_out', 'data')
 chim = tjost.plugin('net_out', 'osc.udp://chimaera.local:4444')
 
-midi = require('midi_explicit')
-scsynth = require('scsynth_explicit')
+id = require('id')
+scsynth = require('scsynth_out')
+midi = require('midi_out')
 
 rate = 3000
 
@@ -43,8 +44,8 @@ success = function(time, uuid, path, ...)
 			local bot = 2*12 - 0.5 - (n % 18 / 6);
 			local range = n/3
 
-			midi.bot = bot
-			midi.range = range
+			md1.bot = bot
+			md1.range = range
 			message(time, '/number', 'iff', n, bot, range)
 		end,
 
@@ -74,57 +75,30 @@ success = function(time, uuid, path, ...)
 end
 
 conf = tjost.plugin('net_in', 'osc.udp://:4444', '50', 'full', function(time, path, fmt, ...)
-	status(time, path, fmt, ...)
-	message(time, path, fmt, ...)
 	if path == '/success' then
 		success(time, ...)
 	end
 end)
+tjost.chain(conf, message)
 
-debug = tjost.plugin('net_in', 'osc.udp://:6666', '50', 'full', function(...)
-	status(...)
-end)
+debug = tjost.plugin('net_in', 'osc.udp://:6666', '50', 'full', status)
 
-methods = {
-	['/on'] = function(time, fmt, ...)
-		midi:on(time, ...)
-		scsynth:on(time, ...)
-	end,
+sc1 = scsynth:new({
+	port = 'scsynth.1',
+	inst = {'base', 'lead'}
+})
 
-	['/off'] = function(time, fmt, ...)
-		midi:off(time, ...)
-		scsynth:off(time, ...)
-	end,
+md1 = midi:new({
+	port = 'midi.1',
+	effect = SOUND_EFFECT_5
+})
 
-	['/set'] = function(time, fmt, ...)
-		midi:set(time, ...)
-		scsynth:set(time, ...)
-	end,
-
-	['/idle'] = function(time, fmt)
-		midi:idle(time)
-		scsynth:idle(time)
-	end
-}
-
-stream = tjost.plugin('net_in', 'osc.tcp://:3333', '60', 'full', function(time, path, ...)
-	--data(time, path, ...)
-
-	local cb = methods[path]
-	if cb then
-		cb(time, ...)
-	end
-end)
-
-tjost.chain(stream, data)
-
-id = coroutine.wrap(function()
-	local i = math.random(1024)
-	while true do
-		i = i + 1
-		coroutine.yield(i)
-	end
-end)
+stream = tjost.plugin('net_in', 'osc.tcp://:3333', '60', 'full', function(...)
+	sc1(...)
+	md1(...)
+end
+)
+--tjost.chain(stream, data)
 
 hostname = tjost.hostname()
 chim(0, '/comm/address', 'is', id(), hostname..'.local')

@@ -657,6 +657,7 @@ _plugin(lua_State *L)
 	int has_callback = 0;
 	switch(lua_type(L, -2))
 	{
+		case LUA_TTABLE: // TODO check for__call metamethod
 		case LUA_TFUNCTION:
 		{
 			has_callback = 1;

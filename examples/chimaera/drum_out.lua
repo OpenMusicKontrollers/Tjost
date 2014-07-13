@@ -23,23 +23,20 @@
 --     distribution.
 --]]
 
+local class = require('class')
+
 local ffi = require('ffi')
 midi_t = ffi.typeof('uint8_t *')
 
-beat = tjost.plugin('midi_out', 'drum')
+local octave = 2
+local base = octave*12
 
-local m = tjost.midi()
-local raw = midi_t(m.raw)
-
-octave = 2
-base = octave*12
-
-tom = {
+local tom = {
 	on = tjost.midi(),
 	off = tjost.midi()
 }
 
-tom_raw = {
+local tom_raw = {
 	on = midi_t(tom.on.raw),
 	off = midi_t(tom.off.raw)
 }
@@ -54,12 +51,12 @@ tom_raw.off[1] = 0x80
 tom_raw.off[2] = base+11
 tom_raw.off[3] = 0x00
 
-snare = {
+local snare = {
 	on = tjost.midi(),
 	off = tjost.midi()
 }
 
-snare_raw = {
+local snare_raw = {
 	on = midi_t(snare.on.raw),
 	off = midi_t(snare.off.raw)
 }
@@ -74,55 +71,53 @@ snare_raw.off[1] = 0x80
 snare_raw.off[2] = base+20
 snare_raw.off[3] = 0x00
 
-counter = 0
-num = 4
-dur = 1
-state = false
-last = nil
+local drum = class:new({
+	port = 'drum',
+	counter = 0,
+	num = 4,
+	dur = 1,
+	state = false,
+	last = nil,
 
-methods = {
-	['/trig'] = function(time, gid)
-		if gid ~= 0 then return end
+	init = function(self, ...)
+		self.beat = tjost.plugin('midi_out', self.port)
 
-		counter = counter + 1
-		if state == false then
-			if counter >= num then
-				counter = 0
-				state = true
-				beat:clear()
-				beat(time, '/beat', 'm', tom.on)
-				beat(time, '/beat', 'm', snare.off)
-				if last then
-					local diff = (time-last)/num
-					beat(time + diff*0.5, '/beat', 'm', snare.off)
-					beat(time + diff*1.5, '/beat', 'm', snare.off)
-					beat(time + diff*2.5, '/beat', 'm', snare.off)
-					beat(time + diff*3.5, '/beat', 'm', snare.off)
-					beat(time + diff*0.5 + 1, '/beat', 'm', snare.on)
-					beat(time + diff*1.5 + 1, '/beat', 'm', snare.on)
-					beat(time + diff*2.5 + 1, '/beat', 'm', snare.on)
-					beat(time + diff*3.5 + 1, '/beat', 'm', snare.on)
-				end
-				last = time
-			end
-		else -- state == true
-			if counter >= dur then
-				counter = dur
-				state = false
-				beat(time, '/beat', 'm', tom.off)
-			end
-		end
+		self.m = tjost.midi()
+		self.raw = midi_t(self.m.raw)
 	end,
 
-	['/thres'] = function(time, gid)
+	['/on'] = function(self, time, sid, gid)
 		if gid ~= 0 then return end
-		--TODO
-	end
-}
 
-control = tjost.plugin('osc_in', 'osc.jack://trig', function(time, path, fmt, ...)
-	local cb = methods[path]
-	if cb then
-		cb(time, ...)
+		self.counter = self.counter + 1
+		if self.state == false then
+			if self.counter >= self.num then
+				self.counter = 0
+				self.state = true
+				self.beat:clear()
+				self.beat(time, '/beat', 'm', tom.on)
+				self.beat(time, '/beat', 'm', snare.off)
+				if self.last then
+					local diff = (time-self.last)/self.num
+					self.beat(time + diff*0.5, '/beat', 'm', snare.off)
+					self.beat(time + diff*1.5, '/beat', 'm', snare.off)
+					self.beat(time + diff*2.5, '/beat', 'm', snare.off)
+					self.beat(time + diff*3.5, '/beat', 'm', snare.off)
+					self.beat(time + diff*0.5 + 1, '/beat', 'm', snare.on)
+					self.beat(time + diff*1.5 + 1, '/beat', 'm', snare.on)
+					self.beat(time + diff*2.5 + 1, '/beat', 'm', snare.on)
+					self.beat(time + diff*3.5 + 1, '/beat', 'm', snare.on)
+				end
+				self.last = time
+			end
+		else -- self.state == true
+			if self.counter >= self.dur then
+				self.counter = self.dur
+				self.state = false
+				self.beat(time, '/beat', 'm', tom.off)
+			end
+		end
 	end
-end)
+})
+
+return drum

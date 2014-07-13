@@ -27,8 +27,8 @@ message = tjost.plugin('dump')
 status = tjost.plugin('osc_out', 'osc.jack://status')
 --data = tjost.plugin('osc_out', 'osc.jack://data')
 chim = tjost.plugin('net_out', 'osc.udp://chimaera.local:4444')
---trig = tjost.plugin('osc_out', 'osc.jack://trig')
 
+id = require('id')
 midi = require('midi')
 tuio2 = require('tuio2')
 
@@ -87,14 +87,6 @@ midi_out = tjost.plugin('midi_out', 'midi')
 midi_fltr = midi(midi_out)
 tuio2_fltr = tuio2(midi_fltr)
 stream = tjost.plugin('net_in', 'osc.udp://:3333', '60', 'full', tuio2_fltr)
-
-id = coroutine.wrap(function()
-	local i = math.random(1024)
-	while true do
-		i = i + 1
-		coroutine.yield(i)
-	end
-end)
 
 hostname = tjost.hostname()
 chim(0, '/comm/address', 'is', id(), hostname..'.local')

@@ -21,20 +21,19 @@
 --     distribution.
 --]]
 
-local counter = 0
+local class = require('class')
 
-return {
+local scsynth = class:new({
+	port = 'scsynth.out',
 	gid_offset = 100,
 	sid_offset = 200,
+	inst = {'inst1', 'inst2', 'inst3', 'inst4', 'inst5', 'inst6', 'inst7', 'inst8'},
 
-	serv = tjost.plugin('osc_out', 'scsynth.out'),
+	init = function(self)
+		self.serv = tjost.plugin('osc_out', self.port)
+	end,
 
-	inst = {
-		'base',
-		'lead'
-	},
-
-	on = function(self, time, sid, gid, pid, x, y)
+	['/on'] = function(self, time, sid, gid, pid, x, y)
 		sid = sid + self.sid_offset
 		self.serv(0, '/s_new', 'siiisisi',
 			self.inst[gid+1], sid, 0, gid+self.gid_offset, 'out', gid, 'gate', 0)
@@ -42,19 +41,17 @@ return {
 			sid, 0, x, 1, y, 'gate', 1)
 	end,
 
-	off = function(self, time, sid, gid, pid)
+	['/off'] = function(self, time, sid, gid, pid)
 		sid = sid + self.sid_offset
 		self.serv(time, '/n_set', 'isi',
 			sid, 'gate', 0)
 	end,
 
-	set = function(self, time, sid, gid, pid, x, y)
+	['/set'] = function(self, time, sid, gid, pid, x, y)
 		sid = sid + self.sid_offset
 		self.serv(time, '/n_set', 'iifif',
 			sid, 0, x, 1, y)
-	end,
-
-	idle = function(self, time)
-		--
 	end
-}
+})
+
+return scsynth

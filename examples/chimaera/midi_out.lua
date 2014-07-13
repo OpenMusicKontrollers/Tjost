@@ -21,6 +21,8 @@
 --     distribution.
 --]]
 
+local class = require('class')
+
 local ffi = require('ffi')
 midi_t = ffi.typeof('uint8_t *')
 
@@ -29,51 +31,54 @@ local bit32 = bit32 or bit -- compatibility with Lua5.2 and LuaJIT
 local PITCHBEND = 0xe0
 local CONTROLLER = 0xb0
 
-local MODULATION = 0x01
-local BREATH = 0x02
-local VOLUME = 0x07
-local SOUND_EFFECT_5 = 0x4a
-local ALL_NOTES_OFF = 0x7b
+MODULATION = 0x01
+BREATH = 0x02
+VOLUME = 0x07
+SOUND_EFFECT_5 = 0x4a
+ALL_NOTES_OFF = 0x7b
 
 local mpath = '/midi'
+local N = 128
 
-local bases = {}
+local midi = class:new({
+	port = 'midi.out',
+	n = N,
+	bot = 3*12 - 0.5 - (N % 18 / 6),
+	range = N/3,
+	effect = VOLUME,
 
--- preallocate table
-local m = {
-	tjost.midi(),
-	tjost.midi(),
-	tjost.midi(),
-	tjost.midi()
-}
+	init = function(self)
+		self.bases = {}
 
-local raw = {
-	midi_t(m[1].raw),
-	midi_t(m[2].raw),
-	midi_t(m[3].raw),
-	midi_t(m[4].raw)
-}
+		-- preallocate table
+		self.m = {
+			tjost.midi(),
+			tjost.midi(),
+			tjost.midi(),
+			tjost.midi()
+		}
 
-local n = 128
+		self.raw = {
+			midi_t(self.m[1].raw),
+			midi_t(self.m[2].raw),
+			midi_t(self.m[3].raw),
+			midi_t(self.m[4].raw)
+		}
+	
+	self.serv = tjost.plugin('midi_out', self.port)
 
-local midi = {
-	[0] = tjost.plugin('midi_out', 'midi.base'),
-	[1] = tjost.plugin('midi_out', 'midi.lead')
-}
+	end,
 
-return {
-	bot = 3*12 - 0.5 - (n % 18 / 6),
-	range = n/3,
-	--effect = VOLUME,
-	effect = SOUND_EFFECT_5,
-
-	on = function(self, time, sid, gid, pid, x, y)
+	['/on'] = function(self, time, sid, gid, pid, x, y)
 		local key, base, bend, eff
 
 		key = self.bot + x*self.range
 		base = math.floor(key)
 		bend = (key-base)/self.range*0x2000 + 0x1fff
 		eff = y * 0x3fff
+
+		local raw = self.raw
+		local m = self.m
 
 		raw[1][0] = gid
 		raw[1][1] = 0x90
@@ -96,41 +101,44 @@ return {
 			raw[4][2] = self.effect
 			raw[4][3] = bit32.rshift(eff, 7)
 
-			midi[gid](time, mpath, 'mmmm', m[1], m[2], m[3], m[4])
+			self.serv(time, mpath, 'mmmm', m[1], m[2], m[3], m[4])
 		else
 			raw[3][0] = gid
 			raw[3][1] = CONTROLLER
 			raw[3][2] = self.effect
 			raw[3][3] = bit32.rshift(eff, 7)
 
-			midi[gid](time, mpath, 'mmm', m[1], m[2], m[3])
+			self.serv(time, mpath, 'mmm', m[1], m[2], m[3])
 		end
 
-		bases[sid] = base
+		self.bases[sid] = base
 	end,
 
-	off = function(self, time, sid, gid, pid)
-		local base
-
-		base = bases[sid]
+	['/off'] = function(self, time, sid, gid, pid)
+		local base = self.bases[sid]
+		local raw = self.raw
+		local m = self.m
 
 		raw[1][0] = gid
 		raw[1][1] = 0x80
 		raw[1][2] = base
 		raw[1][3] = 0x00
 
-		bases[sid] = nil
+		self.bases[sid] = nil
 
-		midi[gid](time, mpath, 'm', m[1])
+		self.serv(time, mpath, 'm', m[1])
 	end,
 
-	set = function(self, time, sid, gid, pid, x, y)
+	['/set'] = function(self, time, sid, gid, pid, x, y)
 		local key, base, bend, eff
 
 		key = self.bot + x*self.range
-		base = bases[sid]
+		base = self.bases[sid]
 		bend = (key-base)/self.range*0x2000 + 0x1fff
 		eff = y * 0x3fff
+
+		local raw = self.raw
+		local m = self.m
 
 		raw[1][0] = gid
 		raw[1][1] = PITCHBEND
@@ -148,31 +156,16 @@ return {
 			raw[3][2] = self.effect
 			raw[3][3] = bit32.rshift(eff, 7)
 
-			midi[gid](time, mpath, 'mmm', m[1], m[2], m[3])
+			self.serv(time, mpath, 'mmm', m[1], m[2], m[3])
 		else
 			raw[2][0] = gid
 			raw[2][1] = CONTROLLER
 			raw[2][2] = self.effect
 			raw[2][3] = bit32.rshift(eff, 7)
 
-			midi[gid](time, mpath, 'mm', m[1], m[2])
+			self.serv(time, mpath, 'mm', m[1], m[2])
 		end
-	end,
-
-	idle = function(self, time)
-		--[[
-		raw[1][0] = 0
-		raw[1][1] = CONTROLLER
-		raw[1][2] = ALL_NOTES_OFF
-		raw[1][3] = 0x0
-
-		raw[2][0] = 1
-		raw[2][1] = CONTROLLER
-		raw[2][2] = ALL_NOTES_OFF
-		raw[2][3] = 0x0
-		
-		midi[0](time, mpath, 'm', m[1])
-		midi[1](time, mpath, 'm', m[2])
-		--]]
 	end
-}
+})
+
+return midi

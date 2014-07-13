@@ -1,5 +1,3 @@
-#!/usr/bin/env tjost
-
 --[[
 -- Copyright (c) 2014 Hanspeter Portner (dev@open-music-kontrollers.ch)
 -- 
@@ -23,10 +21,10 @@
 --     distribution.
 --]]
 
-id = require('id')
-
-write = tjost.plugin('write', 'chim.osc')
-stream = tjost.plugin('net_in', 'osc.udp://:3333', '60', 'full', write)
-			
-chim = tjost.plugin('net_out', 'osc.udp://chimaera.local:4444')
-chim(0, '/engines/dump/enabled', 'ii', id(), 1)
+return coroutine.wrap(function()
+	local i = math.random(1024)
+	while true do
+		i = i + 1
+		coroutine.yield(i)
+	end
+end)

@@ -25,22 +25,28 @@
 
 message = tjost.plugin('dump')
 status = tjost.plugin('osc_out', 'osc.jack://status')
+--data = tjost.plugin('osc_out', 'osc.jack://data')
 chim = tjost.plugin('net_out', 'osc.udp://chimaera.local:4444')
+
+id = require('id')
+tuio2 = require('tuio2_fltr')
+scsynth = require('scsynth_out')
+midi = require('midi_out')
+drum = require('drum_out')
+
+rate = 3000
 
 control = tjost.plugin('osc_in', 'osc.jack://control', function(time, path, fmt, ...)
 	chim(time, path, fmt, ...)
 end)
-
-rate = 3000
 
 success = function(time, uuid, path, ...)
 	local methods = {
 		['/sensors/number'] = function(time, n)
 			local bot = 2*12 - 0.5 - (n % 18 / 6);
 			local range = n/3
-
-			chim(time, '/engines/oscmidi/offset', 'if', id(), bot)
-			chim(time, '/engines/oscmidi/range', 'if', id(), range)
+			midi.bot = bot
+			midi.range = range
 			message(time, '/number', 'iff', n, bot, range)
 		end,
 
@@ -53,9 +59,7 @@ success = function(time, uuid, path, ...)
 
 			chim(0, '/engines/offset', 'if', id(), 0.002)
 			chim(0, '/engines/reset', 'i', id())
-			chim(0, '/engines/oscmidi/enabled', 'ii', id(), 1)
-			--chim(0, '/engines/oscmidi/effect', 'ii', id(), 0x4a)
-			chim(0, '/engines/oscmidi/effect', 'ii', id(), 0x07)
+			chim(0, '/engines/tuio2/enabled', 'ii', id(), 1)
 		end
 	}
 
@@ -77,16 +81,28 @@ debug = tjost.plugin('net_in', 'osc.udp://:6666', '50', 'full', function(...)
 	status(...)
 end)
 
-midi_out = tjost.plugin('midi_out', 'midi')
-stream = tjost.plugin('net_in', 'osc.udp://:3333', '60', 'full', midi_out)
+sc1 = scsynth:new({
+	port = 'scsynth.1',
+	inst = {'base', 'lead'}
+})
 
-id = coroutine.wrap(function()
-	local i = math.random(1024)
-	while true do
-		i = i + 1
-		coroutine.yield(i)
-	end
+md1 = midi:new({
+	port = 'midi.1',
+	effect = SOUND_EFFECT_5
+})
+
+dr1 = drum:new({
+	port = 'drum.1'
+})
+
+tu1 = tuio2:new({}, function(...)
+	sc1(...)
+	md1(...)
+	dr1(...)
 end)
+
+stream = tjost.plugin('net_in', 'osc.udp://:3333', '60', 'full', tu1)
+--tjost.chain(stream, data)
 
 hostname = tjost.hostname()
 chim(0, '/comm/address', 'is', id(), hostname..'.local')
