@@ -30,10 +30,8 @@ if host then
 	net_io = tjost.plugin('net_out', host, offset)
 	osc_in = tjost.plugin('osc_in', host, net_io)
 
-	if string.match(host, 'osc.tcp[46]*://') or string.match(host, 'osc.slip.tcp[46]*://') then
-		osc_out = tjost.plugin('osc_out', 'osc.net')
-		tjost.chain(net_io, osc_out)
-	end
+	osc_out = tjost.plugin('osc_out', 'osc.net')
+	tjost.chain(net_io, osc_out)
 else
 	error('no address given (osc.tcp://localhost:4444)')
 end

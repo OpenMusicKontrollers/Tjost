@@ -81,9 +81,9 @@ add(Tjost_Module *module, int argc, const char **argv)
 	switch(dat->net.type)
 	{
 		case SOCKET_UDP:
-			if(netaddr_udp_sender_init(&dat->net.handle.udp_tx, loop, argv[0])) //TODO close?
+			if(netaddr_udp_sender_init(&dat->net.handle.udp_tx, loop, argv[0], mod_net_recv_cb, module)) //TODO close?
 				MOD_ADD_ERR(module->host, MOD_NAME, "could not initialize socket");
-			module->type = TJOST_MODULE_OUTPUT;
+			module->type = TJOST_MODULE_IN_OUT;
 			break;
 		case SOCKET_TCP:
 			if(netaddr_tcp_endpoint_init(&dat->net.handle.tcp, NETADDR_TCP_SENDER, loop, argv[0], mod_net_recv_cb, module)) //TODO close?

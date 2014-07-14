@@ -31,6 +31,7 @@ chim = tjost.plugin('net_out', 'osc.udp://chimaera.local:4444')
 id = require('id')
 scsynth = require('scsynth_out')
 midi = require('midi_out')
+drum = require('drum_out')
 
 rate = 3000
 
@@ -93,9 +94,14 @@ md1 = midi:new({
 	effect = SOUND_EFFECT_5
 })
 
+dr1 = drum:new({
+	port = 'drum.1'
+})
+
 stream = tjost.plugin('net_in', 'osc.tcp://:3333', '60', 'full', function(...)
 	sc1(...)
 	md1(...)
+	dr1(...)
 end
 )
 --tjost.chain(stream, data)

@@ -24,7 +24,7 @@
 #include <netaddr.h>
 
 static void
-_udp_alloc(uv_handle_t *handle, size_t suggested_size, uv_buf_t *buf)
+_udp_responder_alloc(uv_handle_t *handle, size_t suggested_size, uv_buf_t *buf)
 {
 	NetAddr_UDP_Responder *netaddr = handle->data;
 
@@ -33,7 +33,7 @@ _udp_alloc(uv_handle_t *handle, size_t suggested_size, uv_buf_t *buf)
 }
 
 static void
-_udp_recv_cb(uv_udp_t *handle, ssize_t nread, const uv_buf_t *buf, const struct sockaddr *addr, unsigned flags)
+_udp_responder_recv_cb(uv_udp_t *handle, ssize_t nread, const uv_buf_t *buf, const struct sockaddr *addr, unsigned flags)
 {
 	NetAddr_UDP_Responder *netaddr = handle->data;
 
@@ -42,7 +42,7 @@ _udp_recv_cb(uv_udp_t *handle, ssize_t nread, const uv_buf_t *buf, const struct 
 	else if (nread < 0)
 	{
 		uv_close((uv_handle_t *)handle, NULL);
-		fprintf(stderr, "_udp_recv_cb: %s\n", uv_err_name(nread));
+		fprintf(stderr, "_udp_resopnder_recv_cb: %s\n", uv_err_name(nread));
 	}
 }
 
@@ -98,8 +98,7 @@ netaddr_udp_responder_init(NetAddr_UDP_Responder *netaddr, uv_loop_t *loop, cons
 	}
 	if(netaddr->version == NETADDR_IP_VERSION_4)
 	{
-		const char *host = "0.0.0.0";
-		if((err = uv_ip4_addr(host, port, &recv_addr4)))
+		if((err = uv_ip4_addr("0.0.0.0", port, &recv_addr4)))
 		{
 			fprintf(stderr, "uv_ip4_addr: %s\n", uv_err_name(err));
 			return -1;
@@ -108,8 +107,7 @@ netaddr_udp_responder_init(NetAddr_UDP_Responder *netaddr, uv_loop_t *loop, cons
 	}
 	else // NETADDR_IP_VERSION_6
 	{
-		const char *host = "::1";
-		if((err = uv_ip6_addr(host, port, &recv_addr6)))
+		if((err = uv_ip6_addr("::", port, &recv_addr6)))
 		{
 			fprintf(stderr, "uv_ip6_addr: %s\n", uv_err_name(err));
 			return -1;
@@ -122,7 +120,7 @@ netaddr_udp_responder_init(NetAddr_UDP_Responder *netaddr, uv_loop_t *loop, cons
 		fprintf(stderr, "uv_udp_bind: %s\n", uv_err_name(err));
 		return -1;
 	}
-	if((err = uv_udp_recv_start(&netaddr->recv_socket, _udp_alloc, _udp_recv_cb)))
+	if((err = uv_udp_recv_start(&netaddr->recv_socket, _udp_responder_alloc, _udp_responder_recv_cb)))
 	{
 		fprintf(stderr, "uv_udp_recv_start: %s\n", uv_err_name(err));
 		return -1;
@@ -139,11 +137,36 @@ netaddr_udp_responder_deinit(NetAddr_UDP_Responder *netaddr)
 		fprintf(stderr, "uv_udp_recv_stop: %s\n", uv_err_name(err));
 }
 
+static void
+_udp_sender_alloc(uv_handle_t *handle, size_t suggested_size, uv_buf_t *buf)
+{
+	NetAddr_UDP_Sender *netaddr = handle->data;
+
+	buf->base = (char *)netaddr->buf;
+	buf->len = TJOST_BUF_SIZE;
+}
+
+static void
+_udp_sender_recv_cb(uv_udp_t *handle, ssize_t nread, const uv_buf_t *buf, const struct sockaddr *addr, unsigned flags)
+{
+	NetAddr_UDP_Sender *netaddr = handle->data;
+
+	if(nread > 0)
+		netaddr->rcb((osc_data_t *)buf->base, nread, netaddr->dat);
+	else if (nread < 0)
+	{
+		uv_close((uv_handle_t *)handle, NULL);
+		fprintf(stderr, "_udp_sender_recv_cb: %s\n", uv_err_name(nread));
+	}
+}
+
 int
-netaddr_udp_sender_init(NetAddr_UDP_Sender *netaddr, uv_loop_t *loop, const char *addr)
+netaddr_udp_sender_init(NetAddr_UDP_Sender *netaddr, uv_loop_t *loop, const char *addr, NetAddr_Recv_Cb cb, void *dat)
 {
 	// Client: "osc.udp://name.local:4444"
 
+	netaddr->rcb = cb;
+	netaddr->dat = dat;
 	netaddr->send_socket.data = netaddr;
 
 	if(!strncmp(addr, "osc.udp://", 10))
@@ -190,6 +213,10 @@ netaddr_udp_sender_init(NetAddr_UDP_Sender *netaddr, uv_loop_t *loop, const char
 		return -1;
 	}
 	char remote [128] = {'\0'};
+		
+	struct sockaddr_in src4;
+	struct sockaddr_in6 src6;
+	struct sockaddr *src;
 
 	int err;
 	if(netaddr->version == NETADDR_IP_VERSION_4)
@@ -210,6 +237,13 @@ netaddr_udp_sender_init(NetAddr_UDP_Sender *netaddr, uv_loop_t *loop, const char
 			fprintf(stderr, "uv_ip4_addr: %s\n", uv_err_name(err));
 			return -1;
 		}
+
+		if((err = uv_ip4_addr("0.0.0.0", 0, &src4)))
+		{
+			fprintf(stderr, "up_ip4_addr: %s\n", uv_err_name(err));
+			return -1;
+		}
+		src = (struct sockaddr *)&src4;
 	}
 	else // NETADDR_IP_VERSION_6
 	{
@@ -229,6 +263,24 @@ netaddr_udp_sender_init(NetAddr_UDP_Sender *netaddr, uv_loop_t *loop, const char
 			fprintf(stderr, "uv_ip6_addr: %s\n", uv_err_name(err));
 			return -1;
 		}
+		
+		if((err = uv_ip6_addr("::", 0, &src6)))
+		{
+			fprintf(stderr, "up_ip6_addr: %s\n", uv_err_name(err));
+			return -1;
+		}
+		src = (struct sockaddr *)&src6;
+	}
+
+	if((err = uv_udp_bind(&netaddr->send_socket, src, 0)))
+	{
+		fprintf(stderr, "uv_udp_bind: %s\n", uv_err_name(err));
+		return -1;
+	}
+	if((err = uv_udp_recv_start(&netaddr->send_socket, _udp_sender_alloc, _udp_sender_recv_cb)))
+	{
+		fprintf(stderr, "uv_udp_recv_start: %s\n", uv_err_name(err));
+		return -1;
 	}
 
 	return 0;
@@ -237,7 +289,9 @@ netaddr_udp_sender_init(NetAddr_UDP_Sender *netaddr, uv_loop_t *loop, const char
 void
 netaddr_udp_sender_deinit(NetAddr_UDP_Sender *netaddr)
 {
-	//TODO
+	int err;
+	if((err =	uv_udp_recv_stop(&netaddr->send_socket)))
+		fprintf(stderr, "uv_udp_recv_stop: %s\n", uv_err_name(err));
 }
 
 static void

@@ -45,6 +45,7 @@ typedef enum _NetAddr_IP_Version {
 
 struct _NetAddr_UDP_Sender {
 	uv_udp_t send_socket;
+	NetAddr_Recv_Cb rcb;
 	NetAddr_IP_Version version;
 
 	union {
@@ -57,6 +58,7 @@ struct _NetAddr_UDP_Sender {
 	NetAddr_Send_Cb cb;
 	size_t len;
 	void *dat;
+	osc_data_t buf [TJOST_BUF_SIZE];
 };
 
 struct _NetAddr_UDP_Responder {
@@ -100,7 +102,7 @@ struct _NetAddr_TCP_Endpoint {
 int netaddr_udp_responder_init(NetAddr_UDP_Responder *netaddr, uv_loop_t *loop, const char *addr, NetAddr_Recv_Cb cb, void *dat);
 void netaddr_udp_responder_deinit(NetAddr_UDP_Responder *netaddr);
 
-int netaddr_udp_sender_init(NetAddr_UDP_Sender *netaddr, uv_loop_t *loop, const char *addr);
+int netaddr_udp_sender_init(NetAddr_UDP_Sender *netaddr, uv_loop_t *loop, const char *addr, NetAddr_Recv_Cb cb, void *dat);
 void netaddr_udp_sender_deinit(NetAddr_UDP_Sender *netaddr);
 void netaddr_udp_sender_send(NetAddr_UDP_Sender *netaddr, uv_buf_t *bufs, int nbufs, size_t len, NetAddr_Send_Cb cb, void *dat);
 

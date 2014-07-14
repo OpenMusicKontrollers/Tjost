@@ -510,8 +510,8 @@ main(int argc, const char **argv)
 	luaL_openlibs(host.L);
 
 	// disable libs that are not rt safe.
-	lua_pushnil(host.L);
-		lua_setglobal(host.L, "io");
+	//lua_pushnil(host.L);
+	//	lua_setglobal(host.L, "io"); //FIXME add function to get PID instead
 	lua_pushnil(host.L);
 		lua_setglobal(host.L, "os");
 	lua_pushnil(host.L);

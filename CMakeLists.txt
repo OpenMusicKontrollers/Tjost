@@ -184,14 +184,4 @@ add_library(net_in MODULE mod_net_in.c mod_net.c netaddr_udp.c netaddr_tcp.c)
 set_target_properties(net_in PROPERTIES PREFIX "")
 install(TARGETS net_in DESTINATION lib/tjost)
 
-# fltr_tuio2
-add_library(tuio2 MODULE fltr_tuio2.c)
-set_target_properties(tuio2 PROPERTIES PREFIX "")
-install(TARGETS tuio2 DESTINATION lib/tjost/lua)
-
-# fltr_midi
-add_library(midi MODULE fltr_midi.c)
-set_target_properties(midi PROPERTIES PREFIX "")
-install(TARGETS midi DESTINATION lib/tjost/lua)
-
 add_subdirectory(bin)

@@ -69,12 +69,11 @@ success = function(time, uuid, path, ...)
 end
 
 conf = tjost.plugin('net_in', 'osc.udp://:4444', '50', 'full', function(time, path, fmt, ...)
-	status(time, path, fmt, ...)
-	message(time, path, fmt, ...)
 	if path == '/success' then
 		success(time, ...)
 	end
 end)
+tjost.chain(conf, message)
 
 debug = tjost.plugin('net_in', 'osc.udp://:6666', '50', 'full', status)
 midi_out = tjost.plugin('midi_out', 'midi.out')
