@@ -800,3 +800,115 @@ const luaL_Reg tjost_globals [] = {
 	{"hostname", _hostname},
 	{NULL, NULL}
 };
+
+static int
+_print(lua_State *L)
+{
+	Tjost_Host *host = lua_touserdata(L, lua_upvalueindex(1));
+	tjost_host_message_push(host, "Lua print redirect: %s", lua_tostring(L, 1));
+
+	return 0;
+}
+
+void
+tjost_lua_init(Tjost_Host *host, int argc, const char **argv)
+{
+	lua_State *L = host->L;
+
+	luaL_openlibs(L);
+
+	// disable libs that are not rt safe.
+	//lua_pushnil(L);
+	//	lua_setglobal(L, "io"); //FIXME add function to get PID instead
+	lua_pushnil(L);
+		lua_setglobal(L, "os");
+	lua_pushnil(L);
+		lua_setglobal(L, "debug");
+
+	// disable/overwrite funcs that are not rt safe.
+	lua_pushnil(L);
+		lua_setglobal(L, "loadfile");
+	lua_pushnil(L);
+		lua_setglobal(L, "dofile");
+	lua_pushlightuserdata(L, host);
+	lua_pushcclosure(L, _print, 1);
+		lua_setglobal(L, "print");
+
+	// create global reference for host
+	lua_pushlightuserdata(L, host);
+		lua_setglobal(L, "_H");
+
+	// register Tjost methods
+	lua_pushlightuserdata(L, host);
+	luaL_openlib(L, "tjost", tjost_globals, 1);
+	lua_pop(L, 1); // tjost 
+
+	// register metatables
+	luaL_newmetatable(L, "Tjost_Input"); // mt
+	luaL_register(L, NULL, tjost_input_mt);
+	lua_pushvalue(L, -1);
+	lua_setfield(L, -2, "__index");
+	lua_pop(L, 1); // mt
+
+	luaL_newmetatable(L, "Tjost_Output"); // mt
+	luaL_register(L, NULL, tjost_output_mt);
+	lua_pushvalue(L, -1);
+	lua_setfield(L, -2, "__index");
+	lua_pop(L, 1); // mt
+
+	luaL_newmetatable(L, "Tjost_In_Out"); // mt
+	luaL_register(L, NULL, tjost_in_out_mt);
+	lua_pushvalue(L, -1);
+	lua_setfield(L, -2, "__index");
+	lua_pop(L, 1); // mt
+
+	luaL_newmetatable(L, "Tjost_Uplink"); // mt
+	luaL_register(L, NULL, tjost_uplink_mt);
+	lua_pushvalue(L, -1);
+	lua_setfield(L, -2, "__index");
+	lua_pop(L, 1); // mt
+
+	luaL_newmetatable(L, "Tjost_Blob"); // mt
+	luaL_register(L, NULL, tjost_blob_mt);
+	lua_pop(L, 1); // mt
+
+	luaL_newmetatable(L, "Tjost_Midi"); // mt
+	luaL_register(L, NULL, tjost_midi_mt);
+	lua_pop(L, 1); // mt
+
+	lua_getglobal(L, "package");
+	lua_getfield(L, -1, "cpath");
+	lua_pushstring(L, ";/usr/local/lib/tjost/lua/?.so"); //FIXME
+	lua_concat(L, 2);
+	lua_setfield(L, -2, "cpath");
+	lua_pop(L, 1); // package
+
+	// push command line arguments
+	lua_createtable(L, argc, 0);
+	int i;
+	for(i=0; i<argc; i++) {
+		lua_pushstring(L, argv[i]);
+		lua_rawseti(L, -2, i+1);
+	}
+	lua_setglobal(L, "argv");
+}
+
+void
+tjost_lua_deinit(Tjost_Host *host)
+{
+	lua_State *L = host->L;
+
+	if(L)
+		lua_close(L);
+}
+
+void
+tjost_lua_deregister(Tjost_Host *host)
+{
+	lua_State *L = host->L;
+
+	// deregister Tjost methods which are not rt safe
+	lua_getglobal(L, "tjost");
+	lua_pushnil(L);
+		lua_setfield(L, -2, "plugin");
+}

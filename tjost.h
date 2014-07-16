@@ -197,6 +197,9 @@ extern const luaL_Reg tjost_uplink_mt [];
 extern const luaL_Reg tjost_globals [];
 extern const luaL_Reg tjost_blob_mt [];
 extern const luaL_Reg tjost_midi_mt [];
+void tjost_lua_init(Tjost_Host *host, int argc, const char **argv);
+void tjost_lua_deinit(Tjost_Host *host);
+void tjost_lua_deregister(Tjost_Host *host);
 
 // in tjost_uplink.c
 void tjost_uplink_tx_drain(uv_async_t *handle);
@@ -211,6 +214,10 @@ int tjost_graph_order(void *arg);
 #ifdef HAS_METADATA_API
 void tjost_property_change(jack_uuid_t uuid, const char *key, jack_property_change_t change, void *arg);
 #endif // HAS_METADATA_API
+
+// in tjost_nsm.c
+const char *tjost_nsm_init(int argc, const char **argv);
+void tjost_nsm_deinit();
 
 #ifdef __cplusplus
 }

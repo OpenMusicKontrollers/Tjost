@@ -68,7 +68,7 @@ configure_file(${PROJECT_SOURCE_DIR}/osc.pc.in ${PROJECT_BINARY_DIR}/osc.pc @ONL
 install(FILES ${PROJECT_BINARY_DIR}/osc.pc DESTINATION lib/pkgconfig)
 
 # tjost
-add_executable(tjost tjost.c tjost_lua.c tjost_uplink.c tlsf-3.0/tlsf.c)
+add_executable(tjost tjost.c tjost_lua.c tjost_uplink.c tjost_nsm.c netaddr_udp.c netaddr_tcp.c tlsf-3.0/tlsf.c)
 target_link_libraries(tjost osc ${LIBS})
 install(TARGETS tjost DESTINATION bin)
 
@@ -175,12 +175,12 @@ set_target_properties(cv_out PROPERTIES PREFIX "")
 install(TARGETS cv_out DESTINATION lib/tjost)
 
 # mod_net_out
-add_library(net_out MODULE mod_net_out.c mod_net.c netaddr_udp.c netaddr_tcp.c)
+add_library(net_out MODULE mod_net_out.c mod_net.c)
 set_target_properties(net_out PROPERTIES PREFIX "")
 install(TARGETS net_out DESTINATION lib/tjost)
 
 # mod_net_in
-add_library(net_in MODULE mod_net_in.c mod_net.c netaddr_udp.c netaddr_tcp.c)
+add_library(net_in MODULE mod_net_in.c mod_net.c)
 set_target_properties(net_in PROPERTIES PREFIX "")
 install(TARGETS net_in DESTINATION lib/tjost)
 

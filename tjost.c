@@ -413,6 +413,13 @@ main(int argc, const char **argv)
 	// init eina
 	eina_init();
 
+	uv_loop_t *loop = uv_default_loop();
+
+	// init Non Session Management
+	const char *id = tjost_nsm_init(argc, argv);
+	if(!id)
+		id = "Tjost";
+
 	// init memory pool
 	Tjost_Mem_Chunk *chunk;
 	if(!(chunk = tjost_map_memory_chunk(area_size)))
@@ -426,7 +433,7 @@ main(int argc, const char **argv)
 	// init jack
 	jack_options_t options = server_name ? JackNullOption | JackServerName : JackNullOption;
 	jack_status_t status;
-	if(!(host.client = jack_client_open("Tjost", options, &status, server_name)))
+	if(!(host.client = jack_client_open(id, options, &status, server_name)))
 		FAIL("could not open client\n");
 	if(jack_set_process_callback(host.client, _process, &host))
 		FAIL("could not set process callback\n");
@@ -470,8 +477,6 @@ main(int argc, const char **argv)
 	if(host.arr)
 		eina_module_list_load(host.arr);
 
-	uv_loop_t *loop = uv_default_loop();
-
 	// init libuv
 	int err;
 	if((err = uv_signal_init(loop, &host.sigterm)))
@@ -507,92 +512,14 @@ main(int argc, const char **argv)
 	// init Lua
 	if(!(host.L = lua_newstate(_alloc, &host)))
 		FAIL("could not initialize Lua\n");
-	luaL_openlibs(host.L);
-
-	// disable libs that are not rt safe.
-	//lua_pushnil(host.L);
-	//	lua_setglobal(host.L, "io"); //FIXME add function to get PID instead
-	lua_pushnil(host.L);
-		lua_setglobal(host.L, "os");
-	lua_pushnil(host.L);
-		lua_setglobal(host.L, "debug");
-
-	// disable/overwrite funcs that are not rt safe.
-	lua_pushnil(host.L);
-		lua_setglobal(host.L, "loadfile");
-	lua_pushnil(host.L);
-		lua_setglobal(host.L, "dofile");
-	lua_pushlightuserdata(host.L, &host);
-	lua_pushcclosure(host.L, _print, 1);
-		lua_setglobal(host.L, "print");
-
-	// create global reference for host
-	lua_pushlightuserdata(host.L, &host);
-		lua_setglobal(host.L, "_H");
-
-	// register Tjost methods
-	lua_pushlightuserdata(host.L, &host);
-	luaL_openlib(host.L, "tjost", tjost_globals, 1);
-	lua_pop(host.L, 1); // tjost 
-
-	// register metatables
-	luaL_newmetatable(host.L, "Tjost_Input"); // mt
-	luaL_register(host.L, NULL, tjost_input_mt);
-	lua_pushvalue(host.L, -1);
-	lua_setfield(host.L, -2, "__index");
-	lua_pop(host.L, 1); // mt
-
-	luaL_newmetatable(host.L, "Tjost_Output"); // mt
-	luaL_register(host.L, NULL, tjost_output_mt);
-	lua_pushvalue(host.L, -1);
-	lua_setfield(host.L, -2, "__index");
-	lua_pop(host.L, 1); // mt
-
-	luaL_newmetatable(host.L, "Tjost_In_Out"); // mt
-	luaL_register(host.L, NULL, tjost_in_out_mt);
-	lua_pushvalue(host.L, -1);
-	lua_setfield(host.L, -2, "__index");
-	lua_pop(host.L, 1); // mt
-
-	luaL_newmetatable(host.L, "Tjost_Uplink"); // mt
-	luaL_register(host.L, NULL, tjost_uplink_mt);
-	lua_pushvalue(host.L, -1);
-	lua_setfield(host.L, -2, "__index");
-	lua_pop(host.L, 1); // mt
-
-	luaL_newmetatable(host.L, "Tjost_Blob"); // mt
-	luaL_register(host.L, NULL, tjost_blob_mt);
-	lua_pop(host.L, 1); // mt
-
-	luaL_newmetatable(host.L, "Tjost_Midi"); // mt
-	luaL_register(host.L, NULL, tjost_midi_mt);
-	lua_pop(host.L, 1); // mt
-
-	lua_getglobal(host.L, "package");
-	lua_getfield(host.L, -1, "cpath");
-	lua_pushstring(host.L, ";/usr/local/lib/tjost/lua/?.so");
-	lua_concat(host.L, 2);
-	lua_setfield(host.L, -2, "cpath");
-	lua_pop(host.L, 1); // package
-
-	// push command line arguments
-	lua_createtable(host.L, argc, 0);
-	int i;
-	for(i=0; i<argc; i++) {
-		lua_pushstring(host.L, argv[i]);
-		lua_rawseti(host.L, -2, i+1);
-	}
-	lua_setglobal(host.L, "argv");
+	tjost_lua_init(&host, argc, argv);
 
 	// load file
-	if(luaL_dofile(host.L, argv[1]))
+	if(argv[1] && luaL_dofile(host.L, argv[1]))
 		FAIL("error loading file: %s\n", lua_tostring(host.L, -1));
 	lua_gc(host.L, LUA_GCSTOP, 0); // disable automatic garbage collection
-	
-	// deregister Tjost methods which are not rt safe
-	lua_getglobal(host.L, "tjost");
-	lua_pushnil(host.L);
-		lua_setfield(host.L, -2, "plugin");
+
+	tjost_lua_deregister(&host);
 
 	// activate JACK
 	if(jack_activate(host.client))
@@ -620,8 +547,7 @@ cleanup:
 		jack_deactivate(host.client);
 
 	// deinit Lua
-	if(host.L)
-		lua_close(host.L);
+	tjost_lua_deinit(&host);
 
 	// drain queue
 	Eina_Inlist *itm;
@@ -667,6 +593,9 @@ cleanup:
 		tjost_free_memory(&host);
 		tlsf_destroy(host.tlsf);
 	}
+
+	// deinit Non Session Management
+	tjost_nsm_deinit();
 
 	// deinit eina
 	eina_shutdown();
