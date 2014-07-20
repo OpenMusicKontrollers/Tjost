@@ -167,15 +167,15 @@ add(Tjost_Module *module, int argc, const char **argv)
 		dat->mcss_sched_priority = atoi(argv[1]);
 #endif
 
-	dat->net.unroll = UNROLL_NONE;
+	dat->net.unroll = OSC_UNROLL_MODE_NONE;
 	if( (argc > 2) && argv[2])
 	{
 		if(!strcmp(argv[2], "none"))
-			dat->net.unroll = UNROLL_NONE;
+			dat->net.unroll = OSC_UNROLL_MODE_NONE;
 		else if(!strcmp(argv[2], "partial"))
-			dat->net.unroll = UNROLL_PARTIAL;
+			dat->net.unroll = OSC_UNROLL_MODE_PARTIAL;
 		else if(!strcmp(argv[2], "full"))
-			dat->net.unroll = UNROLL_FULL;
+			dat->net.unroll = OSC_UNROLL_MODE_FULL;
 	}
 
 	if((err = uv_thread_create(&dat->thread, _thread, dat)))

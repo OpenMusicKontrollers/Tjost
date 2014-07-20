@@ -68,7 +68,7 @@ configure_file(${PROJECT_SOURCE_DIR}/osc.pc.in ${PROJECT_BINARY_DIR}/osc.pc @ONL
 install(FILES ${PROJECT_BINARY_DIR}/osc.pc DESTINATION lib/pkgconfig)
 
 # tjost
-add_executable(tjost tjost.c tjost_lua.c tjost_uplink.c tjost_nsm.c netaddr_udp.c netaddr_tcp.c tlsf-3.0/tlsf.c)
+add_executable(tjost tjost.c tjost_lua.c tjost_uplink.c tjost_nsm.c tjost_slip.c netaddr_udp.c netaddr_tcp.c tlsf-3.0/tlsf.c)
 target_link_libraries(tjost osc ${LIBS})
 install(TARGETS tjost DESTINATION bin)
 
@@ -106,6 +106,11 @@ install(TARGETS dump DESTINATION lib/tjost)
 add_library(send MODULE mod_send.c)
 set_target_properties(send PROPERTIES PREFIX "")
 install(TARGETS send DESTINATION lib/tjost)
+
+# mod_serial
+add_library(serial MODULE mod_serial.c)
+set_target_properties(serial PROPERTIES PREFIX "")
+install(TARGETS serial DESTINATION lib/tjost)
 
 # mod_write
 add_library(write MODULE mod_write.c)

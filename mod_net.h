@@ -42,7 +42,8 @@ struct _Mod_Net {
 	jack_ringbuffer_t *rb_in;
 
 	Socket_Type type;
-	Unroll_Type unroll;
+	OSC_Unroll_Mode unroll;
+	jack_nframes_t tstamp;
 	
 	union {
 		NetAddr_UDP_Responder udp_rx;

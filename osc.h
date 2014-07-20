@@ -135,6 +135,27 @@ int osc_check_fmt(const char *format, int offset);
 
 int osc_method_match(OSC_Method *methods, const char *path, const char *fmt);
 void osc_method_dispatch(jack_nframes_t time, osc_data_t *buf, size_t size, OSC_Method *methods, OSC_Bundle_In bundle_in, OSC_Bundle_Out bundle_out, void *dat);
+
+typedef enum _OSC_Unroll_Mode OSC_Unroll_Mode;
+typedef void (*OSC_Unroll_Stamp_Inject) (uint64_t tstamp, void *dat);
+typedef void (*OSC_Unroll_Message_Inject) (osc_data_t *buf, size_t size, void *dat);
+typedef void (*OSC_Unroll_Bundle_Inject) (osc_data_t *buf, size_t size, void *dat);
+typedef struct _OSC_Unroll_Inject OSC_Unroll_Inject;
+
+enum _OSC_Unroll_Mode {
+	OSC_UNROLL_MODE_NONE,
+	OSC_UNROLL_MODE_PARTIAL,
+	OSC_UNROLL_MODE_FULL
+};
+
+struct _OSC_Unroll_Inject {
+	OSC_Unroll_Stamp_Inject stamp;
+	OSC_Unroll_Message_Inject message;
+	OSC_Unroll_Bundle_Inject bundle;
+};
+
+int osc_packet_unroll(osc_data_t *buf, size_t size, OSC_Unroll_Mode mode, OSC_Unroll_Inject *inject, void*dat);
+
 int osc_message_check(osc_data_t *buf, size_t size);
 int osc_bundle_check(osc_data_t *buf, size_t size);
 int osc_packet_check(osc_data_t *buf, size_t size);

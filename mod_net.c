@@ -39,15 +39,19 @@ mod_net_sync(uv_timer_t *handle)
 	net->sync_jack = jack_get_time();
 }
 
-static jack_nframes_t
-_update_tstamp(Tjost_Module *module, uint64_t tstamp)
+static void
+_inject_stamp(uint64_t tstamp, void *dat)
 {
+	Tjost_Module *module = dat;
 	Mod_Net *net = module->dat;
 
 	double diff; // time difference of OSC timestamp to current wall clock time (s)
 
 	if(tstamp == 1ULL)
-		return 0; // immediate execution
+	{
+		net->tstamp = 0; // immediate execution
+		return;
+	}
 
 	uint32_t tstamp_sec = tstamp >> 32;
 	uint32_t tstamp_frac = tstamp & 0xffffffff;
@@ -60,13 +64,16 @@ _update_tstamp(Tjost_Module *module, uint64_t tstamp)
 	diff -= net->sync_osc.tv_nsec * 1e-9;
 
 	jack_time_t future = net->sync_jack + diff*1e6; // us
-	return jack_time_to_frames(module->host->client, future);
+	net->tstamp = jack_time_to_frames(module->host->client, future);
 }
 
 static void
-_inject_message(Tjost_Module *module, jack_nframes_t tstamp, osc_data_t *buf, size_t len)
+_inject_message(osc_data_t *buf, size_t len, void *dat)
 {
+	Tjost_Module *module = dat;
 	Mod_Net *net = module->dat;
+
+	jack_nframes_t tstamp = net->tstamp;
 
 	if(osc_message_check(buf, len))
 	{
@@ -91,14 +98,16 @@ _inject_message(Tjost_Module *module, jack_nframes_t tstamp, osc_data_t *buf, si
 
 // inject whole bundle as-is
 static void
-_inject_bundle(Tjost_Module *module, osc_data_t *buf, size_t len)
+_inject_bundle(osc_data_t *buf, size_t len, void *dat)
 {
+	Tjost_Module *module = dat;
 	Mod_Net *net = module->dat;
 	
 	if(osc_bundle_check(buf, len))
 	{
 		uint64_t timetag = ntohll(*(uint64_t *)(buf + 8));
-		jack_nframes_t tstamp = _update_tstamp(module, timetag);
+		_inject_stamp(timetag, dat);
+		jack_nframes_t tstamp = net->tstamp;
 
 		Tjost_Event tev;
 		tev.module = module;
@@ -119,138 +128,11 @@ _inject_bundle(Tjost_Module *module, osc_data_t *buf, size_t len)
 		fprintf(stderr, MOD_NAME": rx OSC bundle invalid\n");
 }
 
-// extract nested bundles with non-matching timestamps
-static void
-_unroll_partial(Tjost_Module *module, osc_data_t *buf, size_t len)
-{
-	if(strncmp((char *)buf, bundle_str, 8)) // bundle header valid?
-		return;
-
-	osc_data_t *end = buf + len;
-	osc_data_t *ptr = buf;
-
-	uint64_t timetag = ntohll(*(uint64_t *)(buf + 8));
-	jack_nframes_t tstamp = _update_tstamp(module, timetag);
-
-	int has_messages = 0;
-	int has_nested_bundles = 0;
-
-	ptr = buf + 16; // skip bundle header
-	while(ptr < end)
-	{
-		int32_t *size = (int32_t *)ptr;
-		int32_t hsize = htonl(*size);
-		ptr += sizeof(int32_t);
-
-		char c = *(char *)ptr;
-		switch(c)
-		{
-			case '#':
-				has_nested_bundles = 1;
-				_unroll_partial(module, ptr, hsize);
-				break;
-			case '/':
-				has_messages = 1;
-				// ignore for now
-				break;
-			default:
-				fprintf(stderr, MOD_NAME": not an OSC bundle item '%c'\n", c);
-				return;
-		}
-
-		ptr += hsize;
-	}
-
-	if(!has_nested_bundles)
-	{
-		if(has_messages)
-			_inject_bundle(module, buf, len);
-		return;
-	}
-
-	if(!has_messages)
-		return; // discard empty bundles
-
-	// repack bundle with messages only, ignoring nested bundles
-	ptr = buf + 16; // skip bundle header
-	osc_data_t *dst = ptr;
-	while(ptr < end)
-	{
-		int32_t *size = (int32_t *)ptr;
-		int32_t hsize = htonl(*size);
-		ptr += sizeof(int32_t);
-
-		char *c = (char *)ptr;
-		if(*c == '/')
-		{
-			memmove(dst, ptr - sizeof(int32_t), sizeof(int32_t) + hsize);
-			dst += sizeof(int32_t) + hsize;
-		}
-
-		ptr += hsize;
-	}
-
-	size_t nlen = dst - buf; 
-	_inject_bundle(module, buf, nlen);
-}
-
-// fully unroll bundle into single messages
-static void
-_unroll_full(Tjost_Module *module, osc_data_t *buf, size_t len)
-{
-	if(strncmp((char *)buf, bundle_str, 8)) // bundle header valid?
-		return;
-
-	osc_data_t *end = buf + len;
-	osc_data_t *ptr = buf;
-
-	uint64_t timetag = ntohll(*(uint64_t *)(buf + 8));
-	jack_nframes_t tstamp = _update_tstamp(module, timetag);
-
-	int has_nested_bundles = 0;
-
-	ptr = buf + 16; // skip bundle header
-	while(ptr < end)
-	{
-		int32_t *size = (int32_t *)ptr;
-		int32_t hsize = htonl(*size);
-		ptr += sizeof(int32_t);
-
-		char c = *(char *)ptr;
-		switch(c)
-		{
-			case '#':
-				has_nested_bundles = 1;
-				// ignore for now, messages are handled first
-				break;
-			case '/':
-				_inject_message(module, tstamp, ptr, hsize);
-				break;
-			default:
-				fprintf(stderr, MOD_NAME": not an OSC bundle item '%c'\n", c);
-				return;
-		}
-
-		ptr += hsize;
-	}
-
-	if(!has_nested_bundles)
-		return;
-
-	ptr = buf + 16; // skip bundle header
-	while(ptr < end)
-	{
-		int32_t *size = (int32_t *)ptr;
-		int32_t hsize = htonl(*size);
-		ptr += sizeof(int32_t);
-
-		char *c = (char *)ptr;
-		if(*c == '#')
-			_unroll_full(module, ptr, hsize);
-
-		ptr += hsize;
-	}
-}
+static OSC_Unroll_Inject inject = {
+	.stamp = _inject_stamp,
+	.message = _inject_message,
+	.bundle = _inject_bundle
+};
 
 void
 mod_net_recv_cb(osc_data_t *buf, size_t len, void *data)
@@ -258,31 +140,8 @@ mod_net_recv_cb(osc_data_t *buf, size_t len, void *data)
 	Tjost_Module *module = data;
 	Mod_Net *net = module->dat;
 
-	// check and insert messages into sorted list
-	char c = *(char *)buf;
-	switch(c)
-	{
-		case '#':
-			switch(net->unroll)
-			{
-				case UNROLL_NONE:
-					_inject_bundle(module, buf, len);
-					break;
-				case UNROLL_PARTIAL:
-					_unroll_partial(module, buf, len);
-					break;
-				case UNROLL_FULL:
-					_unroll_full(module, buf, len);
-					break;
-			}
-			break;
-		case '/':
-			_inject_message(module, 0, buf, len);
-			break;
-		default:
-			fprintf(stderr, MOD_NAME": not an OSC packet\n");
-			break;
-	}
+	if(!osc_packet_unroll(buf, len, net->unroll, &inject, data))
+		fprintf(stderr, MOD_NAME": not an OSC packet\n");
 }
 
 static void _next(Tjost_Module *module);

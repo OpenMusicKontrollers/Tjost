@@ -74,7 +74,7 @@ add(Tjost_Module *module, int argc, const char **argv)
 		dat->net.delay_nsec = 0UL;
 	}
 
-	dat->net.unroll = UNROLL_NONE; //TODO not used
+	dat->net.unroll = OSC_UNROLL_MODE_NONE; //TODO not used
 
 	module->dat = dat;
 

@@ -219,6 +219,10 @@ void tjost_property_change(jack_uuid_t uuid, const char *key, jack_property_chan
 const char *tjost_nsm_init(int argc, const char **argv);
 void tjost_nsm_deinit();
 
+// in tjost_slip.c
+size_t slip_encode(uint8_t *buf, uv_buf_t *bufs, int nbufs);
+size_t slip_decode(uint8_t *buf, size_t len, size_t *size);
+
 #ifdef __cplusplus
 }
 #endif

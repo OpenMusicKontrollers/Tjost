@@ -202,6 +202,175 @@ osc_method_dispatch(jack_nframes_t time, osc_data_t *buf, size_t size, OSC_Metho
 	}
 }
 
+// extract nested bundles with non-matching timestamps
+static int
+_unroll_partial(osc_data_t *buf, size_t size, OSC_Unroll_Inject *inject, void *dat)
+{
+	if(strncmp((char *)buf, "#bundle", 8)) // bundle header valid?
+		return 0;
+
+	osc_data_t *end = buf + size;
+	osc_data_t *ptr = buf;
+
+	uint64_t timetag = ntohll(*(uint64_t *)(buf + 8));
+	inject->stamp(timetag, dat);
+
+	int has_messages = 0;
+	int has_nested_bundles = 0;
+
+	ptr = buf + 16; // skip bundle header
+	while(ptr < end)
+	{
+		int32_t *size = (int32_t *)ptr;
+		int32_t hsize = htonl(*size);
+		ptr += sizeof(int32_t);
+
+		char c = *(char *)ptr;
+		switch(c)
+		{
+			case '#':
+				has_nested_bundles = 1;
+				if(!_unroll_partial(ptr, hsize, inject, dat))
+					return 0;
+				break;
+			case '/':
+				has_messages = 1;
+				// ignore for now
+				break;
+			default:
+				return 0;
+		}
+
+		ptr += hsize;
+	}
+
+	if(!has_nested_bundles)
+	{
+		if(has_messages)
+			inject->bundle(buf, size, dat);
+		return 1;
+	}
+
+	if(!has_messages)
+		return 1; // discard empty bundles
+
+	// repack bundle with messages only, ignoring nested bundles
+	ptr = buf + 16; // skip bundle header
+	osc_data_t *dst = ptr;
+	while(ptr < end)
+	{
+		int32_t *size = (int32_t *)ptr;
+		int32_t hsize = htonl(*size);
+		ptr += sizeof(int32_t);
+
+		char *c = (char *)ptr;
+		if(*c == '/')
+		{
+			memmove(dst, ptr - sizeof(int32_t), sizeof(int32_t) + hsize);
+			dst += sizeof(int32_t) + hsize;
+		}
+
+		ptr += hsize;
+	}
+
+	size_t nlen = dst - buf; 
+	inject->bundle(buf, nlen, dat);
+
+	return 1;
+}
+
+// fully unroll bundle into single messages
+static int
+_unroll_full(osc_data_t *buf, size_t size, OSC_Unroll_Inject *inject, void *dat)
+{
+	if(strncmp((char *)buf, "#bundle", 8)) // bundle header valid?
+		return 0;
+
+	osc_data_t *end = buf + size;
+	osc_data_t *ptr = buf;
+
+	uint64_t timetag = ntohll(*(uint64_t *)(buf + 8));
+	inject->stamp(timetag, dat);
+
+	int has_nested_bundles = 0;
+
+	ptr = buf + 16; // skip bundle header
+	while(ptr < end)
+	{
+		int32_t *size = (int32_t *)ptr;
+		int32_t hsize = htonl(*size);
+		ptr += sizeof(int32_t);
+
+		char c = *(char *)ptr;
+		switch(c)
+		{
+			case '#':
+				has_nested_bundles = 1;
+				// ignore for now, messages are handled first
+				break;
+			case '/':
+				inject->message(ptr, hsize, dat);
+				break;
+			default:
+				return 0;
+		}
+
+		ptr += hsize;
+	}
+
+	if(!has_nested_bundles)
+		return 1;
+
+	ptr = buf + 16; // skip bundle header
+	while(ptr < end)
+	{
+		int32_t *size = (int32_t *)ptr;
+		int32_t hsize = htonl(*size);
+		ptr += sizeof(int32_t);
+
+		char *c = (char *)ptr;
+		if(*c == '#')
+			if(!_unroll_full(ptr, hsize, inject, dat))
+				return 0;
+
+		ptr += hsize;
+	}
+
+	return 1;
+}
+
+int
+osc_packet_unroll(osc_data_t *buf, size_t size, OSC_Unroll_Mode mode, OSC_Unroll_Inject *inject, void *dat)
+{
+	char c = *(char *)buf;
+	switch(c)
+	{
+		case '#':
+			switch(mode)
+			{
+				case OSC_UNROLL_MODE_NONE:
+					inject->bundle(buf, size, dat);
+					break;
+				case OSC_UNROLL_MODE_PARTIAL:
+					if(!_unroll_partial(buf, size, inject, dat))
+						return 0;
+					break;
+				case OSC_UNROLL_MODE_FULL:
+					if(!_unroll_full(buf, size, inject, dat))
+						return 0;
+					break;
+			}
+			break;
+		case '/':
+			inject->message(buf, size, dat);
+			break;
+		default:
+			return 0;
+	}
+
+	return 1;
+}
+
 int
 osc_message_check(osc_data_t *buf, size_t size)
 {

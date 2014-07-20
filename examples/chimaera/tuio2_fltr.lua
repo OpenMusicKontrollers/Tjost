@@ -38,6 +38,7 @@ local tuio2 = class:new({
 			self.ignore = false
 			self.last_fid = fid
 		else
+			print('ignore')
 			self.ignore = true
 			return
 		end
