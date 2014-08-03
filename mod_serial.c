@@ -172,9 +172,10 @@ _serial_slip_recv_cb(uv_stream_t *stream, ssize_t nread, const uv_buf_t *buf)
 		nread += dat->recv.nchunk; // is there remaining chunk from last call?
 		size_t size;
 		size_t parsed;
-		while( (parsed = slip_decode(ptr, nread, &size)) && (nread > 0) )
+		while( (nread > 0) && (parsed = slip_decode(ptr, nread, &size)) )
 		{
-			_serial_recv_cb(module, (osc_data_t *)ptr, size);
+			if(size > 0)
+				_serial_recv_cb(module, (osc_data_t *)ptr, size);
 			ptr += parsed;
 			nread -= parsed;
 		}
@@ -367,8 +368,8 @@ add(Tjost_Module *module, int argc, const char **argv)
 	
 	uv_loop_t *loop = uv_default_loop();
 
-	int fd_in = open(argv[0], O_RDONLY, 0);
-	int fd_out = open(argv[0], O_WRONLY, 0);
+	int fd_in = open(argv[0], O_RDONLY | O_NOCTTY | O_NONBLOCK, 0);
+	int fd_out = open(argv[0], O_WRONLY | O_NOCTTY | O_NONBLOCK, 0);
 
 	dat->serial_in.data = module;
 	dat->serial_out.data = module;
