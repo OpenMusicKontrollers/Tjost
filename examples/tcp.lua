@@ -31,6 +31,6 @@ resp_in = tjost.plugin('osc_in', 'responder.rx', tcp_in)
 
 send_out = tjost.plugin('osc_out', 'sender.tx')
 
-tcp_out = tjost.plugin('net_out', 'osc.tcp://localhost:3333', '0.1', send_out)
+tcp_out = tjost.plugin('net_out', 'osc.tcp://localhost:3333', '60', '0.1', send_out)
 
 send_in = tjost.plugin('osc_in', 'sender.rx', tcp_out)

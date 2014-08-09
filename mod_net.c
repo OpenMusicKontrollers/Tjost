@@ -82,13 +82,13 @@ _inject_message(osc_data_t *buf, size_t len, void *dat)
 		tev.time = tstamp;
 		tev.size = len;
 
-		if(jack_ringbuffer_write_space(net->rb_in) < sizeof(Tjost_Event) + len)
+		if(jack_ringbuffer_write_space(net->rb.in) < sizeof(Tjost_Event) + len)
 			fprintf(stderr, MOD_NAME": ringbuffer overflow\n");
 		else
 		{
-			if(jack_ringbuffer_write(net->rb_in, (const char *)&tev, sizeof(Tjost_Event)) != sizeof(Tjost_Event))
+			if(jack_ringbuffer_write(net->rb.in, (const char *)&tev, sizeof(Tjost_Event)) != sizeof(Tjost_Event))
 				fprintf(stderr, MOD_NAME": ringbuffer write 1 error\n");
-			if(jack_ringbuffer_write(net->rb_in, (const char *)buf, len) != len)
+			if(jack_ringbuffer_write(net->rb.in, (const char *)buf, len) != len)
 				fprintf(stderr, MOD_NAME": ringbuffer write 2 error\n");
 		}
 	}
@@ -114,13 +114,13 @@ _inject_bundle(osc_data_t *buf, size_t len, void *dat)
 		tev.time = tstamp;
 		tev.size = len;
 
-		if(jack_ringbuffer_write_space(net->rb_in) < sizeof(Tjost_Event) + len)
+		if(jack_ringbuffer_write_space(net->rb.in) < sizeof(Tjost_Event) + len)
 			fprintf(stderr, MOD_NAME": ringbuffer overflow\n");
 		else
 		{
-			if(jack_ringbuffer_write(net->rb_in, (const char *)&tev, sizeof(Tjost_Event)) != sizeof(Tjost_Event))
+			if(jack_ringbuffer_write(net->rb.in, (const char *)&tev, sizeof(Tjost_Event)) != sizeof(Tjost_Event))
 				fprintf(stderr, MOD_NAME": ringbuffer write 1 error\n");
-			if(jack_ringbuffer_write(net->rb_in, (const char *)buf, len) != len)
+			if(jack_ringbuffer_write(net->rb.in, (const char *)buf, len) != len)
 				fprintf(stderr, MOD_NAME": ringbuffer write 2 error\n");
 		}
 	}
@@ -152,7 +152,7 @@ _advance(size_t len, void *arg)
 	Tjost_Module *module = arg;
 	Mod_Net *net = module->dat;
 
-	jack_ringbuffer_read_advance(net->rb_out, len);
+	jack_ringbuffer_read_advance(net->rb.out, len);
 	_next(module);
 }
 
@@ -162,12 +162,12 @@ _next(Tjost_Module *module)
 	Mod_Net *net = module->dat;
 
 	Tjost_Event tev;
-	if(jack_ringbuffer_read_space(net->rb_out) >= sizeof(Tjost_Event))
+	if(jack_ringbuffer_read_space(net->rb.out) >= sizeof(Tjost_Event))
 	{
-		jack_ringbuffer_peek(net->rb_out, (char *)&tev, sizeof(Tjost_Event));
-		if(jack_ringbuffer_read_space(net->rb_out) >= sizeof(Tjost_Event) + tev.size)
+		jack_ringbuffer_peek(net->rb.out, (char *)&tev, sizeof(Tjost_Event));
+		if(jack_ringbuffer_read_space(net->rb.out) >= sizeof(Tjost_Event) + tev.size)
 		{
-			jack_ringbuffer_read_advance(net->rb_out, sizeof(Tjost_Event));
+			jack_ringbuffer_read_advance(net->rb.out, sizeof(Tjost_Event));
 
 			jack_time_t usecs = jack_frames_to_time(module->host->client, tev.time) - net->sync_jack;
 
@@ -195,7 +195,7 @@ _next(Tjost_Module *module)
 			frac = htonl(frac);
 		
 			char ch;
-			jack_ringbuffer_peek(net->rb_out, &ch, 1);
+			jack_ringbuffer_peek(net->rb.out, &ch, 1);
 			switch(ch)
 			{
 				case '#':
@@ -209,7 +209,7 @@ _next(Tjost_Module *module)
 					msg[0].len = sizeof(int32_t);
 
 					jack_ringbuffer_data_t vec [2];
-					jack_ringbuffer_get_read_vector(net->rb_out, vec);
+					jack_ringbuffer_get_read_vector(net->rb.out, vec);
 
 					if(size <= vec[0].len)
 					{
@@ -268,7 +268,7 @@ _next(Tjost_Module *module)
 					msg[1].len = sizeof(header);
 
 					jack_ringbuffer_data_t vec [2];
-					jack_ringbuffer_get_read_vector(net->rb_out, vec);
+					jack_ringbuffer_get_read_vector(net->rb.out, vec);
 
 					if(size <= vec[0].len)
 					{
@@ -326,17 +326,17 @@ mod_net_process_in(Tjost_Module *module, jack_nframes_t nframes)
 	Mod_Net *net = module->dat;
 
 	Tjost_Event tev;
-	while(jack_ringbuffer_read_space(net->rb_in) >= sizeof(Tjost_Event))
+	while(jack_ringbuffer_read_space(net->rb.in) >= sizeof(Tjost_Event))
 	{
-		if(jack_ringbuffer_peek(net->rb_in, (char *)&tev, sizeof(Tjost_Event)) != sizeof(Tjost_Event))
+		if(jack_ringbuffer_peek(net->rb.in, (char *)&tev, sizeof(Tjost_Event)) != sizeof(Tjost_Event))
 			tjost_host_message_push(host, MOD_NAME": %s", "ringbuffer peek error");
 
-		if(jack_ringbuffer_read_space(net->rb_in) >= sizeof(Tjost_Event) + tev.size)
+		if(jack_ringbuffer_read_space(net->rb.in) >= sizeof(Tjost_Event) + tev.size)
 		{
-			jack_ringbuffer_read_advance(net->rb_in, sizeof(Tjost_Event));
+			jack_ringbuffer_read_advance(net->rb.in, sizeof(Tjost_Event));
 
 			osc_data_t *bf = tjost_host_schedule_inline(host, module, tev.time, tev.size);
-			if(jack_ringbuffer_read(net->rb_in, (char *)bf, tev.size) != tev.size)
+			if(jack_ringbuffer_read(net->rb.in, (char *)bf, tev.size) != tev.size)
 				tjost_host_message_push(host, MOD_NAME": %s", "ringbuffer read error");
 		}
 		else
@@ -371,12 +371,12 @@ mod_net_process_out(Tjost_Module *module, jack_nframes_t nframes)
 			tev->time = last;
 		}
 
-		if(jack_ringbuffer_write_space(net->rb_out) < sizeof(Tjost_Event) + tev->size)
+		if(jack_ringbuffer_write_space(net->rb.out) < sizeof(Tjost_Event) + tev->size)
 			tjost_host_message_push(host, MOD_NAME": %s", "ringbuffer overflow");
 		else
 		{
-			jack_ringbuffer_write(net->rb_out, (const char *)tev, sizeof(Tjost_Event));
-			jack_ringbuffer_write(net->rb_out, (const char *)tev->buf, tev->size);
+			jack_ringbuffer_write(net->rb.out, (const char *)tev, sizeof(Tjost_Event));
+			jack_ringbuffer_write(net->rb.out, (const char *)tev->buf, tev->size);
 		}
 
 		module->queue = eina_inlist_remove(module->queue, EINA_INLIST_GET(tev));

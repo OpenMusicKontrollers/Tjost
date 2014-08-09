@@ -71,7 +71,7 @@ _quit(uv_async_t *handle)
 	uv_stop(handle->loop);
 }
 
-void
+static void
 _thread(void *arg)
 {
 	Data *dat = arg;
@@ -115,9 +115,9 @@ add(Tjost_Module *module, int argc, const char **argv)
 	Data *dat = tjost_alloc(module->host, sizeof(Data));
 	memset(dat, 0, sizeof(Data));
 
-	if(!(dat->net.rb_out = jack_ringbuffer_create(TJOST_RINGBUF_SIZE)))
+	if(!(dat->net.rb.out = jack_ringbuffer_create(TJOST_RINGBUF_SIZE)))
 		MOD_ADD_ERR(module->host, MOD_NAME, "could not initialize ringbuffer");
-	if(!(dat->net.rb_in = jack_ringbuffer_create(TJOST_RINGBUF_SIZE)))
+	if(!(dat->net.rb.in = jack_ringbuffer_create(TJOST_RINGBUF_SIZE)))
 		MOD_ADD_ERR(module->host, MOD_NAME, "could not initialize ringbuffer");
 
 	int err;
@@ -212,10 +212,10 @@ del(Tjost_Module *module)
 
 	uv_loop_close(&dat->loop);
 
-	if(dat->net.rb_out)
-		jack_ringbuffer_free(dat->net.rb_out);
-	if(dat->net.rb_in)
-		jack_ringbuffer_free(dat->net.rb_in);
+	if(dat->net.rb.out)
+		jack_ringbuffer_free(dat->net.rb.out);
+	if(dat->net.rb.in)
+		jack_ringbuffer_free(dat->net.rb.in);
 
 	tjost_free(module->host, dat);
 }
