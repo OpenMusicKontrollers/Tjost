@@ -22,6 +22,7 @@
 #     distribution.
 
 pdf('stat.pdf')
+#svg('33_%02d.svg', width=8, height=8, pointsize=16)
 
 {
 	f <- file('stat.dump.osc', 'rb')
@@ -34,7 +35,7 @@ pdf('stat.pdf')
 
 	a <- NULL
 	i <- 0
-	while(i < 2000)
+	while(i < 3000)
 	{
 		time <- readBin(f, 'integer', 1, 4, endian='big')
 		if(!length(time))
@@ -56,17 +57,16 @@ pdf('stat.pdf')
 {
 	mavg <- apply(a, c(2), mean)
 	msd <- apply(a, c(2), sd)
+	print(summary(msd))
 
-	plot(mavg, type='l')
-	plot(msd, type='l')
-
-	#apply(a, c(1), function(o) {
-	#	plot(o, type='l')
-	#})
+	plot(mavg, type='l', ylim=c(-5,5), col=2, xlab='Sensor', ylab='Mean')
+	plot(msd, type='l', ylim=c(0,5), col=2, xlab='Sensor', ylab='Standard deviation')
 }
 
+for(path in c('stat.none.osc', 'stat.quadratic.osc', 'stat.catmullrom.osc', 'stat.lagrange.osc'))
 {
-	f <- file('stat.evnt.osc', 'rb')
+	print(path)
+	f <- file(path, 'rb')
 
 	head <- readChar(f, 8)
 	srate <- readBin(f, 'integer', 1, 4, endian='big')
@@ -76,7 +76,7 @@ pdf('stat.pdf')
 
 	a <- NULL
 	i <- 0
-	while(i < 2000)
+	while(i< 48000)
 	{
 		time <- readBin(f, 'integer', 1, 4, endian='big')
 		if(!length(time))
@@ -95,12 +95,28 @@ pdf('stat.pdf')
 	}
 
 	close(f)
-}
 
-{
-	plot(a[,1], type='l')
-	plot(a[,2], type='l')
-	plot(a[,2] ~ a[,1], type='l')
+	len <- length(a[,1])
+	s <- function(o)
+	{
+		return(c(mean(o), sd(o)))
+	}
+
+	dx <- abs(a[2:len,1] - a[1:(len-1),1])
+	dx <- dx[dx > 0]
+	bx <- log(1/dx) / log(2)
+	print(s(bx))
+	hist(bx, border=2, breaks=1000, xlab='x-dimension bitdepth', main='', xlim=c(5,20))
+
+#	dz <- abs(a[2:len,2] - a[1:(len-1),2])
+#	dz <- dz[dz > 0]
+#	bz <- log(1/dz) / log(2)
+#	print(s(bz))
+#	hist(bz, border=2, breaks=1000, xlab='z-dimension bitdepth', main='', xlim=c(5,20))
+
+	plot(a[,1], type='l', ylim=c(0,1), col=2, xlab='Sample', ylab='x-dimension')
+	plot(a[,2], type='l', ylim=c(0,1), col=2, xlab='Sample', ylab='z-dimension')
+	plot(a[,2] ~ a[,1], type='l', xlim=c(0,1), ylim=c(0,1), col=2, xlab='x-dimension', ylab='z-dimension')
 }
 
 dev.off()
