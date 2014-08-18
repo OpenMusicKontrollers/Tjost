@@ -21,35 +21,38 @@
 #     3. This notice may not be removed or altered from any source
 #     distribution.
 
-f <- xzfile('chim.osc.xz', 'rb')
+pdf('stat.pdf')
 
-head <- readChar(f, 8)
-srate <- readBin(f, 'integer', 1, 4, endian='big')
-
-print(head)
-print(srate)
-
-a <- NULL
-i <- 0
-while(i < 16000)
 {
-	time <- readBin(f, 'integer', 1, 4, endian='big')
-	if(!length(time))
-		break;
-	size <- readBin(f, 'integer', 1, 4, endian='big')
-	path <- readChar(f, 8) # '/dump000'
-	fmt <- readChar(f, 4) # ',ib0'
-	fid <- readBin(f, 'integer', 1, 4, endian='big')
-	len <- readBin(f, 'integer', 1, 4, endian='big')
-	blob <- readBin(f, 'integer', len/2, 2, endian='big')
-	a <- rbind(a, c(blob))
+	f <- file('stat.dump.osc', 'rb')
 
-	i <- i + 1
+	head <- readChar(f, 8)
+	srate <- readBin(f, 'integer', 1, 4, endian='big')
+
+	print(head)
+	print(srate)
+
+	a <- NULL
+	i <- 0
+	while(i < 2000)
+	{
+		time <- readBin(f, 'integer', 1, 4, endian='big')
+		if(!length(time))
+			break;
+		size <- readBin(f, 'integer', 1, 4, endian='big')
+		path <- readChar(f, 8) # '/dump000'
+		fmt <- readChar(f, 4) # ',ib0'
+		fid <- readBin(f, 'integer', 1, 4, endian='big')
+		len <- readBin(f, 'integer', 1, 4, endian='big')
+		blob <- readBin(f, 'integer', len/2, 2, endian='big')
+		a <- rbind(a, c(blob))
+
+		i <- i + 1
+	}
+
+	close(f)
 }
 
-close(f)
-
-pdf('stat.pdf')
 {
 	mavg <- apply(a, c(2), mean)
 	msd <- apply(a, c(2), sd)
@@ -61,4 +64,43 @@ pdf('stat.pdf')
 	#	plot(o, type='l')
 	#})
 }
+
+{
+	f <- file('stat.evnt.osc', 'rb')
+
+	head <- readChar(f, 8)
+	srate <- readBin(f, 'integer', 1, 4, endian='big')
+
+	print(head)
+	print(srate)
+
+	a <- NULL
+	i <- 0
+	while(i < 2000)
+	{
+		time <- readBin(f, 'integer', 1, 4, endian='big')
+		if(!length(time))
+			break;
+		size <- readBin(f, 'integer', 1, 4, endian='big')
+		path <- readChar(f, 8) # '/set0000'
+		fmt <- readChar(f, 8) # ',iiiff00'
+		sid <- readBin(f, 'integer', 1, 4, endian='big')
+		gid <- readBin(f, 'integer', 1, 4, endian='big')
+		pid <- readBin(f, 'integer', 1, 4, endian='big')
+		x <- readBin(f, 'numeric', 1, 4, endian='big')
+		y <- readBin(f, 'numeric', 1, 4, endian='big')
+		a <- rbind(a, c(x, y))
+
+		i <- i + 1
+	}
+
+	close(f)
+}
+
+{
+	plot(a[,1], type='l')
+	plot(a[,2], type='l')
+	plot(a[,2] ~ a[,1], type='l')
+}
+
 dev.off()

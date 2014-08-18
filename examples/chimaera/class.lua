@@ -24,7 +24,7 @@
 local call = function(self, time, path, fmt, ...)
 	local meth = self[path]
 	if meth then
-		meth(self, time, ...)
+		return meth(self, time, ...)
 	end
 end
 

@@ -38,7 +38,7 @@ local tuio2 = class:new({
 			self.ignore = false
 			self.last_fid = fid
 		else
-			print('ignore')
+			print('ignore: '..fid)
 			self.ignore = true
 			return
 		end
@@ -81,7 +81,7 @@ local tuio2 = class:new({
 			end
 			if not found then
 				local b = self.blobs[v]
-				self.cb(time, '/off', 'iii', b[1], b[2], b[3])
+				self.cb(time, '/off', 'iii', unpack(b, 1, 3))
 				self.blobs[v] = nil
 			end
 		end
@@ -96,9 +96,9 @@ local tuio2 = class:new({
 			end
 			local b = self.blobs[w]
 			if found then
-				self.cb(time, '/set', 'iiifff', b[1], b[2], b[3], b[4], b[5], b[6])
+				self.cb(time, '/set', 'iiifff', unpack(b))
 			else
-				self.cb(time, '/on', 'iiifff', b[1], b[2], b[3], b[4], b[5], b[6])
+				self.cb(time, '/on', 'iiifff', unpack(b))
 			end
 		end
 	end

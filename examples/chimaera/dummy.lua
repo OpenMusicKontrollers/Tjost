@@ -32,6 +32,7 @@ id = require('id')
 scsynth = require('scsynth_out')
 midi = require('midi_out')
 drum = require('drum_out')
+map = require('map')
 
 rate = 3000
 
@@ -45,8 +46,9 @@ success = function(time, uuid, path, ...)
 			local bot = 2*12 - 0.5 - (n % 18 / 6);
 			local range = n/3
 
-			md1.bot = bot
-			md1.range = range
+			--md1.bot = bot
+			--md1.range = range
+			md1.map = map_poly_step:new({n=n, oct=2, order=3})
 			message(time, '/number', 'iff', n, bot, range)
 		end,
 
@@ -102,8 +104,7 @@ stream = tjost.plugin('net_in', 'osc.tcp://:3333', '60', 'full', function(...)
 	sc1(...)
 	md1(...)
 	dr1(...)
-end
-)
+end)
 --tjost.chain(stream, data)
 
 hostname = tjost.hostname()

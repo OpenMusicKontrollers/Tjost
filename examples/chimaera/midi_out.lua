@@ -42,9 +42,10 @@ local N = 128
 
 local midi = class:new({
 	port = 'midi.out',
-	n = N,
-	bot = 3*12 - 0.5 - (N % 18 / 6),
-	range = N/3,
+	--n = N,
+	--bot = 3*12 - 0.5 - (N % 18 / 6),
+	--range = N/3,
+	map = map_linear,
 	effect = VOLUME,
 
 	init = function(self)
@@ -65,16 +66,16 @@ local midi = class:new({
 			midi_t(self.m[4].raw)
 		}
 	
-	self.serv = tjost.plugin('midi_out', self.port)
-
+		self.serv = tjost.plugin('midi_out', self.port)
 	end,
 
 	['/on'] = function(self, time, sid, gid, pid, x, y)
 		local key, base, bend, eff
 
-		key = self.bot + x*self.range
+		--key = self.bot + x*self.range
+		key = self.map(x)
 		base = math.floor(key)
-		bend = (key-base)/self.range*0x2000 + 0x1fff
+		bend = (key-base)/self.map.range*0x2000 + 0x1fff
 		eff = y * 0x3fff
 
 		local raw = self.raw
@@ -101,14 +102,14 @@ local midi = class:new({
 			raw[4][2] = self.effect
 			raw[4][3] = bit32.rshift(eff, 7)
 
-			self.serv(time, mpath, 'mmmm', m[1], m[2], m[3], m[4])
+			self.serv(time, mpath, 'mmmm', unpack(m, 1, 4))
 		else
 			raw[3][0] = gid
 			raw[3][1] = CONTROLLER
 			raw[3][2] = self.effect
 			raw[3][3] = bit32.rshift(eff, 7)
 
-			self.serv(time, mpath, 'mmm', m[1], m[2], m[3])
+			self.serv(time, mpath, 'mmm', unpack(m, 1, 3))
 		end
 
 		self.bases[sid] = base
@@ -126,15 +127,16 @@ local midi = class:new({
 
 		self.bases[sid] = nil
 
-		self.serv(time, mpath, 'm', m[1])
+		self.serv(time, mpath, 'm', unpack(m, 1, 1))
 	end,
 
 	['/set'] = function(self, time, sid, gid, pid, x, y)
 		local key, base, bend, eff
 
-		key = self.bot + x*self.range
+		--key = self.bot + x*self.range
+		key = self.map(x)
 		base = self.bases[sid]
-		bend = (key-base)/self.range*0x2000 + 0x1fff
+		bend = (key-base)/self.map.range*0x2000 + 0x1fff
 		eff = y * 0x3fff
 
 		local raw = self.raw
@@ -156,14 +158,14 @@ local midi = class:new({
 			raw[3][2] = self.effect
 			raw[3][3] = bit32.rshift(eff, 7)
 
-			self.serv(time, mpath, 'mmm', m[1], m[2], m[3])
+			self.serv(time, mpath, 'mmm', unpack(m, 1, 3))
 		else
 			raw[2][0] = gid
 			raw[2][1] = CONTROLLER
 			raw[2][2] = self.effect
 			raw[2][3] = bit32.rshift(eff, 7)
 
-			self.serv(time, mpath, 'mm', m[1], m[2])
+			self.serv(time, mpath, 'mm', unpack(m, 1, 2))
 		end
 	end
 })
