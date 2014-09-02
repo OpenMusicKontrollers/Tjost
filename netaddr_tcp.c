@@ -23,6 +23,9 @@
 
 #include <netaddr.h>
 
+static const char *connect_msg = "/connect\0\0\0\0,\0\0\0";
+static const char *disconnect_msg = "/disconnect\0,\0\0\0";
+
 static void
 _tcp_prefix_alloc(uv_handle_t *handle, size_t suggested_size, uv_buf_t *buf)
 {
@@ -111,6 +114,8 @@ _tcp_slip_recv_cb(uv_stream_t *stream, ssize_t nread, const uv_buf_t *buf)
 		netaddr->streams = eina_list_remove(netaddr->streams, stream);
 		free(stream);
 		fprintf(stderr, "_tcp_slip_recv_cb: %s\n", uv_err_name(nread));
+		if(nread == UV_EOF)
+			netaddr->recv.cb((osc_data_t *)disconnect_msg, 16, netaddr->recv.dat);
 	}
 	else // nread == 0
 		;
@@ -142,9 +147,10 @@ _responder_connect(uv_stream_t *responder, int status)
 		return;
 	}
 
-	fprintf(stderr, "connect to sender\n");
-
 	NetAddr_TCP_Endpoint *netaddr = responder->data;
+
+	fprintf(stderr, "connect to sender\n");
+	netaddr->recv.cb((osc_data_t *)connect_msg, 16, netaddr->recv.dat);
 
 	uv_tcp_t *stream = calloc(1, sizeof(uv_tcp_t));
 	stream->data = netaddr;
@@ -319,6 +325,7 @@ _sender_connect(uv_connect_t *conn, int status)
 	}
 	
 	fprintf(stderr, "connect to responder\n");
+	netaddr->recv.cb((osc_data_t *)connect_msg, 16, netaddr->recv.dat);
 
 	int err;
 	if(!netaddr->slip)
