@@ -23,5 +23,7 @@
 --     distribution.
 --]]
 
-osc_out = tjost.plugin('osc_out', 'osc.midi')
-midi_in = tjost.plugin('raw_in', 'virtual', osc_out)
+device = argv[3]
+
+osc_out = tjost.plugin({name='osc_out', port='osc.midi'})
+midi_in = tjost.plugin({name='raw_in', device=device}, osc_out)

@@ -108,14 +108,17 @@ _poll(uv_poll_t *handle, int status, int events)
 }
 
 int
-add(Tjost_Module *module, int argc, const char **argv)
+add(Tjost_Module *module)
 {
+	Tjost_Host *host = module->host;
+	lua_State *L = host->L;
 	Data *dat = tjost_alloc(module->host, sizeof(Data));
 	memset(dat, 0, sizeof(Data));
+
+	lua_getfield(L, 1, "device");
+	const char *device = luaL_optstring(L, -1, "virtual");
+	lua_pop(L, 1);
 	
-	const char *device = "virtual";
-	if( (argc > 0) && argv[0] )
-		device = argv[0];
 	if(snd_rawmidi_open(&dat->dev, NULL, device, 0))
 		MOD_ADD_ERR(module->host, MOD_NAME, "could not open MIDI device");
 

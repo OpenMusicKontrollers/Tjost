@@ -23,5 +23,5 @@
 --     distribution.
 --]]
 
-osc_out = tjost.plugin('osc_out', 'osc.send')
-send = tjost.plugin('send', osc_out)
+osc_out = tjost.plugin({name='osc_out', port='osc.send'})
+send = tjost.plugin({name='send'}, osc_out)

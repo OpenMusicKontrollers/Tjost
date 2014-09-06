@@ -27,8 +27,8 @@ local ffi = require('ffi')
 buf_t = ffi.typeof('float *')
 
 audio_out = {
-	tjost.plugin('audio_out', 'audio.out.1'),
-	tjost.plugin('audio_out', 'audio.out.2'),
+	tjost.plugin({name='audio_out', port='audio.out.1'}),
+	tjost.plugin({name='audio_out', port='audio.out.2'}),
 }
 
 gain = {
@@ -37,7 +37,7 @@ gain = {
 }
 
 audio_in = {
-	tjost.plugin('audio_in', 'audio.in.1', function(time, path, fmt, last, typ, b)
+	tjost.plugin({name='audio_in', port='audio.in.1'}, function(time, path, fmt, last, typ, b)
 		local buf = buf_t(b.raw)
 		for i = 0, #b/4-1 do
 			buf[i] = buf[i] * gain[1]
@@ -45,7 +45,7 @@ audio_in = {
 		audio_out[1](time, path, fmt, last, typ, b)
 	end),
 
-	tjost.plugin('audio_in', 'audio.in.2', function(time, path, fmt, last, typ, b)
+	tjost.plugin({name='audio_in', port='audio.in.2'}, function(time, path, fmt, last, typ, b)
 		local buf = buf_t(b.raw)
 		for i = 0, #b/4-1 do
 			buf[i] = buf[i] * gain[2]
@@ -58,7 +58,7 @@ function set_gain(idx, val)
 	gain[idx] = val
 end
 
-osc_in = tjost.plugin('send', function(time, path, fmt, ...)
+osc_in = tjost.plugin({name='send'}, function(time, path, fmt, ...)
 	if path == '/gain' and fmt == 'if' then
 		set_gain(...)
 	end

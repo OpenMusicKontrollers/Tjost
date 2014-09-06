@@ -23,6 +23,6 @@
 --     distribution.
 --]]
 
-message = tjost.plugin('dump')
+message = tjost.plugin({name='dump'})
 
-timer = tjost.plugin('timer', '2.0', message)
+timer = tjost.plugin({name='timer', delay=2.0}, message)

@@ -23,9 +23,9 @@
 --     distribution.
 --]]
 
-dump = tjost.plugin('dump')
+dump = tjost.plugin({name='dump'})
 
-loopback = tjost.plugin('loopback', function(time, path, fmt, val)
+loopback = tjost.plugin({name='loopback'}, function(time, path, fmt, val)
 	dump(time, path, fmt, val)
 	loopback(0, path, fmt, val+1)
 end)

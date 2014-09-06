@@ -24,8 +24,10 @@
 --]]
 
 if argv[3] == 'verbose' then
-	dump = tjost.plugin('dump', 'verbose')
+	verbose = 1
 else
-	dump = tjost.plugin('dump')
+	verbose = 0
 end
-osc_in = tjost.plugin('osc_in', 'osc.dump', dump)
+
+dump = tjost.plugin({name='dump', verbose=verbose})
+osc_in = tjost.plugin({name='osc_in', port='osc.dump'}, dump)

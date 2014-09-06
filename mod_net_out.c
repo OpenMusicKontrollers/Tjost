@@ -102,8 +102,27 @@ _thread(void *arg)
 }
 
 int
-add(Tjost_Module *module, int argc, const char **argv)
+add(Tjost_Module *module)
 {
+	Tjost_Host *host = module->host;
+	lua_State *L = host->L;
+
+	lua_getfield(L, 1, "uri");
+	const char *uri = luaL_optstring(L, -1, NULL);
+	lua_pop(L, 1);
+	
+	lua_getfield(L, 1, "rtprio");
+	const int rtprio = luaL_optint(L, -1, 60);
+	lua_pop(L, 1);
+	
+	lua_getfield(L, 1, "unroll");
+	const char *unroll = luaL_optstring(L, -1, "full");
+	lua_pop(L, 1);
+	
+	lua_getfield(L, 1, "offset");
+	const float offset = luaL_optnumber(L, -1, 0.f);
+	lua_pop(L, 1);
+
 	Data *dat = tjost_alloc(module->host, sizeof(Data));
 	memset(dat, 0, sizeof(Data));
 
@@ -129,9 +148,9 @@ add(Tjost_Module *module, int argc, const char **argv)
 	if((err = uv_timer_start(&dat->net.sync, mod_net_sync, 0, 1000))) // ms
 		MOD_ADD_ERR(module->host, MOD_NAME, uv_err_name(err));
 
-	if(!strncmp(argv[0], "osc.udp://", 10) || !strncmp(argv[0], "osc.udp4://", 11) || !strncmp(argv[0], "osc.udp6://", 11))
+	if(!strncmp(uri, "osc.udp://", 10) || !strncmp(uri, "osc.udp4://", 11) || !strncmp(uri, "osc.udp6://", 11))
 		dat->net.type = SOCKET_UDP;
-	else if(!strncmp(argv[0], "osc.tcp://", 10) || !strncmp(argv[0], "osc.tcp4://", 11) || !strncmp(argv[0], "osc.tcp6://", 11) || !strncmp(argv[0], "osc.slip.tcp://", 15) || !strncmp(argv[0], "osc.slip.tcp4://", 16) || !strncmp(argv[0], "osc.slip.tcp6://", 16))
+	else if(!strncmp(uri, "osc.tcp://", 10) || !strncmp(uri, "osc.tcp4://", 11) || !strncmp(uri, "osc.tcp6://", 11) || !strncmp(uri, "osc.slip.tcp://", 15) || !strncmp(uri, "osc.slip.tcp4://", 16) || !strncmp(uri, "osc.slip.tcp6://", 16))
 		dat->net.type = SOCKET_TCP;
 	else
 		MOD_ADD_ERR(module->host, MOD_NAME, "unknown OSC protocol layer");
@@ -141,30 +160,34 @@ add(Tjost_Module *module, int argc, const char **argv)
 	switch(dat->net.type)
 	{
 		case SOCKET_UDP:
-			if(netaddr_udp_sender_init(&dat->net.handle.udp_tx, &dat->loop, argv[0], mod_net_recv_cb, module)) //TODO close?
+			if(netaddr_udp_sender_init(&dat->net.handle.udp_tx, &dat->loop, uri, mod_net_recv_cb, module)) //TODO close?
 				MOD_ADD_ERR(module->host, MOD_NAME, "could not initialize socket");
 			module->type = TJOST_MODULE_IN_OUT;
 			break;
 		case SOCKET_TCP:
-			if(netaddr_tcp_endpoint_init(&dat->net.handle.tcp, NETADDR_TCP_SENDER, &dat->loop, argv[0], mod_net_recv_cb, module)) //TODO close?
+			if(netaddr_tcp_endpoint_init(&dat->net.handle.tcp, NETADDR_TCP_SENDER, &dat->loop, uri, mod_net_recv_cb, module)) //TODO close?
 				MOD_ADD_ERR(module->host, MOD_NAME, "could not initialize socket");
 			module->type = TJOST_MODULE_IN_OUT;
 			break;
 	}
 
-	if( (argc > 1) && argv[1])
 #ifndef _WIN32 // POSIX only
-		dat->schedp.sched_priority = atoi(argv[1]);
+	dat->schedp.sched_priority = rtprio;
 #else
-		dat->mcss_sched_priority = atoi(argv[1]);
+	dat->mcss_sched_priority = rtprio;
 #endif
 
-	dat->net.unroll = OSC_UNROLL_MODE_NONE; //TODO not used
-	if( (argc > 2) && argv[2])
+	if(!strcmp(unroll, "none"))
+		dat->net.unroll = OSC_UNROLL_MODE_NONE;
+	else if(!strcmp(unroll, "partial"))
+		dat->net.unroll = OSC_UNROLL_MODE_PARTIAL;
+	else if(!strcmp(unroll, "full"))
+		dat->net.unroll = OSC_UNROLL_MODE_FULL;
+
+	if(offset > 0.f)
 	{
-		float del = atof(argv[2]);
-		dat->net.delay_sec = (uint32_t)del;
-		dat->net.delay_nsec = (del - dat->net.delay_sec) * 1e9;
+		dat->net.delay_sec = (uint32_t)offset;
+		dat->net.delay_nsec = (offset - dat->net.delay_sec) * 1e9;
 	}
 	else
 	{

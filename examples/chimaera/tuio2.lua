@@ -23,10 +23,10 @@
 --     distribution.
 --]]
 
-message = tjost.plugin('dump')
-status = tjost.plugin('osc_out', 'osc.jack://status')
---data = tjost.plugin('osc_out', 'osc.jack://data')
-chim = tjost.plugin('net_out', 'osc.udp://chimaera.local:4444')
+message = tjost.plugin({name='dump'})
+status = tjost.plugin({name='osc_out', port='osc.jack://status'})
+--data = tjost.plugin({name='osc_out', port='osc.jack://data'})
+chim = tjost.plugin({name='net_out', uri='osc.udp://chimaera.local:4444'})
 
 id = require('id')
 tuio2 = require('tuio2_fltr')
@@ -36,7 +36,7 @@ drum = require('drum_out')
 
 rate = 3000
 
-control = tjost.plugin('osc_in', 'osc.jack://control', function(time, path, fmt, ...)
+control = tjost.plugin({name='osc_in', port='osc.jack://control'}, function(time, path, fmt, ...)
 	chim(time, path, fmt, ...)
 end)
 
@@ -69,14 +69,14 @@ success = function(time, uuid, path, ...)
 	end
 end
 
-conf = tjost.plugin('net_in', 'osc.udp://:4444', '50', 'full', function(time, path, fmt, ...)
+conf = tjost.plugin({name='net_in', uri='osc.udp://:4444', rtprio=50, unroll='full'}, function(time, path, fmt, ...)
 	if path == '/success' then
 		success(time, ...)
 	end
 end)
 tjost.chain(conf, message)
 
-debug = tjost.plugin('net_in', 'osc.udp://:6666', '50', 'full', status)
+debug = tjost.plugin({name='net_in', uri='osc.udp://:6666', rtprio=50, unroll='full'}, status)
 
 sc1 = scsynth:new({
 	port = 'scsynth.1',
@@ -98,7 +98,7 @@ tu1 = tuio2:new({}, function(...)
 	dr1(...)
 end)
 
-stream = tjost.plugin('net_in', 'osc.udp://:3333', '60', 'full', tu1)
+stream = tjost.plugin({name='net_in', uri='osc.udp://:3333', rtprio=60, unroll='full'}, tu1)
 --tjost.chain(stream, data)
 
 hostname = tjost.hostname()

@@ -23,9 +23,9 @@
 --     distribution.
 --]]
 
-dump = tjost.plugin('dump', 'verbose')
+dump = tjost.plugin({name='dump', verbose=1})
 
-loopback = tjost.plugin('loopback', function(...)
+loopback = tjost.plugin({name='loopback'}, function(...)
 	dump(...)
 	loopback(...)
 end)

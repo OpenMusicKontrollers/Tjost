@@ -26,9 +26,9 @@
 local ffi = require('ffi')
 buf_t = ffi.typeof('uint8_t *')
 
-midi_out = tjost.plugin('midi_out', 'midi.out')
+midi_out = tjost.plugin({name='midi_out', port='midi.out'})
 
-midi_in = tjost.plugin('midi_in', 'midi.in', function(time, path, fmt, ...)
+midi_in = tjost.plugin({name='midi_in', port='midi.in'}, function(time, path, fmt, ...)
 	for _, v in ipairs({...}) do
 		local m = buf_t(v.raw)
 

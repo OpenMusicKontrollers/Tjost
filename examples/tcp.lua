@@ -23,14 +23,14 @@
 --     distribution.
 --]]
 
-resp_out = tjost.plugin('osc_out', 'responder.tx')
+resp_out = tjost.plugin({name='osc_out', port='responder.tx'})
 
-tcp_in = tjost.plugin('net_in', 'osc.tcp://:3333', '60', resp_out)
+tcp_in = tjost.plugin({name='net_in', uri='osc.tcp://:3333', rtprio=60}, resp_out)
 
-resp_in = tjost.plugin('osc_in', 'responder.rx', tcp_in)
+resp_in = tjost.plugin({name='osc_in', port='responder.rx'}, tcp_in)
 
-send_out = tjost.plugin('osc_out', 'sender.tx')
+send_out = tjost.plugin({name='osc_out', port='sender.tx'})
 
-tcp_out = tjost.plugin('net_out', 'osc.tcp://localhost:3333', '60', '0.1', send_out)
+tcp_out = tjost.plugin({name='net_out', uri='osc.tcp://localhost:3333', rtprio=60, offset=0.1}, send_out)
 
-send_in = tjost.plugin('osc_in', 'sender.rx', tcp_out)
+send_in = tjost.plugin({name='osc_in', port='sender.rx'}, tcp_out)

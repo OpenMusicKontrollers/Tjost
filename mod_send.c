@@ -284,8 +284,10 @@ process_in(jack_nframes_t nframes, void *arg)
 }
 
 int
-add(Tjost_Module *module, int argc, const char **argv)
+add(Tjost_Module *module)
 {
+	Tjost_Host *host = module->host;
+	lua_State *L = host->L;
 	Data *dat = tjost_alloc(module->host, sizeof(Data));
 	memset(dat, 0, sizeof(Data));
 

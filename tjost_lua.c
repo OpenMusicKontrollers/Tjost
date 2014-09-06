@@ -625,16 +625,6 @@ const luaL_Reg tjost_midi_mt [] = {
 static int
 _plugin(lua_State *L)
 {
-	int argc = lua_gettop(L);
-	const char **argv = calloc(argc, sizeof(const char *));
-
-	int i;
-	for(i=0; i<argc; i++)
-		if(lua_isstring(L, i+1))
-			argv[i] = lua_tostring(L, i+1);
-		else
-			break;
-
 	Tjost_Host *host = lua_touserdata(L, lua_upvalueindex(1));
 
 	Tjost_Module *module = lua_newuserdata(L, sizeof(Tjost_Module));
@@ -642,8 +632,12 @@ _plugin(lua_State *L)
 
 	Eina_Module *mod;
 
-	if(!(mod = eina_module_find(host->arr, argv[0])))
-		fprintf(stderr, "could not find module '%s'\n", argv[0]);
+	lua_getfield(L, 1, "name");
+	const char *name = luaL_optstring(L, -1, NULL);
+	lua_pop(L, 1);
+
+	if(!(mod = eina_module_find(host->arr, name)))
+		fprintf(stderr, "could not find module '%s'\n", name);
 	if(!(module->add = eina_module_symbol_get(mod, "add")))
 		fprintf(stderr, "could not get 'add' symbol\n");
 	if(!(module->del = eina_module_symbol_get(mod, "del")))
@@ -682,12 +676,11 @@ _plugin(lua_State *L)
 			break;
 	}
 
-	if(module->add(module, argc-1-has_callback, argv+1))
+	if(module->add(module))
 	{
 		lua_pop(L, 1);
 		lua_pushnil(L);
 	}
-	free(argv);
 
 	switch(module->type)
 	{

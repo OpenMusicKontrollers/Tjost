@@ -179,14 +179,17 @@ process_out(jack_nframes_t nframes, void *arg)
 }
 
 int
-add(Tjost_Module *module, int argc, const char **argv)
+add(Tjost_Module *module)
 {
+	Tjost_Host *host = module->host;
+	lua_State *L = host->L;
 	Data *dat = tjost_alloc(module->host, sizeof(Data));
 	memset(dat, 0, sizeof(Data));
 
-	const char *device = "midi.seq";
-	if( (argc > 0) && argv[0] )
-		device = argv[0];
+	lua_getfield(L, 1, "device");
+	const char *device = luaL_optstring(L, -1, "seq");
+	lua_pop(L, 1);
+
 	if(snd_seq_open(&dat->seq, "hw", SND_SEQ_OPEN_OUTPUT, 0))
 		MOD_ADD_ERR(module->host, MOD_NAME, "could not create sequencer");
 	if(snd_seq_set_client_name(dat->seq, jack_get_client_name(module->host->client)))

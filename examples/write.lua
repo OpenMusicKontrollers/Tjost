@@ -31,8 +31,8 @@ n = 16
 b = tjost.blob(2*n)
 buf = buf_t(b.raw)
 
-dump = tjost.plugin('dump', 'verbose')
-write = tjost.plugin('write', 'bin.osc')
+dump = tjost.plugin({name='dump', verbose=1})
+write = tjost.plugin({name='write', path='bin.osc'})
 
 function newblob()
 	for i=1, n do
@@ -41,7 +41,7 @@ function newblob()
 	loopback(0, '/blob', 'b', b)
 end
 
-loopback = tjost.plugin('loopback', function(time, ...)
+loopback = tjost.plugin({name='loopback'}, function(time, ...)
 	dump(time, ...)
 	write(time, ...)
 	newblob()

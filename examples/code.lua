@@ -23,7 +23,7 @@
 --     distribution.
 --]]
 
-osc_out = tjost.plugin('osc_out', 'osc.out')
+osc_out = tjost.plugin({name='osc_out', port='osc.out'})
 
 methods = {
 	['/trigger'] = function(time, ...)
@@ -38,7 +38,7 @@ methods = {
 	end
 }
 
-osc_in = tjost.plugin('osc_in', 'osc.in', function(time, path, ...)
+osc_in = tjost.plugin({name='osc_in', port='osc.in'}, function(time, path, ...)
 	local cb = methods[path]
 	if cb then cb(time, ...) end
 end)

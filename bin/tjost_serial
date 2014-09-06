@@ -23,12 +23,12 @@
 --     distribution.
 --]]
 
-file = argv[3]
+device = argv[3]
 
-if file then
-	osc_out = tjost.plugin('osc_out', file..'.tx')
-	serial_io = tjost.plugin('serial', file, osc_out)
-	osc_in = tjost.plugin('osc_in', file..'.rx', serial_io)
+if device then
+	osc_out = tjost.plugin({name='osc_out', port=device..'.tx'})
+	serial_io = tjost.plugin({name='serial', device=device}, osc_out)
+	osc_in = tjost.plugin({name='osc_in', port=device..'.rx'}, serial_io)
 else
-	error('no file given (/dev/ttyACM0)')
+	print('FAIL: no device given')
 end

@@ -23,5 +23,5 @@
 --     distribution.
 --]]
 
-osc_out = tjost.plugin('osc_out', 'osc.cv')
-cv_in = tjost.plugin('cv_in', 'cv', osc_out)
+osc_out = tjost.plugin({name='osc_out', port='osc.cv'})
+cv_in = tjost.plugin({name='cv_in', port='cv'}, osc_out)

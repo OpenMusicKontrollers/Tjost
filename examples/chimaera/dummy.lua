@@ -23,10 +23,10 @@
 --     distribution.
 --]]
 
-message = tjost.plugin('dump')
-status = tjost.plugin('osc_out', 'status')
---data = tjost.plugin('osc_out', 'data')
-chim = tjost.plugin('net_out', 'osc.udp://chimaera.local:4444')
+message = tjost.plugin({name='dump'})
+status = tjost.plugin({name='osc_out', port='status'})
+--data = tjost.plugin({name='osc_out', port='data'})
+chim = tjost.plugin({name='net_out', uri='osc.udp://chimaera.local:4444'})
 
 id = require('id')
 scsynth = require('scsynth_out')
@@ -36,7 +36,7 @@ map = require('map')
 
 rate = 3000
 
-control = tjost.plugin('osc_in', 'control', function(time, path, fmt, ...)
+control = tjost.plugin({name='osc_in', port='control'}, function(time, path, fmt, ...)
 	chim(time, path, fmt, ...)
 end)
 
@@ -46,9 +46,8 @@ success = function(time, uuid, path, ...)
 			local bot = 2*12 - 0.5 - (n % 18 / 6);
 			local range = n/3
 
-			--md1.bot = bot
-			--md1.range = range
-			md1.map = map_poly_step:new({n=n, oct=2, order=3})
+			--md1.map = map_poly_step:new({n=n, oct=2, order=3})
+			md1.map = map_linear:new({n=n, oct=2})
 			message(time, '/number', 'iff', n, bot, range)
 		end,
 
@@ -77,14 +76,14 @@ success = function(time, uuid, path, ...)
 	end
 end
 
-conf = tjost.plugin('net_in', 'osc.udp://:4444', '50', 'full', function(time, path, fmt, ...)
+conf = tjost.plugin({name='net_in', uri='osc.udp://:4444', rtprio=50, unroll='full'}, function(time, path, fmt, ...)
 	if path == '/success' then
 		success(time, ...)
 	end
 end)
 tjost.chain(conf, message)
 
-debug = tjost.plugin('net_in', 'osc.udp://:6666', '50', 'full', status)
+debug = tjost.plugin({name='net_in', uri='osc.udp://:6666', rtprio=50, unroll='full'}, status)
 
 sc1 = scsynth:new({
 	port = 'scsynth.1',
@@ -93,14 +92,15 @@ sc1 = scsynth:new({
 
 md1 = midi:new({
 	port = 'midi.1',
-	effect = SOUND_EFFECT_5
+	--effect = SOUND_EFFECT_5
+	effect = VOLUME
 })
 
 dr1 = drum:new({
 	port = 'drum.1'
 })
 
-stream = tjost.plugin('net_in', 'osc.tcp://:3333', '60', 'full', function(...)
+stream = tjost.plugin({name='net_in', uri='osc.tcp://:3333', rtprio=60, unroll='full'}, function(...)
 	sc1(...)
 	md1(...)
 	dr1(...)

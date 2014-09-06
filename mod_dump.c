@@ -299,17 +299,18 @@ process_out(jack_nframes_t nframes, void *arg)
 }
 
 int
-add(Tjost_Module *module, int argc, const char **argv)
+add(Tjost_Module *module)
 {
+	Tjost_Host *host = module->host;
+	lua_State *L = host->L;
 	Data *dat = tjost_alloc(module->host, sizeof(Data));
 	memset(dat, 0, sizeof(Data));
 
 	uv_loop_t *loop = uv_default_loop();
 
-	if( (argc > 0) && argv[0])
-		dat->verbose = !strcmp(argv[0], "verbose") ? 1 : 0;
-	else
-		dat->verbose = 0;
+	lua_getfield(L, 1, "verbose");
+	dat->verbose = luaL_optint(L, -1, 0) ? 1 : 0;
+	lua_pop(L, 1);
 
 	if(!(dat->rb = jack_ringbuffer_create(TJOST_RINGBUF_SIZE)))
 		MOD_ADD_ERR(module->host, MOD_NAME, "could not initialize ringbuffer");

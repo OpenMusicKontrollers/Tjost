@@ -30,7 +30,7 @@ local scsynth = class:new({
 	inst = {'inst1', 'inst2', 'inst3', 'inst4', 'inst5', 'inst6', 'inst7', 'inst8'},
 
 	init = function(self)
-		self.serv = tjost.plugin('osc_out', self.port)
+		self.serv = tjost.plugin({name='osc_out', port=self.port})
 	end,
 
 	['/on'] = function(self, time, sid, gid, pid, x, y)

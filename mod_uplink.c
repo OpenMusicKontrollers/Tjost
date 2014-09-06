@@ -59,7 +59,7 @@ process_out(jack_nframes_t nframes, void *arg)
 }
 
 int
-add(Tjost_Module *module, int argc, const char **argv)
+add(Tjost_Module *module)
 {
 	module->type = TJOST_MODULE_UPLINK;
 

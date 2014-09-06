@@ -23,7 +23,7 @@
 --     distribution.
 --]]
 
-message = tjost.plugin('dump')
+message = tjost.plugin({name='dump'})
 
 methods = {
 	-- responders
@@ -57,7 +57,7 @@ methods = {
 	end
 }
 
-uplink = tjost.plugin('uplink', function(time, path, fmt, ...)
+uplink = tjost.plugin({name='uplink'}, function(time, path, fmt, ...)
 	message(time, path, fmt, ...)
 
 	local cb = methods[path]
@@ -66,4 +66,4 @@ uplink = tjost.plugin('uplink', function(time, path, fmt, ...)
 	end
 end)
 
-osc_in = tjost.plugin('osc_in', 'osc.uplink', uplink)
+osc_in = tjost.plugin({name='osc_in', port='osc.uplink'}, uplink)

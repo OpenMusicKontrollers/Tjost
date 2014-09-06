@@ -23,9 +23,9 @@
 --     distribution.
 --]]
 
-message = tjost.plugin('dump')
-status = tjost.plugin('osc_out', 'status')
-chim = tjost.plugin('net_out', 'osc.udp://chimaera.local:4444')
+message = tjost.plugin({name='dump'})
+status = tjost.plugin({name='osc_out', port='status'})
+chim = tjost.plugin({name='net_out', uri='osc.udp://chimaera.local:4444'})
 
 id = require('id')
 
@@ -68,16 +68,16 @@ success = function(time, uuid, path, ...)
 	end
 end
 
-conf = tjost.plugin('net_in', 'osc.udp://:4444', '50', 'full', function(time, path, fmt, ...)
+conf = tjost.plugin({name='net_in', uri='osc.udp://:4444', rtprio=50, unroll='full'}, function(time, path, fmt, ...)
 	if path == '/success' then
 		success(time, ...)
 	end
 end)
 tjost.chain(conf, message)
 
-debug = tjost.plugin('net_in', 'osc.udp://:6666', '50', 'full', status)
-midi_out = tjost.plugin('midi_out', 'midi.out')
-stream = tjost.plugin('net_in', 'osc.tcp://:3333', '60', 'full', midi_out)
+debug = tjost.plugin({name='net_in', uri='osc.udp://:6666', rtprio=50, unroll='full'}, status)
+midi_out = tjost.plugin({name='midi_out', port='midi.out'})
+stream = tjost.plugin({name='net_in', uri='osc.tcp://:3333', rtprio=60, unroll='full'}, midi_out)
 
 hostname = tjost.hostname()
 chim(0, '/comm/address', 'is', id(), hostname..'.local')

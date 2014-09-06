@@ -25,8 +25,8 @@
 
 JSON = require('JSON')
 
-message = tjost.plugin('dump')
-chim = tjost.plugin('net_out', 'osc.udp://chimaera.local:4444')
+message = tjost.plugin({name='dump'})
+chim = tjost.plugin({name='net_out', uri='osc.udp://chimaera.local:4444'})
 
 calls = {}
 
@@ -67,7 +67,7 @@ function config(time, ...)
 	--TODO
 end
 
-conf = tjost.plugin('net_in', 'osc.udp://:4444', '50', 'full', function(time, path, fmt, uuid, dest, ...)
+conf = tjost.plugin({name='net_in', uri='osc.udp://:4444', rtprio=50, unroll=full}, function(time, path, fmt, uuid, dest, ...)
 	if path == '/success' then
 		if calls[dest] then
 			if dest:find('!') then

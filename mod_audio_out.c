@@ -240,11 +240,17 @@ process_out(jack_nframes_t nframes, void *arg)
 }
 
 int
-add(Tjost_Module *module, int argc, const char **argv)
+add(Tjost_Module *module)
 {
+	Tjost_Host *host = module->host;
+	lua_State *L = host->L;
 	jack_port_t *port = NULL;
 
-	if(!(port = jack_port_register(module->host->client, argv[0], JACK_DEFAULT_AUDIO_TYPE, JackPortIsOutput, 0)))
+	lua_getfield(L, 1, "port");
+	const char *portn = luaL_optstring(L, -1, "audio.out");
+	lua_pop(L, 1);
+
+	if(!(port = jack_port_register(module->host->client, portn, JACK_DEFAULT_AUDIO_TYPE, JackPortIsOutput, 0)))
 		MOD_ADD_ERR(module->host, MOD_NAME, "could not register jack port");
 
 	module->dat = port;

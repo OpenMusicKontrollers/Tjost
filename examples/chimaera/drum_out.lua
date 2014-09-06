@@ -80,7 +80,7 @@ local drum = class:new({
 	last = nil,
 
 	init = function(self, ...)
-		self.beat = tjost.plugin('midi_out', self.port)
+		self.beat = tjost.plugin({name='midi_out'}, self.port)
 
 		self.m = tjost.midi()
 		self.raw = midi_t(self.m.raw)

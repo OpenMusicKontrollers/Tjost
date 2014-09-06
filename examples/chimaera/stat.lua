@@ -26,18 +26,18 @@
 id = require('id')
 
 methods = {
-	['/dump'] = tjost.plugin('write', 'stat.dump.osc'),
-	['/set'] = tjost.plugin('write', 'stat.evnt.osc')
+	['/dump'] = tjost.plugin({name='write', path='stat.dump.osc'}),
+	['/set'] = tjost.plugin({name='write', path='stat.evnt.osc'})
 }
 
-stream = tjost.plugin('net_in', 'osc.udp://:3333', '60', 'full', function(time, path, ...)
+stream = tjost.plugin({name='net_in', uri='osc.udp://:3333', rtprio=60, unroll'full'}, function(time, path, ...)
 	local meth = methods[path]
 	if meth then
 		meth(time, path, ...)
 	end
 end)
 			
-chim = tjost.plugin('net_out', 'osc.udp://chimaera.local:4444')
+chim = tjost.plugin({name='net_out', uri='osc.udp://chimaera.local:4444'})
 
 chim(0, '/sensors/movingaverage', 'ii', id(), 8)
 --chim(0, '/sensors/interpolation', 'is', id(), 'none')

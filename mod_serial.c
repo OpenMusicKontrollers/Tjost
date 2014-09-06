@@ -356,10 +356,20 @@ process_out(jack_nframes_t nframes, void *arg)
 }
 
 int
-add(Tjost_Module *module, int argc, const char **argv)
+add(Tjost_Module *module)
 {
+	Tjost_Host *host = module->host;
+	lua_State *L = host->L;
 	Data *dat = tjost_alloc(module->host, sizeof(Data));
 	memset(dat, 0, sizeof(Data));
+
+	lua_getfield(L, 1, "device");
+	const char *device = luaL_optstring(L, -1, NULL);
+	lua_pop(L, 1);
+
+	lua_getfield(L, 1, "unroll");
+	const char *unroll = luaL_optstring(L, -1, "full");
+	lua_pop(L, 1);
 
 	if(!(dat->rb_in = jack_ringbuffer_create(TJOST_RINGBUF_SIZE)))
 		MOD_ADD_ERR(module->host, MOD_NAME, "could not initialize ringbuffer");
@@ -368,8 +378,8 @@ add(Tjost_Module *module, int argc, const char **argv)
 	
 	uv_loop_t *loop = uv_default_loop();
 
-	int fd_in = open(argv[0], O_RDONLY | O_NOCTTY | O_NONBLOCK, 0);
-	int fd_out = open(argv[0], O_WRONLY | O_NOCTTY | O_NONBLOCK, 0);
+	int fd_in = open(device, O_RDONLY | O_NOCTTY | O_NONBLOCK, 0);
+	int fd_out = open(device, O_WRONLY | O_NOCTTY | O_NONBLOCK, 0);
 
 	dat->serial_in.data = module;
 	dat->serial_out.data = module;
@@ -386,7 +396,12 @@ add(Tjost_Module *module, int argc, const char **argv)
 	if((err = uv_read_start((uv_stream_t *)&dat->serial_in, _serial_slip_alloc, _serial_slip_recv_cb)))
 		MOD_ADD_ERR(module->host, MOD_NAME, uv_err_name(err));
 
-	dat->unroll = OSC_UNROLL_MODE_FULL;
+	if(!strcmp(unroll, "none"))
+		dat->unroll = OSC_UNROLL_MODE_NONE;
+	else if(!strcmp(unroll, "partial"))
+		dat->unroll = OSC_UNROLL_MODE_PARTIAL;
+	else if(!strcmp(unroll, "full"))
+		dat->unroll = OSC_UNROLL_MODE_FULL;
 
 	dat->asio.data = module;
 	if((err = uv_async_init(loop, &dat->asio, _asio)))

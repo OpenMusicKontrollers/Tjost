@@ -38,41 +38,41 @@ mt = {
 osc_methods = {}
 setmetatable(osc_methods, mt)
 
-osc_in = tjost.plugin('osc_in', 'osc.in', function(time, path, fmt, ...)
+osc_in = tjost.plugin({name='osc_in', port='osc.in'}, function(time, path, fmt, ...)
 	local method = osc_methods[path]
 	if method then
 		method(time, fmt, ...)
 	end
 end)
 
-osc_out = tjost.plugin('osc_out', 'osc.out')
+osc_out = tjost.plugin({name='osc_out', port='osc.out'})
 
 osc_stereo = 0
 osc_mono = {}
 
-osc_stereo = tjost.plugin('osc_in', 'osc.stereo', function(time, path, ...)
+osc_stereo = tjost.plugin({name='osc_in', port='osc.stereo'}, function(time, path, ...)
 	local method = osc_mono[path]
 	if method then
 		method(time, '/mono', ...)
 	end
 end)
 
-osc_mono['/left'] = tjost.plugin('osc_out', 'osc.left')
-osc_mono['/right'] = tjost.plugin('osc_out', 'osc.right')
+osc_mono['/left'] = tjost.plugin({name='osc_out', port='osc.left'})
+osc_mono['/right'] = tjost.plugin({name='osc_out', port='osc.right'})
 
 midi_out = {
-	base = tjost.plugin('midi_out', 'base'),
-	lead = tjost.plugin('midi_out', 'lead')
+	base = tjost.plugin({name='midi_out', port='base'}),
+	lead = tjost.plugin({name='midi_out', port='lead'})
 }
 
-midi_in = tjost.plugin('osc_in', 'osc.midi')
+midi_in = tjost.plugin({name='osc_in', port='osc.midi'})
 tjost.chain(midi_in, midi_out.base)
 tjost.chain(midi_in, midi_out.lead)
 
-net_out = tjost.plugin('net_out', 'osc.udp://localhost:3333')
-net_in = tjost.plugin('net_in', 'osc.udp://:4444', net_out)
+net_out = tjost.plugin({name='net_out', uri='osc.udp://localhost:3333'})
+net_in = tjost.plugin({name='net_in', uri='osc.udp://:4444'}, net_out)
 
-midi_clk = tjost.plugin('midi_in', 'clk')
+midi_clk = tjost.plugin({name='midi_in', port='clk'})
 tjost.chain(midi_clk, midi_out.base)
 tjost.chain(midi_clk, midi_out.lead)
 tjost.chain(midi_clk, net_out)

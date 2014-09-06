@@ -66,7 +66,7 @@ local midi = class:new({
 			midi_t(self.m[4].raw)
 		}
 	
-		self.serv = tjost.plugin('midi_out', self.port)
+		self.serv = tjost.plugin({name='midi_out', port=self.port})
 	end,
 
 	['/on'] = function(self, time, sid, gid, pid, x, y)

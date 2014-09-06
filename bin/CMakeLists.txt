@@ -1,5 +1,3 @@
-#configure_file("${PROJECT_SOURCE_DIR}/bin/tjost_midi2osc.in" "${PROJECT_SOURCE_DIR}/bin/tjost_midi2osc")
-
 # convenience scripts
 set(scripts "")
 

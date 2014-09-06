@@ -63,7 +63,7 @@ typedef struct _Tjost_Child Tjost_Child;
 typedef struct _Tjost_Mem_Chunk Tjost_Mem_Chunk;
 typedef struct _Tjost_Host Tjost_Host;
 
-typedef int (*Tjost_Module_Add_Cb)(Tjost_Module *module, int argc, const char **argv);
+typedef int (*Tjost_Module_Add_Cb)(Tjost_Module *module);
 typedef void (*Tjost_Module_Del_Cb)(Tjost_Module *module);
 
 #define TJOST_MODULE_INPUT	0b001

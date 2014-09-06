@@ -27,9 +27,9 @@ remote = 'osc.udp://localhost:3333'
 host = 'osc.udp://:4444'
 
 -- outputs
-osc_out = tjost.plugin('osc_out', host)
-net_out = tjost.plugin('net_out', remote)
+osc_out = tjost.plugin({name='osc_out', port=host})
+net_out = tjost.plugin({name='net_out', uri=remote})
 
 -- inputs
-osc_in = tjost.plugin('osc_in', remote, net_out)
-net_in = tjost.plugin('net_in', host, osc_out)
+osc_in = tjost.plugin({name='osc_in', port=remote}, net_out)
+net_in = tjost.plugin({name='net_in', uri=host}, osc_out)

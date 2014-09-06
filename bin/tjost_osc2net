@@ -24,15 +24,16 @@
 --]]
 
 host = argv[3]
-rtprio = argv[4] or '60'
-offset = argv[5] or 0 -- immediate timestamp
+rtprio = argv[4]
+unroll = argv[5]
+offset = argv[5]
 
 if host then
-	net_io = tjost.plugin('net_out', host, rtprio, offset)
-	osc_in = tjost.plugin('osc_in', host, net_io)
+	net_io = tjost.plugin({name='net_out', uri=host, rtprio=rtprio, urnoll=unroll, offset=offset})
+	osc_in = tjost.plugin({name='osc_in', port=host}, net_io)
 
-	osc_out = tjost.plugin('osc_out', 'osc.net')
+	osc_out = tjost.plugin({name='osc_out', port='osc.net'})
 	tjost.chain(net_io, osc_out)
 else
-	error('no address given (osc.tcp://localhost:4444)')
+	print('FAIL: no uri given')
 end

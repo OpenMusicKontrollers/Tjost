@@ -23,21 +23,21 @@
 --     distribution.
 --]]
 
-dump = tjost.plugin('dump', 'verbose')
+dump = tjost.plugin({name='dump', verbose=1})
 
 responder = {
-	none = tjost.plugin('net_in', 'osc.udp://:3331', '60', 'none', dump),
-	partial = tjost.plugin('net_in', 'osc.udp://:3332', '60', 'partial', dump),
-	full = tjost.plugin('net_in', 'osc.udp://:3333', '60', 'full', dump),
+	none = tjost.plugin({name='net_in', uri='osc.udp://:3331', rtprio=60, unroll='none'}, dump),
+	partial = tjost.plugin({name='net_in', uri='osc.udp://:3332', rtprio=60, unroll='partial'}, dump),
+	full = tjost.plugin({name='net_in', uri='osc.udp://:3333', rtprio=60, unroll='full'}, dump),
 }
 
 sender = {
-	none = tjost.plugin('net_out', 'osc.udp://localhost:3331'),
-	partial = tjost.plugin('net_out', 'osc.udp://localhost:3332'),
-	full = tjost.plugin('net_out', 'osc.udp://localhost:3333')
+	none = tjost.plugin({name='net_out', uri='osc.udp://localhost:3331'}),
+	partial = tjost.plugin({name='net_out', uri='osc.udp://localhost:3332'}),
+	full = tjost.plugin({name='net_out', uri='osc.udp://localhost:3333'})
 }
 
-loopback = tjost.plugin('loopback', function(...)
+loopback = tjost.plugin({name='loopback'}, function(...)
 	sender.none(...)
 	sender.partial(...)
 	sender.full(...)

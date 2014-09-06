@@ -164,14 +164,17 @@ process_out(jack_nframes_t nframes, void *arg)
 }
 
 int
-add(Tjost_Module *module, int argc, const char **argv)
+add(Tjost_Module *module)
 {
+	Tjost_Host *host = module->host;
+	lua_State *L = host->L;
 	Data *dat = tjost_alloc(module->host, sizeof(Data));
 	memset(dat, 0, sizeof(Data));
 
-	const char *device = "virtual";
-	if( (argc > 0) && argv[0] )
-		device = argv[0];
+	lua_getfield(L, 1, "device");
+	const char *device = luaL_optstring(L, -1, "virtual");
+	lua_pop(L, 1);
+
 	if(snd_rawmidi_open(NULL, &dat->dev, device, 0))
 		MOD_ADD_ERR(module->host, MOD_NAME, "could not open MIDI device");
 
