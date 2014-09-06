@@ -112,7 +112,7 @@ add(Tjost_Module *module)
 	lua_pop(L, 1);
 	
 	lua_getfield(L, 1, "rtprio");
-	const int rtprio = luaL_optint(L, -1, 60);
+	const int rtprio = luaL_optint(L, -1, 0);
 	lua_pop(L, 1);
 	
 	lua_getfield(L, 1, "unroll");

@@ -185,7 +185,7 @@ _osc_method_dispatch_bundle(jack_nframes_t time, osc_data_t *buf, size_t size, O
 	}
 
 	if(bundle_out)
-		bundle_out(dat);
+		bundle_out(time, dat);
 }
 
 void

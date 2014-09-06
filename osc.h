@@ -58,7 +58,7 @@ typedef union _swap32_t swap32_t;
 typedef union _swap64_t swap64_t;
 typedef int (*OSC_Callback) (jack_nframes_t time, const char *path, const char *fmt, osc_data_t *arg, void *dat);
 typedef void (*OSC_Bundle_In) (jack_nframes_t time, void *dat);
-typedef void (*OSC_Bundle_Out) (void *dat);
+typedef void (*OSC_Bundle_Out) (jack_nframes_t time, void *dat);
 typedef struct _OSC_Method OSC_Method;
 typedef struct _OSC_Blob OSC_Blob;
 typedef union _OSC_Argument OSC_Argument;

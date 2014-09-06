@@ -93,7 +93,6 @@ struct _Tjost_Blob {
 struct _Tjost_Bundle {
 	EINA_INLIST;
 
-	jack_nframes_t time;
 	osc_data_t *ptr;
 };
 
@@ -127,7 +126,6 @@ struct _Tjost_Module {
 	osc_data_t *buf_ptr;
 	osc_data_t *itm;
 	Eina_Inlist *bndls;
-	int nest;
 };
 
 struct _Tjost_Child {

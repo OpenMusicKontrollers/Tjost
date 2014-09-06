@@ -24,4 +24,4 @@
 --]]
 
 osc_out = tjost.plugin({name='osc_out', port='osc.send'})
-send = tjost.plugin({name='send'}, osc_out)
+send = tjost.plugin({name='send'}, function(...) osc_out(...) end)

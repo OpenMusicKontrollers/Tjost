@@ -38,17 +38,17 @@ process_out(jack_nframes_t nframes, void *arg)
 	Tjost_Event *tev;
 	EINA_INLIST_FOREACH_SAFE(module->queue, l, tev)
 	{
-		if(tev->time >= last + 2*nframes)
+		if(tev->time >= last + nframes)
 			break;
 		else if(tev->time == 0) // immediate execution in next periods
-			tev->time = last + nframes;
-		else if(tev->time < last + nframes)
+			tev->time = last;
+		else if(tev->time < last)
 		{
 			tjost_host_message_push(host, MOD_NAME": %s %i", "late event", tev->time - last);
 			tev->time = last + nframes;
 		}
 
-		tjost_host_schedule(host, module, tev->time, tev->size, tev->buf); // schedule for next period
+		tjost_host_schedule(host, module, tev->time + nframes, tev->size, tev->buf); // schedule for next period
 
 		module->queue = eina_inlist_remove(module->queue, EINA_INLIST_GET(tev));
 		tjost_free(host, tev);

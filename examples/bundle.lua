@@ -31,21 +31,14 @@ loopback = tjost.plugin({name='loopback'}, function(...)
 end)
 
 function newbundle()
-	--loopback(0, '/hello', 's', 'world')
-
-	--loopback(0)
-	--	loopback('/hello', 's', 'world')
-	--	loopback('/ping', '')
-	--loopback()
-
-	loopback(0)
+	loopback('/bundle/push', '')
 		loopback('/hello', 's', 'world')
-		loopback(0)
+		loopback('/bundle/push', '')
 			loopback('/LAC', 'i', 2014)
 			loopback('/pong', 'T')
-		loopback()
+		loopback('/bundle/pop', '')
 		loopback('/ping', '')
-	loopback()
+	loopback('/bundle/pop', '')
 end
 
 newbundle()
