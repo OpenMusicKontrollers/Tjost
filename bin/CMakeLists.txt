@@ -16,6 +16,7 @@ set(scripts ${scripts} tjost_net2osc)
 set(scripts ${scripts} tjost_dump)
 set(scripts ${scripts} tjost_send)
 set(scripts ${scripts} tjost_write)
+set(scripts ${scripts} tjost_read)
 set(scripts ${scripts} tjost_serial)
 
 install(PROGRAMS ${scripts} DESTINATION bin)

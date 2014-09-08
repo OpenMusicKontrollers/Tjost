@@ -25,7 +25,7 @@
 
 message = tjost.plugin({name='dump'})
 status = tjost.plugin({name='osc_out', port='status'})
---data = tjost.plugin({name='osc_out', port='data'})
+data = tjost.plugin({name='osc_out', port='data'})
 chim = tjost.plugin({name='net_out', uri='osc.udp://chimaera.local:4444'})
 
 id = require('id')
@@ -64,7 +64,7 @@ success = function(time, uuid, path, ...)
 
 			chim(0, '/engines/enabled', 'ii', id(), 0)
 			chim(0, '/engines/mode', 'is', id(), 'osc.tcp')
-			chim(0, '/engines/offset', 'if', id(), 0.002)
+			chim(0, '/engines/offset', 'if', id(), 0.0025)
 			chim(0, '/engines/reset', 'i', id())
 			chim(0, '/engines/dummy/enabled', 'ii', id(), 1)
 		end
@@ -92,8 +92,8 @@ sc1 = scsynth:new({
 
 md1 = midi:new({
 	port = 'midi.1',
-	--effect = SOUND_EFFECT_5
-	effect = VOLUME
+	effect = SOUND_EFFECT_5
+	--effect = VOLUME
 })
 
 dr1 = drum:new({
@@ -105,7 +105,7 @@ stream = tjost.plugin({name='net_in', uri='osc.tcp://:3333', rtprio=60, unroll='
 	md1(...)
 	dr1(...)
 end)
---tjost.chain(stream, data)
+tjost.chain(stream, data)
 
 hostname = tjost.hostname()
 chim(0, '/comm/address', 'is', id(), hostname..'.local')

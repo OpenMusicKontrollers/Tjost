@@ -25,7 +25,7 @@
 
 #include <tjost.h>
 
-#define MOD_NAME "write"
+#define MOD_NAME "read"
 
 typedef struct _Data Data;
 
@@ -37,103 +37,77 @@ struct _Data {
 	jack_nframes_t offset;
 };
 
-static void
-_asio(uv_async_t *handle)
-{
-	Tjost_Module *module = handle->data;
-	Tjost_Host *host = module->host;
-	Data *dat = module->dat;
-
-	Tjost_Event tev;
-	while(jack_ringbuffer_read_space(dat->rb) >= sizeof(Tjost_Event))
-	{
-		jack_ringbuffer_peek(dat->rb, (char *)&tev, sizeof(Tjost_Event));
-		if(jack_ringbuffer_read_space(dat->rb) >= sizeof(Tjost_Event) + tev.size)
-		{
-			jack_ringbuffer_read_advance(dat->rb, sizeof(Tjost_Event));
-
-			jack_ringbuffer_data_t vec [2];
-			jack_ringbuffer_get_read_vector(dat->rb, vec);
-
-			osc_data_t *buffer;
-			if(vec[0].len >= tev.size)
-				buffer = (osc_data_t *)vec[0].buf;
-			else
-			{
-				buffer = dat->buffer;
-				jack_ringbuffer_read(dat->rb, (char *)buffer, tev.size);
-			}
-
-			assert((uintptr_t)buffer % sizeof(uint32_t) == 0);
-
-			uint32_t ntime = tev.time;
-			uint32_t nsize = tev.size;
-
-			ntime = htonl(ntime);
-			nsize = htonl(nsize);
-
-			fwrite(&ntime, sizeof(uint32_t), 1, dat->f);
-			fwrite(&nsize, sizeof(uint32_t), 1, dat->f);
-			fwrite(buffer, tev.size, 1, dat->f);
-
-			if(vec[0].len >= tev.size)
-				jack_ringbuffer_read_advance(dat->rb, tev.size);
-		}
-		else
-			break;
-	}
-}
-
 int
-process_out(jack_nframes_t nframes, void *arg)
+process_in(jack_nframes_t nframes, void *arg)
 {
 	Tjost_Module *module = arg;
 	Tjost_Host *host = module->host;
 	Data *dat = module->dat;
 
-	jack_nframes_t last = jack_last_frame_time(host->client);
-
 	if(dat->offset == 0) //TODO add way to reset this
-		dat->offset = last;
+		dat->offset = jack_last_frame_time(host->client);
 
-	unsigned int count = eina_inlist_count(module->queue);
-
-	// handle events
-	Eina_Inlist *l;
-	Tjost_Event *tev;
-	EINA_INLIST_FOREACH_SAFE(module->queue, l, tev)
+	Tjost_Event tev;
+	while(jack_ringbuffer_read_space(dat->rb) >= sizeof(Tjost_Event))
 	{
-		if(tev->time >= last + nframes)
-			break;
-		else if(tev->time == 0) // immediate execution
-			tev->time = last;
-		else if(tev->time < last)
-		{
-			tjost_host_message_push(host, MOD_NAME": %s %i", "late event", tev->time - last);
-			tev->time = last;
-		}
+		if(jack_ringbuffer_peek(dat->rb, (char *)&tev, sizeof(Tjost_Event)) != sizeof(Tjost_Event))
+			tjost_host_message_push(host, MOD_NAME": %s", "ringbuffer peek error");
 
-		if(jack_ringbuffer_write_space(dat->rb) < sizeof(Tjost_Event) + tev->size)
-			tjost_host_message_push(host, MOD_NAME": %s", "ringbuffer overflow");
+		if(jack_ringbuffer_read_space(dat->rb) >= sizeof(Tjost_Event) + tev.size)
+		{
+			jack_ringbuffer_read_advance(dat->rb, sizeof(Tjost_Event));
+
+			tev.time += dat->offset;
+			osc_data_t *bf = tjost_host_schedule_inline(host, module, tev.time, tev.size);
+			if(jack_ringbuffer_read(dat->rb, (char *)bf, tev.size) != tev.size)
+				tjost_host_message_push(host, MOD_NAME": %s", "ringbuffer read error");
+		}
 		else
-		{
-			tev->time -= dat->offset; // relative time to first written event
-			jack_ringbuffer_write(dat->rb, (const char *)tev, sizeof(Tjost_Event));
-			jack_ringbuffer_write(dat->rb, (const char *)tev->buf, tev->size);
-		}
-
-		module->queue = eina_inlist_remove(module->queue, EINA_INLIST_GET(tev));
-		tjost_free(host, tev);
+			break;
 	}
 
-	if(count > 0)
-	{
-		int err;
-		if((err = uv_async_send(&dat->asio)))
-			tjost_host_message_push(host, MOD_NAME": %s", uv_err_name(err));
-	}
+	int err;
+	if((err = uv_async_send(&dat->asio)))
+		tjost_host_message_push(host, MOD_NAME": %s", uv_err_name(err));
 
 	return 0;
+}
+
+static void
+_asio(uv_async_t *handle)
+{
+	Tjost_Module *module = handle->data;
+	Data *dat = module->dat;
+	
+	while(!feof(dat->f) && (jack_ringbuffer_write_space(dat->rb) > TJOST_BUF_SIZE) )
+	{
+		uint32_t ntime;
+		uint32_t nsize;
+		fread(&ntime, sizeof(uint32_t), 1, dat->f);
+		ntime = ntohl(ntime);
+		fread(&nsize, sizeof(uint32_t), 1, dat->f);
+		nsize = ntohl(nsize);
+		fread(dat->buffer, sizeof(osc_data_t), nsize, dat->f);
+		
+		Tjost_Event tev;
+		tev.time = ntime;
+		tev.size = nsize;
+
+		if(osc_message_check(dat->buffer, tev.size))
+		{
+			if(jack_ringbuffer_write_space(dat->rb) < sizeof(Tjost_Event) + tev.size)
+				fprintf(stderr, MOD_NAME": ringbuffer overflow\n");
+			else
+			{
+				if(jack_ringbuffer_write(dat->rb, (const char *)&tev, sizeof(Tjost_Event)) != sizeof(Tjost_Event))
+					fprintf(stderr, MOD_NAME": ringbuffer write 1 error\n");
+				if(jack_ringbuffer_write(dat->rb, (const char *)dat->buffer, tev.size) != tev.size)
+					fprintf(stderr, MOD_NAME": ringbuffer write 2 error\n");
+			}
+		}
+		else
+			fprintf(stderr, MOD_NAME": rx OSC message invalid\n");
+	}
 }
 
 int
@@ -152,17 +126,19 @@ add(Tjost_Module *module)
 
 	if(path)
 	{
-		if(!(dat->f = fopen(path, "wb")))
+		if(!(dat->f = fopen(path, "rb")))
 			MOD_ADD_ERR(module->host, MOD_NAME, "could not open file handle");
 	}
 	else
-		dat->f = stdout;
+		dat->f = stdin;
 
-	const char *head = "tjostbin";
-	uint32_t nsrate = htonl(module->host->srate);
-	fwrite(head, sizeof(char), 8, dat->f);
-	fwrite(&nsrate, sizeof(uint32_t), 1, dat->f);
-	fflush(dat->f);
+	char head [8];
+	uint32_t nsrate;
+	fread(head, sizeof(char), 8, dat->f);
+	fread(&nsrate, sizeof(uint32_t), 1, dat->f);
+	nsrate = ntohl(nsrate);
+	if(strncmp(head, "tjostbin", 8))
+		MOD_ADD_ERR(module->host, MOD_NAME, "not an OSC binary file");
 
 	if(!(dat->rb = jack_ringbuffer_create(TJOST_RINGBUF_SIZE)))
 		MOD_ADD_ERR(module->host, MOD_NAME, "could not initialize ringbuffer");
@@ -173,7 +149,7 @@ add(Tjost_Module *module)
 		MOD_ADD_ERR(module->host, MOD_NAME, uv_err_name(err));
 
 	module->dat = dat;
-	module->type = TJOST_MODULE_OUTPUT;
+	module->type = TJOST_MODULE_INPUT;
 
 	return 0;
 }

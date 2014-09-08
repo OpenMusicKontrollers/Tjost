@@ -117,6 +117,11 @@ add_library(write MODULE mod_write.c)
 set_target_properties(write PROPERTIES PREFIX "")
 install(TARGETS write DESTINATION lib/tjost)
 
+# mod_read
+add_library(read MODULE mod_read.c)
+set_target_properties(read PROPERTIES PREFIX "")
+install(TARGETS read DESTINATION lib/tjost)
+
 # mod_midi_in
 add_library(midi_in MODULE mod_midi_in.c)
 set_target_properties(midi_in PROPERTIES PREFIX "")
