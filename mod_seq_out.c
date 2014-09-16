@@ -197,7 +197,7 @@ add(Tjost_Module *module)
 	dat->port = snd_seq_create_simple_port(dat->seq, device,
 		SND_SEQ_PORT_CAP_READ | SND_SEQ_PORT_CAP_SUBS_READ,
 		SND_SEQ_PORT_TYPE_HARDWARE);
-	if(!dat->port < 0)
+	if(dat->port < 0)
 		MOD_ADD_ERR(module->host, MOD_NAME, "could not create port");
 	dat->queue = snd_seq_alloc_queue(dat->seq);
 	if(dat->queue < 0)
