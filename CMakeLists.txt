@@ -31,6 +31,13 @@ if(USE_ALSA)
 	include_directories(${ALSA_INCLUDE_DIRS})
 endif()
 
+# RtMidi
+option(USE_RTMIDI "use RtMidi" ON)
+if(USE_RTMIDI)
+	pkg_search_module(RTMIDI REQUIRED librtmidi)
+	include_directories(${RTMIDI_INCLUDE_DIRS})
+endif()
+
 # lua
 option(USE_LUAJIT "use LuaJIT" ON)
 if(USE_LUAJIT)
@@ -132,36 +139,44 @@ add_library(midi_out MODULE mod_midi_out.c)
 set_target_properties(midi_out PROPERTIES PREFIX "")
 install(TARGETS midi_out DESTINATION lib/tjost)
 
-# mod_raw_in
 if(USE_ALSA)
+	# mod_raw_in
 	add_library(raw_in MODULE mod_raw_in.c)
 	set_target_properties(raw_in PROPERTIES PREFIX "")
 	target_link_libraries(raw_in ${ALSA_LDFLAGS})
 	install(TARGETS raw_in DESTINATION lib/tjost)
-endif()
 
-# mod_raw_out
-if(USE_ALSA)
+	# mod_raw_out
 	add_library(raw_out MODULE mod_raw_out.c)
 	set_target_properties(raw_out PROPERTIES PREFIX "")
 	target_link_libraries(raw_out ${ALSA_LDFLAGS})
 	install(TARGETS raw_out DESTINATION lib/tjost)
-endif()
 
-# mod_seq_in
-if(USE_ALSA)
+	# mod_seq_in
 	add_library(seq_in MODULE mod_seq_in.c)
 	set_target_properties(seq_in PROPERTIES PREFIX "")
 	target_link_libraries(seq_in ${ALSA_LDFLAGS})
 	install(TARGETS seq_in DESTINATION lib/tjost)
-endif()
 
-# mod_seq_out
-if(USE_ALSA)
+	# mod_seq_out
 	add_library(seq_out MODULE mod_seq_out.c)
 	set_target_properties(seq_out PROPERTIES PREFIX "")
 	target_link_libraries(seq_out ${ALSA_LDFLAGS})
 	install(TARGETS seq_out DESTINATION lib/tjost)
+endif()
+
+if(USE_RTMIDI)
+	# mod_rtmidi_in
+	add_library(rtmidi_in MODULE mod_rtmidi_in.c rtmidi_c.cpp)
+	set_target_properties(rtmidi_in PROPERTIES PREFIX "")
+	target_link_libraries(rtmidi_in ${RTMIDI_LDFLAGS})
+	install(TARGETS rtmidi_in DESTINATION lib/tjost)
+
+	# mod_rtmidi_out
+	add_library(rtmidi_out MODULE mod_rtmidi_out.c rtmidi_c.cpp)
+	set_target_properties(rtmidi_out PROPERTIES PREFIX "")
+	target_link_libraries(rtmidi_out ${RTMIDI_LDFLAGS})
+	install(TARGETS rtmidi_out DESTINATION lib/tjost)
 endif()
 
 # mod_audio_in
