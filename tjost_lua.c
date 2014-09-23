@@ -655,7 +655,7 @@ _plugin(lua_State *L)
 
 	// has a responder function ? TODO check Output of Uplink
 	int has_callback = 0;
-	switch(lua_type(L, -2))
+	switch(lua_type(L, 2))
 	{
 		case LUA_TTABLE: // TODO check for__call metamethod
 		case LUA_TFUNCTION:
@@ -664,7 +664,7 @@ _plugin(lua_State *L)
 			module->has_lua_callback = 1;
 
 			lua_pushlightuserdata(L, module);
-			lua_pushvalue(L, -3); // responder function
+			lua_pushvalue(L, 2); // responder function
 			lua_rawset(L, LUA_REGISTRYINDEX);
 			break;
 		}
@@ -672,7 +672,7 @@ _plugin(lua_State *L)
 		{
 			has_callback = 1;
 
-			Tjost_Module *mod_out = lua_touserdata(L, -2);
+			Tjost_Module *mod_out = lua_touserdata(L, 2);
 			Tjost_Child *child = tjost_alloc(host, sizeof(Tjost_Child));
 			child->module = mod_out;
 			module->children = eina_inlist_append(module->children, EINA_INLIST_GET(child));

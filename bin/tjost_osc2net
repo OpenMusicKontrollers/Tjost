@@ -29,11 +29,9 @@ unroll = argv[5]
 offset = argv[5]
 
 if host then
-	net_io = tjost.plugin({name='net_out', uri=host, rtprio=rtprio, urnoll=unroll, offset=offset})
-	osc_in = tjost.plugin({name='osc_in', port=host}, net_io)
-
 	osc_out = tjost.plugin({name='osc_out', port='osc.net'})
-	tjost.chain(net_io, osc_out)
+	net_io = tjost.plugin({name='net_out', uri=host, rtprio=rtprio, urnoll=unroll, offset=offset}, osc_out)
+	osc_in = tjost.plugin({name='osc_in', port=host}, net_io)
 else
 	print('FAIL: no uri given')
 end
