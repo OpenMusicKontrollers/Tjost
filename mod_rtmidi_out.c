@@ -33,8 +33,7 @@ typedef struct _Data Data;
 struct _Data {
 	RtMidiC_Out *dev;
 
-	jack_ringbuffer_t *rb;
-	uv_async_t asio;
+	Tjost_Pipe pipe;
 	osc_data_t buffer [TJOST_BUF_SIZE] __attribute__((aligned (8)));
 };
 
@@ -75,42 +74,23 @@ static OSC_Method methods [] = {
 	{NULL, NULL, NULL}
 };
 
-static void
-_asio(uv_async_t *handle)
+static osc_data_t *
+_alloc(jack_nframes_t timestamp, size_t len, void *arg)
 {
-	Tjost_Module *module = handle->data;
+	Tjost_Module *module = arg;
 	Data *dat = module->dat;
 
-	Tjost_Event tev;
-	while(jack_ringbuffer_read_space(dat->rb) >= sizeof(Tjost_Event))
-	{
-		jack_ringbuffer_peek(dat->rb, (char *)&tev, sizeof(Tjost_Event));
-		if(jack_ringbuffer_read_space(dat->rb) >= sizeof(Tjost_Event) + tev.size)
-		{
-			jack_ringbuffer_read_advance(dat->rb, sizeof(Tjost_Event));
-			
-			jack_ringbuffer_data_t vec [2];
-			jack_ringbuffer_get_read_vector(dat->rb, vec);
-			
-			osc_data_t *buffer;
-			if(vec[0].len >= tev.size)
-				buffer = (osc_data_t *)vec[0].buf;
-			else
-			{
-				buffer = dat->buffer;
-				jack_ringbuffer_read(dat->rb, (char *)buffer, tev.size);
-			}
-			
-			assert((uintptr_t)buffer % sizeof(uint32_t) == 0);
+	return dat->buffer;
+}
 
-			osc_method_dispatch(tev.time, buffer, tev.size, methods, NULL, NULL, module);
-			
-			if(vec[0].len >= tev.size)
-				jack_ringbuffer_read_advance(dat->rb, tev.size);
-		}
-		else
-			break;
-	}
+static int
+_sched(jack_nframes_t timestamp, osc_data_t *buf, size_t len, void *arg)
+{
+	Tjost_Module *module = arg;
+
+	osc_method_dispatch(timestamp, buf, len, methods, NULL, NULL, module);
+
+	return 0; // reload
 }
 
 int
@@ -139,14 +119,9 @@ process_out(jack_nframes_t nframes, void *arg)
 			tev->time = last;
 		}
 
-		if(jack_ringbuffer_write_space(dat->rb) < sizeof(Tjost_Event) + tev->size)
-			tjost_host_message_push(host, MOD_NAME": %s", "ringbuffer overflow");
-		else
-		{
-			tev->time -= last; // time relative to current period
-			jack_ringbuffer_write(dat->rb, (const char *)tev, sizeof(Tjost_Event));
-			jack_ringbuffer_write(dat->rb, (const char *)tev->buf, tev->size);
-		}
+		tev->time -= last; // time relative to current period
+		if(tjost_pipe_produce(&dat->pipe, tev->time, tev->size, tev->buf))
+			tjost_host_message_push(host, MOD_NAME": %s", "tjost_pipe_produce error");
 
 		module->queue = eina_inlist_remove(module->queue, EINA_INLIST_GET(tev));
 		tjost_free(host, tev);
@@ -154,9 +129,8 @@ process_out(jack_nframes_t nframes, void *arg)
 
 	if(count > 0)
 	{
-		int err;
-		if((err = uv_async_send(&dat->asio)))
-			tjost_host_message_push(host, MOD_NAME": %s", uv_err_name(err));
+		if(tjost_pipe_flush(&dat->pipe))
+			tjost_host_message_push(host, MOD_NAME": %s", "tjost_pipe_flush error");
 	}
 
 	return 0;
@@ -183,15 +157,11 @@ add(Tjost_Module *module)
 	if(rtmidic_out_virtual_port_open(dat->dev, device))
 		MOD_ADD_ERR(module->host, MOD_NAME, "could not open virtual port");
 
-	if(!(dat->rb = jack_ringbuffer_create(TJOST_RINGBUF_SIZE)))
-		MOD_ADD_ERR(module->host, MOD_NAME, "could not initialize ringbuffer");
-	
 	uv_loop_t *loop = uv_default_loop();
 
-	dat->asio.data = module;
-	int err;
-	if((err = uv_async_init(loop, &dat->asio, _asio)))
-		MOD_ADD_ERR(module->host, MOD_NAME, uv_err_name(err));
+	if(tjost_pipe_init(&dat->pipe))
+		MOD_ADD_ERR(module->host, MOD_NAME, "could not initialize tjost pipe");
+	tjost_pipe_listen_start(&dat->pipe, loop, _alloc, _sched, module);
 
 	module->dat = dat;
 	module->type = TJOST_MODULE_OUTPUT;
@@ -204,10 +174,8 @@ del(Tjost_Module *module)
 {
 	Data *dat = module->dat;
 
-	uv_close((uv_handle_t *)&dat->asio, NULL);
-
-	if(dat->rb)
-		jack_ringbuffer_free(dat->rb);
+	tjost_pipe_listen_stop(&dat->pipe);
+	tjost_pipe_deinit(&dat->pipe);
 
 	if(rtmidic_out_port_close(dat->dev))
 		fprintf(stderr, MOD_NAME": could not close port\n");

@@ -30,58 +30,39 @@
 typedef struct _Data Data;
 
 struct _Data {
-	jack_ringbuffer_t *rb;
-	uv_async_t asio;
-	osc_data_t buffer [TJOST_BUF_SIZE];
+	Tjost_Pipe pipe;
+
 	FILE *f;
 	jack_nframes_t offset;
+	osc_data_t buffer [TJOST_BUF_SIZE];
 };
 
-static void
-_asio(uv_async_t *handle)
+static osc_data_t *
+_alloc(jack_nframes_t timestamp, size_t len, void *arg)
 {
-	Tjost_Module *module = handle->data;
-	Tjost_Host *host = module->host;
+	Tjost_Module *module = arg;
 	Data *dat = module->dat;
 
-	Tjost_Event tev;
-	while(jack_ringbuffer_read_space(dat->rb) >= sizeof(Tjost_Event))
-	{
-		jack_ringbuffer_peek(dat->rb, (char *)&tev, sizeof(Tjost_Event));
-		if(jack_ringbuffer_read_space(dat->rb) >= sizeof(Tjost_Event) + tev.size)
-		{
-			jack_ringbuffer_read_advance(dat->rb, sizeof(Tjost_Event));
+	return dat->buffer;
+}
 
-			jack_ringbuffer_data_t vec [2];
-			jack_ringbuffer_get_read_vector(dat->rb, vec);
+static int
+_sched(jack_nframes_t timestamp, osc_data_t *buf, size_t len, void *arg)
+{
+	Tjost_Module *module = arg;
+	Data *dat = module->dat;
 
-			osc_data_t *buffer;
-			if(vec[0].len >= tev.size)
-				buffer = (osc_data_t *)vec[0].buf;
-			else
-			{
-				buffer = dat->buffer;
-				jack_ringbuffer_read(dat->rb, (char *)buffer, tev.size);
-			}
+	uint32_t ntime = timestamp;
+	uint32_t nsize = len;
 
-			assert((uintptr_t)buffer % sizeof(uint32_t) == 0);
+	ntime = htonl(ntime);
+	nsize = htonl(nsize);
 
-			uint32_t ntime = tev.time;
-			uint32_t nsize = tev.size;
+	fwrite(&ntime, sizeof(uint32_t), 1, dat->f);
+	fwrite(&nsize, sizeof(uint32_t), 1, dat->f);
+	fwrite(buf, len, 1, dat->f);
 
-			ntime = htonl(ntime);
-			nsize = htonl(nsize);
-
-			fwrite(&ntime, sizeof(uint32_t), 1, dat->f);
-			fwrite(&nsize, sizeof(uint32_t), 1, dat->f);
-			fwrite(buffer, tev.size, 1, dat->f);
-
-			if(vec[0].len >= tev.size)
-				jack_ringbuffer_read_advance(dat->rb, tev.size);
-		}
-		else
-			break;
-	}
+	return 0; // reload
 }
 
 int
@@ -113,14 +94,9 @@ process_out(jack_nframes_t nframes, void *arg)
 			tev->time = last;
 		}
 
-		if(jack_ringbuffer_write_space(dat->rb) < sizeof(Tjost_Event) + tev->size)
-			tjost_host_message_push(host, MOD_NAME": %s", "ringbuffer overflow");
-		else
-		{
-			tev->time -= dat->offset; // relative time to first written event
-			jack_ringbuffer_write(dat->rb, (const char *)tev, sizeof(Tjost_Event));
-			jack_ringbuffer_write(dat->rb, (const char *)tev->buf, tev->size);
-		}
+		tev->time -= dat->offset; // relative time to first written event
+		if(tjost_pipe_produce(&dat->pipe, tev->time, tev->size, tev->buf))
+			tjost_host_message_push(host, MOD_NAME": %s", "tjost_pipe_produce error");
 
 		module->queue = eina_inlist_remove(module->queue, EINA_INLIST_GET(tev));
 		tjost_free(host, tev);
@@ -128,9 +104,8 @@ process_out(jack_nframes_t nframes, void *arg)
 
 	if(count > 0)
 	{
-		int err;
-		if((err = uv_async_send(&dat->asio)))
-			tjost_host_message_push(host, MOD_NAME": %s", uv_err_name(err));
+		tjost_pipe_flush(&dat->pipe);
+			tjost_host_message_push(host, MOD_NAME": %s", "tjost_pipe_flush error");
 	}
 
 	return 0;
@@ -164,13 +139,9 @@ add(Tjost_Module *module)
 	fwrite(&nsrate, sizeof(uint32_t), 1, dat->f);
 	fflush(dat->f);
 
-	if(!(dat->rb = jack_ringbuffer_create(TJOST_RINGBUF_SIZE)))
-		MOD_ADD_ERR(module->host, MOD_NAME, "could not initialize ringbuffer");
-
-	dat->asio.data = module;
-	int err;
-	if((err = uv_async_init(loop, &dat->asio, _asio)))
-		MOD_ADD_ERR(module->host, MOD_NAME, uv_err_name(err));
+	if(tjost_pipe_init(&dat->pipe))
+		MOD_ADD_ERR(module->host, MOD_NAME, "could not initialize tjost pipe");
+	tjost_pipe_listen_start(&dat->pipe, loop, _alloc, _sched, module);
 
 	module->dat = dat;
 	module->type = TJOST_MODULE_OUTPUT;
@@ -183,16 +154,14 @@ del(Tjost_Module *module)
 {
 	Data *dat = module->dat;
 
-	uv_close((uv_handle_t *)&dat->asio, NULL);
+	tjost_pipe_listen_stop(&dat->pipe);
+	tjost_pipe_deinit(&dat->pipe);
 
 	if( dat->f && (dat->f != stdout) )
 	{
 		fflush(dat->f);
 		fclose(dat->f);
 	}
-
-	if(dat->rb)
-		jack_ringbuffer_free(dat->rb);
 
 	tjost_free(module->host, dat);
 }

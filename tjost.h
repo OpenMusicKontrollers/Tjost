@@ -62,6 +62,7 @@ typedef struct _Tjost_Module Tjost_Module;
 typedef struct _Tjost_Child Tjost_Child;
 typedef struct _Tjost_Mem_Chunk Tjost_Mem_Chunk;
 typedef struct _Tjost_Host Tjost_Host;
+typedef struct _Tjost_Pipe Tjost_Pipe;
 
 typedef int (*Tjost_Module_Add_Cb)(Tjost_Module *module);
 typedef void (*Tjost_Module_Del_Cb)(Tjost_Module *module);
@@ -174,6 +175,19 @@ struct _Tjost_Host {
 	Eina_Inlist *queue; // host event queue
 };
 
+typedef osc_data_t *(*Tjost_Pipe_Alloc_Cb)(jack_nframes_t timestamp, size_t len, void *arg);
+typedef int (*Tjost_Pipe_Sched_Cb)(jack_nframes_t timestamp, osc_data_t *buf, size_t len, void *arg);
+
+struct _Tjost_Pipe {
+	jack_ringbuffer_t *rb;
+
+	// rx
+	uv_async_t asio;
+	Tjost_Pipe_Alloc_Cb alloc_cb;
+	Tjost_Pipe_Sched_Cb sched_cb;
+	void *arg;
+};
+
 // in tjost.c
 void *tjost_alloc(Tjost_Host *host, size_t len);
 void *tjost_realloc(Tjost_Host *host, size_t len, void *buf);
@@ -185,6 +199,16 @@ void tjost_module_schedule(Tjost_Module *module, jack_nframes_t time, size_t len
 
 void tjost_host_message_push(Tjost_Host *host, const char *fmt, ...);
 int tjost_host_message_pull(Tjost_Host *host, char *str);
+
+// in tjost_pipe.c
+int tjost_pipe_init(Tjost_Pipe *pipe);
+int tjost_pipe_deinit(Tjost_Pipe *pipe);
+size_t tjost_pipe_space(Tjost_Pipe *pipe);
+int tjost_pipe_produce(Tjost_Pipe *pipe, jack_nframes_t timestamp, size_t len, osc_data_t *buf);
+int tjost_pipe_flush(Tjost_Pipe *pipe);
+int tjost_pipe_consume(Tjost_Pipe *pipe, Tjost_Pipe_Alloc_Cb alloc_cb, Tjost_Pipe_Sched_Cb sched_cb, void *arg);
+int tjost_pipe_listen_start(Tjost_Pipe *pipe, uv_loop_t *loop, Tjost_Pipe_Alloc_Cb alloc_cb, Tjost_Pipe_Sched_Cb sched_cb, void *arg);
+int tjost_pipe_listen_stop(Tjost_Pipe *pipe);
 
 // in tjost_lua.c
 void tjost_lua_deserialize(Tjost_Event *tev);

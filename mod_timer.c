@@ -28,9 +28,25 @@
 typedef struct _Data Data;
 
 struct _Data {
-	jack_ringbuffer_t *rb;
+	Tjost_Pipe pipe;
 	uv_timer_t timer;
 };
+
+static osc_data_t *
+_alloc(jack_nframes_t timestamp, size_t len, void *arg)
+{
+	Tjost_Module *module = arg;
+	Tjost_Host *host = module->host;
+	Data *dat = module->dat;
+
+	return tjost_host_schedule_inline(host, module, timestamp, len);
+}
+
+static int
+_sched(jack_nframes_t timestamp, osc_data_t *buf, size_t len, void *arg)
+{
+	return 0; // reload
+}
 
 int
 process_in(jack_nframes_t nframes, void *arg)
@@ -39,23 +55,8 @@ process_in(jack_nframes_t nframes, void *arg)
 	Tjost_Host *host = module->host;
 	Data *dat = module->dat;
 
-	Tjost_Event tev;
-	while(jack_ringbuffer_read_space(dat->rb) >= sizeof(Tjost_Event))
-	{
-		if(jack_ringbuffer_peek(dat->rb, (char *)&tev, sizeof(Tjost_Event)) != sizeof(Tjost_Event))
-			tjost_host_message_push(host, MOD_NAME": %s", "ringbuffer peek error");
-
-		if(jack_ringbuffer_read_space(dat->rb) >= sizeof(Tjost_Event) + tev.size)
-		{
-			jack_ringbuffer_read_advance(dat->rb, sizeof(Tjost_Event));
-
-			osc_data_t *bf = tjost_host_schedule_inline(host, module, tev.time, tev.size);
-			if(jack_ringbuffer_read(dat->rb, (char *)bf, tev.size) != tev.size)
-				tjost_host_message_push(host, MOD_NAME": %s", "ringbuffer read error");
-		}
-		else
-			break;
-	}
+	if(tjost_pipe_consume(&dat->pipe, _alloc, _sched, module))
+		tjost_host_message_push(host, MOD_NAME": %s", "tjost_pipe_consume error");
 
 	return 0;
 }
@@ -72,20 +73,10 @@ _timeup(uv_timer_t *handle)
 	ptr = osc_set_fmt(ptr, "");
 	size_t len = ptr - buf;
 
-	Tjost_Event tev;
-	tev.time = 0; // immediate execution
-	tev.size = len;
-	if(osc_message_check(buf, tev.size))
+	if(osc_message_check(buf, len))
 	{
-		if(jack_ringbuffer_write_space(dat->rb) < sizeof(Tjost_Event) + tev.size)
-			fprintf(stderr, MOD_NAME": ringbuffer overflow\n");
-		else
-		{
-			if(jack_ringbuffer_write(dat->rb, (const char *)&tev, sizeof(Tjost_Event)) != sizeof(Tjost_Event))
-				fprintf(stderr, MOD_NAME": ringbuffer write 1 error\n");
-			if(jack_ringbuffer_write(dat->rb, (const char *)buf, len) != len)
-				fprintf(stderr, MOD_NAME": ringbuffer write 2 error\n");
-		}
+		if(tjost_pipe_produce(&dat->pipe, 0, len, buf))
+			fprintf(stderr, MOD_NAME": tjost_pipe_produce error\n");
 	}
 	else
 		fprintf(stderr, MOD_NAME": rx OSC message invalid\n");
@@ -103,8 +94,8 @@ add(Tjost_Module *module)
 	const int msec = luaL_optnumber(L, -1, 1.f) * 1000;
 	lua_pop(L, 1);
 	
-	if(!(dat->rb = jack_ringbuffer_create(TJOST_RINGBUF_SIZE)))
-		MOD_ADD_ERR(module->host, MOD_NAME, "could not initialize ringbuffer");
+	if(tjost_pipe_init(&dat->pipe))
+		MOD_ADD_ERR(module->host, MOD_NAME, "could not initialize tjost pipe");
 
 	uv_loop_t *loop = uv_default_loop();
 
@@ -130,8 +121,7 @@ del(Tjost_Module *module)
 	if((err = uv_timer_stop(&dat->timer)))
 		fprintf(stderr, MOD_NAME": %s\n", uv_err_name(err));
 
-	if(dat->rb)
-		jack_ringbuffer_free(dat->rb);
+	tjost_pipe_deinit(&dat->pipe);
 
 	tjost_free(module->host, dat);
 }
