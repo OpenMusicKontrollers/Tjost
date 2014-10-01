@@ -240,13 +240,13 @@ tjost_add_memory(Tjost_Host *host)
 static void
 tjost_free_memory(Tjost_Host *host)
 {
-	Tjost_Mem_Chunk *chunk;
-
-	EINA_INLIST_FREE(host->rtmem_chunks, chunk)
+	Eina_Inlist *itm;
+	EINA_INLIST_FREE(host->rtmem_chunks, itm)
 	{
-		tlsf_remove_pool(host->tlsf, chunk->pool);
+		Tjost_Mem_Chunk *chunk = EINA_INLIST_CONTAINER_GET(itm, Tjost_Mem_Chunk);
+		//tlsf_remove_pool(host->tlsf, chunk->pool); //FIXME
 		host->rtmem_sum -= chunk->size;
-		host->rtmem_chunks = eina_inlist_remove(host->rtmem_chunks, EINA_INLIST_GET(chunk));
+		host->rtmem_chunks = eina_inlist_remove(host->rtmem_chunks, itm);
 		tjost_unmap_memory_chunk(chunk);
 	}
 }

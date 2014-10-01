@@ -125,7 +125,7 @@ tjost_pipe_listen_start(Tjost_Pipe *pipe, uv_loop_t *loop, Tjost_Pipe_Alloc_Cb a
 	pipe->asio.data = pipe;
 	int err;
 	if((err = uv_async_init(loop, &pipe->asio, _asio)))
-		fprintf(stderr, "tjost_pipe_init: %s\n", uv_err_name(err));
+		fprintf(stderr, "tjost_pipe_listen_start: %s\n", uv_err_name(err));
 
 	return 0;
 }

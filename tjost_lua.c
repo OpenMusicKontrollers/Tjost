@@ -410,14 +410,16 @@ _gc_input(lua_State *L)
 	lua_pushlightuserdata(L, module);
 	lua_pushnil(L);
 	lua_rawset(L, LUA_REGISTRYINDEX);
+	lua_gc(host->L, LUA_GCSTEP, 0);
 
 	module->del(module);
 	host->modules = eina_inlist_remove(host->modules, EINA_INLIST_GET(module));
 
-	Tjost_Child *child;
-	EINA_INLIST_FREE(module->children, child)
+	Eina_Inlist *itm;
+	EINA_INLIST_FREE(module->children, itm)
 	{
-		module->children = eina_inlist_remove(module->children, EINA_INLIST_GET(child));
+		Tjost_Child *child = EINA_INLIST_CONTAINER_GET(itm, Tjost_Child);
+		module->children = eina_inlist_remove(module->children, itm);
 		tjost_free(host, child);
 	}
 
@@ -435,6 +437,7 @@ _gc_output(lua_State *L)
 	lua_pushlightuserdata(L, module);
 	lua_pushnil(L);
 	lua_rawset(L, LUA_REGISTRYINDEX);
+	lua_gc(host->L, LUA_GCSTEP, 0);
 
 	module->del(module);
 	_clear(module);
@@ -454,15 +457,17 @@ _gc_in_out(lua_State *L)
 	lua_pushlightuserdata(L, module);
 	lua_pushnil(L);
 	lua_rawset(L, LUA_REGISTRYINDEX);
+	lua_gc(host->L, LUA_GCSTEP, 0);
 
 	module->del(module);
 	_clear(module);
 	host->modules = eina_inlist_remove(host->modules, EINA_INLIST_GET(module));
 
-	Tjost_Child *child;
-	EINA_INLIST_FREE(module->children, child)
+	Eina_Inlist *itm;
+	EINA_INLIST_FREE(module->children, itm)
 	{
-		module->children = eina_inlist_remove(module->children, EINA_INLIST_GET(child));
+		Tjost_Child *child = EINA_INLIST_CONTAINER_GET(itm, Tjost_Child);
+		module->children = eina_inlist_remove(module->children, itm);
 		tjost_free(host, child);
 	}
 
@@ -480,6 +485,7 @@ _gc_uplink(lua_State *L)
 	lua_pushlightuserdata(L, module);
 	lua_pushnil(L);
 	lua_rawset(L, LUA_REGISTRYINDEX);
+	lua_gc(host->L, LUA_GCSTEP, 0);
 
 	module->del(module);
 	_clear(module);

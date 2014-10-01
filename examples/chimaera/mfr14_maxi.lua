@@ -1,3 +1,5 @@
+#!/usr/bin/env tjost
+
 --[[
 -- Copyright (c) 2014 Hanspeter Portner (dev@open-music-kontrollers.ch)
 -- 
@@ -21,39 +23,27 @@
 --     distribution.
 --]]
 
-local class = require('class')
+midi = require('midi_out')
+map = require('map')
+mfr14_dummy = require('mfr14_dummy')
 
-local scsynth = class:new({
-	port = 'scsynth.out',
-	out_offset = 0,
-	gid_offset = 100,
-	sid_offset = 200,
-	wrap = 100,
-	inst = {'inst1', 'inst2', 'inst3', 'inst4', 'inst5', 'inst6', 'inst7', 'inst8'},
+mfr14_dummy({
+	name = 'maxi',
 
-	init = function(self)
-		self.serv = tjost.plugin({name='osc_out', port=self.port})
-	end,
+	scsynth = {
+		out_offset = 8,
+		gid_offset = 106,
+		sid_offset = 800,
+		inst = {'base4', 'lead4'}
+	},
 
-	['/on'] = function(self, time, sid, gid, pid, x, y)
-		sid = sid%self.wrap + self.sid_offset
-		self.serv(0, '/s_new', 'siiisisi',
-			self.inst[gid+1], sid, 0, gid+self.gid_offset, 'out', gid+self.out_offset, 'gate', 0)
-		self.serv(time, '/n_set', 'iififsi',
-			sid, 0, x, 1, y, 'gate', 1)
-	end,
+	midi = {
+		effect = SOUND_EFFECT_5,
+		--effect = VOLUME,
+		gid_offset = 6,
+		map = function(n) return map_linear:new({n=n, oct=2}) end
+	},
 
-	['/off'] = function(self, time, sid, gid, pid)
-		sid = sid%self.wrap + self.sid_offset
-		self.serv(time, '/n_set', 'isi',
-			sid, 'gate', 0)
-	end,
-
-	['/set'] = function(self, time, sid, gid, pid, x, y)
-		sid = sid%self.wrap + self.sid_offset
-		self.serv(time, '/n_set', 'iifif',
-			sid, 0, x, 1, y)
-	end
+	drum = false,
+	data = false
 })
-
-return scsynth

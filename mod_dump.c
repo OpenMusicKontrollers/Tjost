@@ -289,7 +289,8 @@ add(Tjost_Module *module)
 
 	if(tjost_pipe_init(&dat->pipe))
 		MOD_ADD_ERR(module->host, MOD_NAME, "could not initialize tjost pipe");
-	tjost_pipe_listen_start(&dat->pipe, loop, _alloc, _sched, module);
+	if(tjost_pipe_listen_start(&dat->pipe, loop, _alloc, _sched, module))
+		MOD_ADD_ERR(module->host, MOD_NAME, "could not start listening in tjost pipe");
 
 	module->dat = dat;
 	module->type = TJOST_MODULE_OUTPUT;
