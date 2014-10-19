@@ -71,9 +71,8 @@ _rtmidic_cb(double timestamp, size_t len, uint8_t* message, void **cb)
 	Data *dat = (Data *)((uint8_t *)cb - offsetof(Data, cb));
 
 	// TODO assert(len <= 4)
-	uint8_t m [4];
-	m[0] = message[0] & 0x0f;
-	m[1] = message[0] & 0xf0;
+	uint8_t m [4] = {0x0};
+	m[1] = message[0];
 	m[2] = message[1];
 	m[3] = message[2];
 

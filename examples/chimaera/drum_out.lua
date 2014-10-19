@@ -25,6 +25,7 @@
 
 local class = require('class')
 
+local bit32 = require('bit')
 local ffi = require('ffi')
 midi_t = ffi.typeof('uint8_t *')
 
@@ -41,13 +42,15 @@ local tom_raw = {
 	off = midi_t(tom.off.raw)
 }
 
-tom_raw.on[0] = 0x02
-tom_raw.on[1] = 0x90
+channel = 0x02
+
+tom_raw.on[0] = 0x00
+tom_raw.on[1] = bit32.bor(0x90, channel)
 tom_raw.on[2] = base+11
 tom_raw.on[3] = 0x7f
 
-tom_raw.off[0] = 0x02
-tom_raw.off[1] = 0x80
+tom_raw.off[0] = 0x00
+tom_raw.off[1] = bit32.bor(0x80, channel)
 tom_raw.off[2] = base+11
 tom_raw.off[3] = 0x00
 
@@ -61,13 +64,13 @@ local snare_raw = {
 	off = midi_t(snare.off.raw)
 }
 
-snare_raw.on[0] = 0x02
-snare_raw.on[1] = 0x90
+snare_raw.on[0] = 0x00
+snare_raw.on[1] = bit32.bor(0x90, channel)
 snare_raw.on[2] = base+20
 snare_raw.on[3] = 0x1f
 
-snare_raw.off[0] = 0x02
-snare_raw.off[1] = 0x80
+snare_raw.off[0] = 0x00
+snare_raw.off[1] = bit32.bor(0x80, channel)
 snare_raw.off[2] = base+20
 snare_raw.off[3] = 0x00
 

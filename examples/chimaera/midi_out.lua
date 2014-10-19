@@ -94,31 +94,31 @@ local midi = class:new({
 
 		gid = gid + self.gid_offset
 
-		raw[1][0] = gid
-		raw[1][1] = 0x90
+		raw[1][0] = 0x00
+		raw[1][1] = bit32.bor(0x90, gid)
 		raw[1][2] = base
 		raw[1][3] = 0x7f
 
-		raw[2][0] = gid
-		raw[2][1] = PITCHBEND
+		raw[2][0] = 0x00
+		raw[2][1] = bit32.bor(PITCHBEND, gid)
 		raw[2][2] = bit32.band(bend, 0x7f)
 		raw[2][3] = bit32.rshift(bend, 7)
 
 		if self.effect <= 0xd then
-			raw[3][0] = gid
-			raw[3][1] = CONTROLLER
+			raw[3][0] = 0x00
+			raw[3][1] = bit32.bor(CONTROLLER, gid)
 			raw[3][2] = bit32.bor(self.effect, 0x20)
 			raw[3][3] = bit32.band(eff, 0x7f)
 
-			raw[4][0] = gid
-			raw[4][1] = CONTROLLER
+			raw[4][0] = 0x00
+			raw[4][1] = bit32.bor(CONTROLLER, gid)
 			raw[4][2] = self.effect
 			raw[4][3] = bit32.rshift(eff, 7)
 
 			self.serv(time, mpath, 'mmmm', unpack(m, 1, 4))
 		else
-			raw[3][0] = gid
-			raw[3][1] = CONTROLLER
+			raw[3][0] = 0x00
+			raw[3][1] = bit32.bor(CONTROLLER, gid)
 			raw[3][2] = self.effect
 			raw[3][3] = bit32.rshift(eff, 7)
 
@@ -136,8 +136,8 @@ local midi = class:new({
 		
 		gid = gid + self.gid_offset
 
-		raw[1][0] = gid
-		raw[1][1] = 0x80
+		raw[1][0] = 0x00
+		raw[1][1] = bit32.bor(0x80, gid)
 		raw[1][2] = base
 		raw[1][3] = 0x00
 
@@ -162,26 +162,26 @@ local midi = class:new({
 		
 		gid = gid + self.gid_offset
 
-		raw[1][0] = gid
-		raw[1][1] = PITCHBEND
+		raw[1][0] = 0x00
+		raw[1][1] = bit32.bor(PITCHBEND, gid)
 		raw[1][2] = bit32.band(bend, 0x7f)
 		raw[1][3] = bit32.rshift(bend, 7)
 
 		if self.effect <= 0xd then
-			raw[2][0] = gid
-			raw[2][1] = CONTROLLER
+			raw[2][0] = 0x00
+			raw[2][1] = bit32.bor(CONTROLLER, gid)
 			raw[2][2] = bit32.bor(self.effect, 0x20)
 			raw[2][3] = bit32.band(eff, 0x7f)
 
-			raw[3][0] = gid
-			raw[3][1] = CONTROLLER
+			raw[3][0] = 0x00
+			raw[3][1] = bit32.bor(CONTROLLER, gid)
 			raw[3][2] = self.effect
 			raw[3][3] = bit32.rshift(eff, 7)
 
 			self.serv(time, mpath, 'mmm', unpack(m, 1, 3))
 		else
-			raw[2][0] = gid
-			raw[2][1] = CONTROLLER
+			raw[2][0] = 0x00
+			raw[2][1] = bit32.bor(CONTROLLER, gid)
 			raw[2][2] = self.effect
 			raw[2][3] = bit32.rshift(eff, 7)
 

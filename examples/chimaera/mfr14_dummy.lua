@@ -64,6 +64,7 @@ return function(config)
 			chim(0, '/engines/offset', 'if', id(), 0.0025)
 			chim(0, '/engines/reset', 'i', id())
 			chim(0, '/engines/dummy/enabled', 'ii', id(), 1)
+			chim(0, '/engines/dummy/redundancy', 'ii', id(), 1)
 		end
 	end)
 	tjost.chain(chim, message)

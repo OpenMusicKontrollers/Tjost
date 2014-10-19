@@ -37,9 +37,9 @@ success = function(time, uuid, path, ...)
 			local bot = 2*12 - 0.5 - (n % 18 / 6);
 			local range = n/3
 
-			chim(0, '/engines/oscmidi/offset', 'if', id(), bot)
-			chim(0, '/engines/oscmidi/range', 'if', id(), bot)
-			chim(0, '/engines/oscmidi/effect', 'ii', id(), 0x07)
+			chim(0, '/engines/oscmidi/reset', 'i', id())
+			chim(0, '/engines/oscmidi/attributes/0', 'isffi', id(), 'control_change', bot, range, 0x07)
+			chim(0, '/engines/oscmidi/attributes/1', 'isffi', id(), 'control_change', bot, range, 0x07)
 			message(time, '/number', 'iff', n, bot, range)
 		end,
 
@@ -58,7 +58,11 @@ success = function(time, uuid, path, ...)
 			chim(0, '/engines/mode', 'is', id(), 'osc.tcp')
 			chim(0, '/engines/offset', 'if', id(), 0.002)
 			chim(0, '/engines/reset', 'i', id())
+
 			chim(0, '/engines/oscmidi/enabled', 'ii', id(), 1)
+			chim(0, '/engines/oscmidi/multi', 'ii', id(), 1)
+			chim(0, '/engines/oscmidi/format', 'is', id(), 'midi')
+			chim(0, '/engines/oscmidi/path', 'is', id(), '/midi')
 		end
 	}
 
@@ -77,7 +81,9 @@ tjost.chain(conf, message)
 
 debug = tjost.plugin({name='net_in', uri='osc.udp://:6666', rtprio=50, unroll='full'}, status)
 midi_out = tjost.plugin({name='midi_out', port='midi.out'})
+osc_out = tjost.plugin({name='osc_out', port='osc.out'})
 stream = tjost.plugin({name='net_in', uri='osc.tcp://:3333', rtprio=60, unroll='full'}, midi_out)
+tjost.chain(stream, osc_out)
 
 hostname = tjost.hostname()
 chim(0, '/comm/address', 'is', id(), hostname..'.local')

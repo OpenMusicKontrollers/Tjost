@@ -23,6 +23,7 @@
 --     distribution.
 --]]
 
+local bit32 = require('bit')
 local ffi = require('ffi')
 buf_t = ffi.typeof('uint8_t *')
 
@@ -32,7 +33,7 @@ midi_in = tjost.plugin({name='midi_in', port='midi.in'}, function(time, path, fm
 	for _, v in ipairs({...}) do
 		local m = buf_t(v.raw)
 
-		if (m[1] == 0x90) or (m[1] == 0x80) then
+		if (bit32.band(m[1], 0xf0) == 0x90) or (bit32.band(m[1], 0xf0) == 0x80) then
 			m[2] = m[2] + 12 -- shift frequency up by 1 octave
 		end
 	end

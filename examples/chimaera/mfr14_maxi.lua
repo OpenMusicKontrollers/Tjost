@@ -38,8 +38,8 @@ mfr14_dummy({
 	},
 
 	midi = {
-		effect = SOUND_EFFECT_5,
-		--effect = VOLUME,
+		--effect = SOUND_EFFECT_5,
+		effect = VOLUME,
 		gid_offset = 6,
 		map = function(n) return map_linear:new({n=n, oct=2}) end
 	},

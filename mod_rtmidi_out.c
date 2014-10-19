@@ -54,7 +54,7 @@ _midi(jack_nframes_t time, const char *path, const char *fmt, osc_data_t *buf, v
 			case 'm':
 			{
 				ptr = osc_get_midi(ptr, &M);
-				m[0] = M[0] | M[1];
+				m[0] = M[1];
 				m[1] = M[2];
 				m[2] = M[3];
 
