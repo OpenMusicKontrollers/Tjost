@@ -125,7 +125,7 @@ _tty_recv_cb(uv_stream_t *stream, ssize_t nread, const uv_buf_t *buf)
 
 			switch(*type)
 			{
-				case 'i':
+				case OSC_INT32:
 				{
 					int32_t i;
 					if(sscanf(cur, "%"SCNi32, &i))
@@ -134,7 +134,7 @@ _tty_recv_cb(uv_stream_t *stream, ssize_t nread, const uv_buf_t *buf)
 						fprintf(stderr, MOD_NAME": type mismatch at '%c'\n", *type);
 					break;
 				}
-				case 'f':
+				case OSC_FLOAT:
 				{
 					float f;
 					if(sscanf(cur, "%f", &f))
@@ -143,13 +143,13 @@ _tty_recv_cb(uv_stream_t *stream, ssize_t nread, const uv_buf_t *buf)
 						fprintf(stderr, MOD_NAME": type mismatch at '%c'\n", *type);
 					break;
 				}
-				case 's':
+				case OSC_STRING:
 				{
 					char *s = cur;
 					ptr = osc_set_string(ptr, s);
 					break;
 				}
-				case 'b':
+				case OSC_BLOB:
 				{
 					int32_t size = strlen(cur) / 2;
 					uint8_t *payload = calloc(size, sizeof(uint8_t));
@@ -162,13 +162,13 @@ _tty_recv_cb(uv_stream_t *stream, ssize_t nread, const uv_buf_t *buf)
 					break;
 				}
 
-				case 'T':
-				case 'F':
-				case 'N':
-				case 'I':
+				case OSC_TRUE:
+				case OSC_FALSE:
+				case OSC_NIL:
+				case OSC_BANG:
 					break;
 
-				case 'h':
+				case OSC_INT64:
 				{
 					int64_t h;
 					if(sscanf(cur, "%"SCNi64, &h))
@@ -177,7 +177,7 @@ _tty_recv_cb(uv_stream_t *stream, ssize_t nread, const uv_buf_t *buf)
 						fprintf(stderr, MOD_NAME": type mismatch at '%c'\n", *type);
 					break;
 				}
-				case 'd':
+				case OSC_DOUBLE:
 				{
 					double d;
 					if(sscanf(cur, "%lf", &d))
@@ -186,7 +186,7 @@ _tty_recv_cb(uv_stream_t *stream, ssize_t nread, const uv_buf_t *buf)
 						fprintf(stderr, MOD_NAME": type mismatch at '%c'\n", *type);
 					break;
 				}
-				case 't':
+				case OSC_TIMETAG:
 				{
 					uint64_t t;
 					uint32_t sec, frac;
@@ -200,19 +200,19 @@ _tty_recv_cb(uv_stream_t *stream, ssize_t nread, const uv_buf_t *buf)
 					break;
 				}
 
-				case 'S':
+				case OSC_SYMBOL:
 				{
 					char *S = cur;
 					ptr = osc_set_symbol(ptr, S);
 					break;
 				}
-				case 'c':
+				case OSC_CHAR:
 				{
 					char c = *cur;
 					ptr = osc_set_char(ptr, c);
 					break;
 				}
-				case 'm':
+				case OSC_MIDI:
 				{
 					uint8_t m [4];
 					if(sscanf(cur, "%02"SCNx8"%02"SCNx8"%02"SCNx8"%02"SCNx8, m, m+1, m+2, m+3))

@@ -74,7 +74,7 @@ process_in(jack_nframes_t nframes, void *arg)
 			char *fmt = (char *)ptr;
 			char *fmt_ptr = fmt;
 			*fmt_ptr++ = ',';
-			memset(fmt_ptr, 'm', N);
+			memset(fmt_ptr, OSC_MIDI, N);
 			fmt_ptr += N;
 			*fmt_ptr++ = '\0';
 			while( (fmt_ptr-fmt) % 4)

@@ -27,14 +27,6 @@
 
 #include <osc.h>
 
-#include <tjost_config.h>
-
-#ifdef HAS_METADATA_API
-#	include <jack/metadata.h>
-#	include <jackey.h>
-#	include <jack_osc/jack_osc.h>
-#endif // HAS_METADATA_API
-
 // characters not allowed in OSC path string
 static const char invalid_path_chars [] = {
 	' ', '#',
@@ -49,51 +41,6 @@ static const char valid_format_chars [] = {
 	OSC_SYMBOL, OSC_CHAR, OSC_MIDI,
 	'\0'
 };
-
-int
-osc_mark_port(jack_client_t *client, jack_port_t *port)
-{
-#ifdef HAS_METADATA_API
-	jack_uuid_t uuid = jack_port_uuid(port);
-	return jack_set_property(client, uuid, JACKEY_EVENT_TYPES, JACK_EVENT_TYPE__OSC, "text/plain");
-#else
-	return 0;
-#endif // HAS_METADATA_API
-}
-
-int
-osc_unmark_port(jack_client_t *client, jack_port_t *port)
-{
-#ifdef HAS_METADATA_API
-	jack_uuid_t uuid = jack_port_uuid(port);
-	return jack_remove_property(client, uuid, JACKEY_EVENT_TYPES);
-#else
-	return 0;
-#endif // HAS_METADATA_API
-}
-
-int
-osc_is_marked_port(jack_port_t *port)
-{
-#ifdef HAS_METADATA_API
-	jack_uuid_t uuid = jack_port_uuid(port);
-	char *value = NULL;
-	char *type = NULL;
-
-	int marked = 0;
-
-	if( (jack_get_property(uuid, JACKEY_EVENT_TYPES, &value, &type) == 0) &&
-			(strstr(value, JACK_EVENT_TYPE__OSC) != NULL) )
-		marked = 1;
-	if(value)
-		jack_free(value);
-	if(type)
-		jack_free(type);
-	return marked;
-#else
-	return 0;
-#endif // HAS_METADATA_API
-}
 
 // check for valid path string
 int
@@ -129,9 +76,9 @@ osc_check_fmt(const char *format, int offset)
 }
 
 int
-osc_method_match(OSC_Method *methods, const char *path, const char *fmt)
+osc_method_match(osc_method_t *methods, const char *path, const char *fmt)
 {
-	OSC_Method *meth;
+	osc_method_t *meth;
 	for(meth=methods; meth->cb; meth++)
 		if( (!meth->path || !strcmp(meth->path, path)) && (!meth->fmt || !strcmp(meth->fmt, fmt+1)) )
 			return 1;
@@ -139,7 +86,7 @@ osc_method_match(OSC_Method *methods, const char *path, const char *fmt)
 }
 
 static void
-_osc_method_dispatch_message(jack_nframes_t time, osc_data_t *buf, size_t size, OSC_Method *methods, void *dat)
+_osc_method_dispatch_message(uint64_t time, osc_data_t *buf, size_t size, osc_method_t *methods, void *dat)
 {
 	osc_data_t *ptr = buf;
 	osc_data_t *end = buf + size;
@@ -150,7 +97,7 @@ _osc_method_dispatch_message(jack_nframes_t time, osc_data_t *buf, size_t size, 
 	ptr = osc_get_path(ptr, &path);
 	ptr = osc_get_fmt(ptr, &fmt);
 
-	OSC_Method *meth;
+	osc_method_t *meth;
 	for(meth=methods; meth->cb; meth++)
 		if( (!meth->path || !strcmp(meth->path, path)) && (!meth->fmt || !strcmp(meth->fmt, fmt+1)) )
 			if(meth->cb(time, path, fmt+1, ptr, dat))
@@ -158,7 +105,7 @@ _osc_method_dispatch_message(jack_nframes_t time, osc_data_t *buf, size_t size, 
 }
 
 static void
-_osc_method_dispatch_bundle(jack_nframes_t time, osc_data_t *buf, size_t size, OSC_Method *methods, OSC_Bundle_In bundle_in, OSC_Bundle_Out bundle_out, void *dat)
+_osc_method_dispatch_bundle(uint64_t time, osc_data_t *buf, size_t size, osc_method_t *methods, osc_bundle_in_cb_t bundle_in, osc_bundle_out_cb_t bundle_out, void *dat)
 {
 	osc_data_t *ptr = buf;
 	osc_data_t *end = buf + size;
@@ -189,7 +136,7 @@ _osc_method_dispatch_bundle(jack_nframes_t time, osc_data_t *buf, size_t size, O
 }
 
 void
-osc_method_dispatch(jack_nframes_t time, osc_data_t *buf, size_t size, OSC_Method *methods, OSC_Bundle_In bundle_in, OSC_Bundle_Out bundle_out, void *dat)
+osc_method_dispatch(uint64_t time, osc_data_t *buf, size_t size, osc_method_t *methods, osc_bundle_in_cb_t bundle_in, osc_bundle_out_cb_t bundle_out, void *dat)
 {
 	switch(*buf)
 	{
@@ -204,7 +151,7 @@ osc_method_dispatch(jack_nframes_t time, osc_data_t *buf, size_t size, OSC_Metho
 
 // extract nested bundles with non-matching timestamps
 static int
-_unroll_partial(osc_data_t *buf, size_t size, OSC_Unroll_Inject *inject, void *dat)
+_unroll_partial(osc_data_t *buf, size_t size, osc_unroll_inject_t *inject, void *dat)
 {
 	if(strncmp((char *)buf, "#bundle", 8)) // bundle header valid?
 		return 0;
@@ -281,7 +228,7 @@ _unroll_partial(osc_data_t *buf, size_t size, OSC_Unroll_Inject *inject, void *d
 
 // fully unroll bundle into single messages
 static int
-_unroll_full(osc_data_t *buf, size_t size, OSC_Unroll_Inject *inject, void *dat)
+_unroll_full(osc_data_t *buf, size_t size, osc_unroll_inject_t *inject, void *dat)
 {
 	if(strncmp((char *)buf, "#bundle", 8)) // bundle header valid?
 		return 0;
@@ -340,7 +287,7 @@ _unroll_full(osc_data_t *buf, size_t size, OSC_Unroll_Inject *inject, void *dat)
 }
 
 int
-osc_packet_unroll(osc_data_t *buf, size_t size, OSC_Unroll_Mode mode, OSC_Unroll_Inject *inject, void *dat)
+osc_packet_unroll(osc_data_t *buf, size_t size, osc_unroll_mode_t mode, osc_unroll_inject_t *inject, void *dat)
 {
 	char c = *(char *)buf;
 	switch(c)
@@ -494,7 +441,7 @@ extern osc_data_t *osc_get_fmt(osc_data_t *buf, const char **fmt);
 extern osc_data_t *osc_get_int32(osc_data_t *buf, int32_t *i);
 extern osc_data_t *osc_get_float(osc_data_t *buf, float *f);
 extern osc_data_t *osc_get_string(osc_data_t *buf, const char **s);
-extern osc_data_t *osc_get_blob(osc_data_t *buf, OSC_Blob *b);
+extern osc_data_t *osc_get_blob(osc_data_t *buf, osc_blob_t *b);
 
 extern osc_data_t *osc_get_int64(osc_data_t *buf, int64_t *h);
 extern osc_data_t *osc_get_double(osc_data_t *buf, double *d);
@@ -505,7 +452,7 @@ extern osc_data_t *osc_get_char(osc_data_t *buf, char *c);
 extern osc_data_t *osc_get_midi(osc_data_t *buf, uint8_t **m);
 
 osc_data_t *
-osc_skip(OSC_Type type, osc_data_t *buf)
+osc_skip(osc_type_t type, osc_data_t *buf)
 {
 	switch(type)
 	{
@@ -539,7 +486,7 @@ osc_skip(OSC_Type type, osc_data_t *buf)
 }
 
 osc_data_t *
-osc_get(OSC_Type type, osc_data_t *buf, OSC_Argument *arg)
+osc_get(osc_type_t type, osc_data_t *buf, osc_argument_t *arg)
 {
 	switch(type)
 	{
@@ -603,7 +550,7 @@ osc_vararg_get(osc_data_t *buf, const char **path, const char **fmt, ...)
 				ptr = osc_get_string(ptr, va_arg(args, const char **));
 				break;
 			case OSC_BLOB:
-				ptr = osc_get_blob(ptr, va_arg(args, OSC_Blob *));
+				ptr = osc_get_blob(ptr, va_arg(args, osc_blob_t *));
 				break;
 
 			case OSC_INT64:
@@ -667,7 +614,7 @@ extern osc_data_t *osc_start_bundle_item(osc_data_t *buf, osc_data_t **itm);
 extern osc_data_t *osc_end_bundle_item(osc_data_t *buf, osc_data_t *itm);
 
 osc_data_t *
-osc_set(OSC_Type type, osc_data_t *buf, OSC_Argument *arg)
+osc_set(osc_type_t type, osc_data_t *buf, osc_argument_t *arg)
 {
 	switch(type)
 	{

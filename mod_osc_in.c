@@ -22,8 +22,9 @@
  */
 
 #include <tjost.h>
+#include <mod_osc.h>
 
-#include <jack_osc/jack_osc.h>
+#include <jack_osc.h>
 
 #define MOD_NAME "osc_in"
 

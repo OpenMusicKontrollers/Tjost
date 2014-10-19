@@ -31,9 +31,6 @@ extern "C" {
 #include <arpa/inet.h> // hton & co.
 #include <stdint.h>
 
-#include <jack/jack.h>
-#include <jack/midiport.h>
-
 #define quads(size) (((((size_t)size-1) & ~0x3) >> 2) + 1)
 #define round_to_four_bytes(size) (quads((size_t)size) << 2)
 
@@ -54,14 +51,20 @@ extern "C" {
 #define OSC_IMMEDIATE 1ULL
 
 typedef uint8_t osc_data_t;
+typedef uint64_t osc_time_t;
+
+typedef int (*osc_method_cb_t) (osc_time_t time, const char *path, const char *fmt, osc_data_t *arg, void *dat);
+typedef void (*osc_bundle_in_cb_t) (osc_time_t time, void *dat);
+typedef void (*osc_bundle_out_cb_t) (osc_time_t time, void *dat);
+
+typedef struct _osc_method_t osc_method_t;
+typedef struct _osc_blob_t osc_blob_t;
+typedef union _osc_argument_t osc_argument_t;
+
 typedef union _swap32_t swap32_t;
 typedef union _swap64_t swap64_t;
-typedef int (*OSC_Callback) (jack_nframes_t time, const char *path, const char *fmt, osc_data_t *arg, void *dat);
-typedef void (*OSC_Bundle_In) (jack_nframes_t time, void *dat);
-typedef void (*OSC_Bundle_Out) (jack_nframes_t time, void *dat);
-typedef struct _OSC_Method OSC_Method;
-typedef struct _OSC_Blob OSC_Blob;
-typedef union _OSC_Argument OSC_Argument;
+
+typedef enum _osc_type_t osc_type_t;
 
 union _swap32_t {
 	uint32_t u;
@@ -74,11 +77,11 @@ union _swap64_t {
 	uint64_t u;
 
 	int64_t h;
-	uint64_t t;
+	osc_time_t t;
 	double d;
 };
 
-typedef enum _OSC_Type {
+enum _osc_type_t {
 	OSC_INT32		=	'i',
 	OSC_FLOAT		=	'f',
 	OSC_STRING		=	's',
@@ -96,65 +99,60 @@ typedef enum _OSC_Type {
 	OSC_SYMBOL		=	'S',
 	OSC_CHAR			=	'c',
 	OSC_MIDI			=	'm'
-
-} OSC_Type;
-
-
-struct _OSC_Method {
-	const char *path;
-	const char *fmt;
-	OSC_Callback cb;
 };
 
-struct _OSC_Blob {
+
+struct _osc_method_t {
+	const char *path;
+	const char *fmt;
+	osc_method_cb_t cb;
+};
+
+struct _osc_blob_t {
 	int32_t size;
 	void *payload;
 };
 
-union _OSC_Argument {
+union _osc_argument_t {
 	int32_t i;
 	float f;
 	const char *s;
-	OSC_Blob b;
+	osc_blob_t b;
 
 	int64_t h;
 	double d;
-	uint64_t t;
+	osc_time_t t;
 
 	const char *S;
 	char c;
 	uint8_t *m;
 };
 
-int osc_mark_port(jack_client_t *client, jack_port_t *port);
-int osc_unmark_port(jack_client_t *client, jack_port_t *port);
-int osc_is_marked_port(jack_port_t *port);
-
 int osc_check_path(const char *path);
 int osc_check_fmt(const char *format, int offset);
 
-int osc_method_match(OSC_Method *methods, const char *path, const char *fmt);
-void osc_method_dispatch(jack_nframes_t time, osc_data_t *buf, size_t size, OSC_Method *methods, OSC_Bundle_In bundle_in, OSC_Bundle_Out bundle_out, void *dat);
+int osc_method_match(osc_method_t *methods, const char *path, const char *fmt);
+void osc_method_dispatch(osc_time_t time, osc_data_t *buf, size_t size, osc_method_t *methods, osc_bundle_in_cb_t bundle_in, osc_bundle_out_cb_t bundle_out, void *dat);
 
-typedef enum _OSC_Unroll_Mode OSC_Unroll_Mode;
-typedef void (*OSC_Unroll_Stamp_Inject) (uint64_t tstamp, void *dat);
-typedef void (*OSC_Unroll_Message_Inject) (osc_data_t *buf, size_t size, void *dat);
-typedef void (*OSC_Unroll_Bundle_Inject) (osc_data_t *buf, size_t size, void *dat);
-typedef struct _OSC_Unroll_Inject OSC_Unroll_Inject;
+typedef enum _osc_unroll_mode_t osc_unroll_mode_t;
+typedef void (*osc_unroll_stamp_inject_cb_t) (osc_time_t tstamp, void *dat);
+typedef void (*osc_unroll_message_inject_cb_t) (osc_data_t *buf, size_t size, void *dat);
+typedef void (*osc_unroll_bundle_inject_cb_t) (osc_data_t *buf, size_t size, void *dat);
+typedef struct _osc_unroll_inject_t osc_unroll_inject_t;
 
-enum _OSC_Unroll_Mode {
+enum _osc_unroll_mode_t {
 	OSC_UNROLL_MODE_NONE,
 	OSC_UNROLL_MODE_PARTIAL,
 	OSC_UNROLL_MODE_FULL
 };
 
-struct _OSC_Unroll_Inject {
-	OSC_Unroll_Stamp_Inject stamp;
-	OSC_Unroll_Message_Inject message;
-	OSC_Unroll_Bundle_Inject bundle;
+struct _osc_unroll_inject_t {
+	osc_unroll_stamp_inject_cb_t stamp;
+	osc_unroll_message_inject_cb_t message;
+	osc_unroll_bundle_inject_cb_t bundle;
 };
 
-int osc_packet_unroll(osc_data_t *buf, size_t size, OSC_Unroll_Mode mode, OSC_Unroll_Inject *inject, void*dat);
+int osc_packet_unroll(osc_data_t *buf, size_t size, osc_unroll_mode_t mode, osc_unroll_inject_t *inject, void*dat);
 
 int osc_message_check(osc_data_t *buf, size_t size);
 int osc_bundle_check(osc_data_t *buf, size_t size);
@@ -228,7 +226,7 @@ osc_get_string(osc_data_t *buf, const char **s)
 }
 
 __always_inline osc_data_t *
-osc_get_blob(osc_data_t *buf, OSC_Blob *b)
+osc_get_blob(osc_data_t *buf, osc_blob_t *b)
 {
 	b->size = osc_blobsize(buf);
 	b->payload = buf + 4;
@@ -254,7 +252,7 @@ osc_get_double(osc_data_t *buf, double *d)
 }
 
 __always_inline osc_data_t *
-osc_get_timetag(osc_data_t *buf, uint64_t *t)
+osc_get_timetag(osc_data_t *buf, osc_time_t *t)
 {
 	swap64_t s = {.u = *(uint64_t *)buf};
 	s.u = ntohll(s.u);
@@ -285,8 +283,8 @@ osc_get_midi(osc_data_t *buf, uint8_t **m)
 	return buf + 4;
 }
 
-osc_data_t *osc_skip(OSC_Type type, osc_data_t *buf);
-osc_data_t *osc_get(OSC_Type type, osc_data_t *buf, OSC_Argument *arg);
+osc_data_t *osc_skip(osc_type_t type, osc_data_t *buf);
+osc_data_t *osc_get(osc_type_t type, osc_data_t *buf, osc_argument_t *arg);
 size_t osc_vararg_get(osc_data_t *buf, const char **path, const char **fmt, ...);
 
 // write OSC argument to raw buffer
@@ -378,7 +376,7 @@ osc_set_double(osc_data_t *buf, double d)
 }
 
 __always_inline osc_data_t *
-osc_set_timetag(osc_data_t *buf, uint64_t t)
+osc_set_timetag(osc_data_t *buf, osc_time_t t)
 {
 	swap64_t *s = (swap64_t *)buf;
 	s->t = t;
@@ -421,7 +419,7 @@ osc_set_midi_inline(osc_data_t *buf, uint8_t **m)
 }
 
 __always_inline osc_data_t *
-osc_start_bundle(osc_data_t *buf, uint64_t t, osc_data_t **bndl)
+osc_start_bundle(osc_data_t *buf, osc_time_t t, osc_data_t **bndl)
 {
 	*bndl = buf;
 	strncpy((char *)buf, "#bundle", 8);
@@ -459,7 +457,7 @@ osc_end_bundle_item(osc_data_t *buf, osc_data_t *itm)
 		return itm;
 }
 
-osc_data_t *osc_set(OSC_Type type, osc_data_t *buf, OSC_Argument *arg);
+osc_data_t *osc_set(osc_type_t type, osc_data_t *buf, osc_argument_t *arg);
 size_t osc_vararg_set(osc_data_t *buf, const char *path, const char *fmt, ...);
 
 #ifdef __cplusplus

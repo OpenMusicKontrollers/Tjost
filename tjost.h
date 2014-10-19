@@ -48,6 +48,7 @@ extern "C" {
 
 #include <tjost_config.h>
 
+#include <jack/jack.h>
 #include <jack/ringbuffer.h>
 #ifdef HAS_METADATA_API
 #	include <jack/metadata.h>

@@ -48,30 +48,30 @@ _serialize_message(osc_data_t *buffer, size_t len, int verbose)
 	for(type=fmt+1; *type; type++)
 		switch(*type)
 		{
-			case 'i':
+			case OSC_INT32:
 			{
 				int32_t i;
 				ptr = osc_get_int32(ptr, &i);
 				printf(" %"PRIi32, i);
 				break;
 			}
-			case 'f':
+			case OSC_FLOAT:
 			{
 				float f;
 				ptr = osc_get_float(ptr, &f);
 				printf(" %f", f);
 				break;
 			}
-			case 's':
+			case OSC_STRING:
 			{
 				const char *s;
 				ptr = osc_get_string(ptr, &s);
 				printf(" '%s'", s);
 				break;
 			}
-			case 'b':
+			case OSC_BLOB:
 			{
-				OSC_Blob b;
+				osc_blob_t b;
 				ptr = osc_get_blob(ptr, &b);
 				printf(" (%"PRIi32")", b.size);
 				if(verbose)
@@ -86,21 +86,21 @@ _serialize_message(osc_data_t *buffer, size_t len, int verbose)
 				break;
 			}
 
-			case 'h':
+			case OSC_INT64:
 			{
 				int64_t h;
 				ptr = osc_get_int64(ptr, &h);
 					printf(" %"PRIi64, h);
 				break;
 			}
-			case 'd':
+			case OSC_DOUBLE:
 			{
 				double d;
 				ptr = osc_get_double(ptr, &d);
 				printf(" %f", d);
 				break;
 			}
-			case 't':
+			case OSC_TIMETAG:
 			{
 				uint64_t t;
 				ptr = osc_get_timetag(ptr, &t);
@@ -109,21 +109,21 @@ _serialize_message(osc_data_t *buffer, size_t len, int verbose)
 				printf(" %08"PRIX32".%08"PRIX32, sec, frac);
 				break;
 			}
-			case 'S':
+			case OSC_SYMBOL:
 			{
 				const char *S;
 				ptr = osc_get_string(ptr, &S);
 				printf(" '%s'", S);
 				break;
 			}
-			case 'c':
+			case OSC_CHAR:
 			{
 				char c;
 				ptr = osc_get_char(ptr, &c);
 				printf(" %c", c);
 				break;
 			}
-			case 'm':
+			case OSC_MIDI:
 			{
 				uint8_t *m;
 				ptr = osc_get_midi(ptr, &m);

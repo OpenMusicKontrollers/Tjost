@@ -128,7 +128,7 @@ _inject_bundle(osc_data_t *buf, size_t len, void *dat)
 		fprintf(stderr, MOD_NAME": rx OSC bundle invalid\n");
 }
 
-static OSC_Unroll_Inject inject = {
+static osc_unroll_inject_t inject = {
 	.stamp = _inject_stamp,
 	.message = _inject_message,
 	.bundle = _inject_bundle

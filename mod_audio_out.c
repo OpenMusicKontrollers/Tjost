@@ -34,11 +34,11 @@ struct _Data {
 };
 
 static int
-_audio(jack_nframes_t time, const char *path, const char *fmt, osc_data_t *buf, void *dat)
+_audio(osc_time_t time, const char *path, const char *fmt, osc_data_t *buf, void *dat)
 {
 	Data *data = dat;
 
-	OSC_Blob b;
+	osc_blob_t b;
 	jack_nframes_t last;
 	int32_t sample_type;
 
@@ -191,7 +191,7 @@ _audio(jack_nframes_t time, const char *path, const char *fmt, osc_data_t *buf, 
 	return 1;
 }
 
-static OSC_Method methods [] = {
+static osc_method_t methods [] = {
 	{AUDIO_PATH, AUDIO_FMT, _audio},
 	{NULL, NULL, NULL}
 };

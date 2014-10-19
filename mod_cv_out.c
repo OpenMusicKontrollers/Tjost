@@ -36,11 +36,11 @@ struct _Data {
 };
 
 static int
-_cv(jack_nframes_t time, const char *path, const char *fmt, osc_data_t *buf, void *dat)
+_cv(osc_time_t time, const char *path, const char *fmt, osc_data_t *buf, void *dat)
 {
 	Data *data = dat;
 
-	OSC_Blob b;
+	osc_blob_t b;
 	jack_nframes_t last;
 
 	osc_data_t *ptr = buf;
@@ -57,7 +57,7 @@ _cv(jack_nframes_t time, const char *path, const char *fmt, osc_data_t *buf, voi
 	return 1;
 }
 
-static OSC_Method methods [] = {
+static osc_method_t methods [] = {
 	{CV_PATH, CV_FMT, _cv},
 	{NULL, NULL, NULL}
 };

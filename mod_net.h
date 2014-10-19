@@ -44,7 +44,7 @@ struct _Mod_Net {
 	} rb;
 
 	Socket_Type type;
-	OSC_Unroll_Mode unroll;
+	osc_unroll_mode_t unroll;
 	jack_nframes_t tstamp;
 	
 	union {

@@ -45,7 +45,7 @@ tjost_uplink_rx_push(Tjost_Host *host, Tjost_Module *module, osc_data_t *buf, si
 }
 
 static int
-_connect(jack_nframes_t time, const char *path, const char *fmt, osc_data_t *buf, void *dat)
+_connect(osc_time_t time, const char *path, const char *fmt, osc_data_t *buf, void *dat)
 {
 	Tjost_Event *tev = dat;
 	Tjost_Module *module = tev->module;
@@ -63,7 +63,7 @@ _connect(jack_nframes_t time, const char *path, const char *fmt, osc_data_t *buf
 }
 
 static int
-_disconnect(jack_nframes_t time, const char *path, const char *fmt, osc_data_t *buf, void *dat)
+_disconnect(osc_time_t time, const char *path, const char *fmt, osc_data_t *buf, void *dat)
 {
 	Tjost_Event *tev = dat;
 	Tjost_Module *module = tev->module;
@@ -81,7 +81,7 @@ _disconnect(jack_nframes_t time, const char *path, const char *fmt, osc_data_t *
 }
 
 static int
-_ports(jack_nframes_t time, const char *path, const char *fmt, osc_data_t *buf, void *dat)
+_ports(osc_time_t time, const char *path, const char *fmt, osc_data_t *buf, void *dat)
 {
 	Tjost_Event *tev = dat;
 	Tjost_Module *module = tev->module;
@@ -127,7 +127,7 @@ _ports(jack_nframes_t time, const char *path, const char *fmt, osc_data_t *buf, 
 }
 
 static int
-_connections(jack_nframes_t time, const char *path, const char *fmt, osc_data_t *buf, void *dat)
+_connections(osc_time_t time, const char *path, const char *fmt, osc_data_t *buf, void *dat)
 {
 	Tjost_Event *tev = dat;
 	Tjost_Module *module = tev->module;
@@ -182,7 +182,7 @@ _connections(jack_nframes_t time, const char *path, const char *fmt, osc_data_t 
 	return 1;
 }
 
-static OSC_Method methods [] = {
+static osc_method_t methods [] = {
 	{"/jack/connect", "ss", _connect},
 	{"/jack/disconnect", "ss", _disconnect},
 

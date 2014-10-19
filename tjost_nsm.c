@@ -47,7 +47,7 @@ _nsm_send_cb(size_t len, void *arg)
 }
 
 static int
-_nsm_reply(jack_nframes_t time, const char *path, const char *fmt, osc_data_t *buf, void *dat)
+_nsm_reply(osc_time_t time, const char *path, const char *fmt, osc_data_t *buf, void *dat)
 {
 	Tjost_NSM *nsm = dat;
 	const char *msg;
@@ -65,7 +65,7 @@ _nsm_reply(jack_nframes_t time, const char *path, const char *fmt, osc_data_t *b
 }
 
 static int
-_nsm_error(jack_nframes_t time, const char *path, const char *fmt, osc_data_t *buf, void *dat)
+_nsm_error(osc_time_t time, const char *path, const char *fmt, osc_data_t *buf, void *dat)
 {
 	Tjost_NSM *nsm = dat;
 	const char *msg;
@@ -83,7 +83,7 @@ _nsm_error(jack_nframes_t time, const char *path, const char *fmt, osc_data_t *b
 }
 
 static int
-_nsm_client_open(jack_nframes_t time, const char *path, const char *fmt, osc_data_t *buf, void *dat)
+_nsm_client_open(osc_time_t time, const char *path, const char *fmt, osc_data_t *buf, void *dat)
 {
 	Tjost_NSM *nsm = dat;
 
@@ -113,7 +113,7 @@ _nsm_client_open(jack_nframes_t time, const char *path, const char *fmt, osc_dat
 }
 
 static int
-_nsm_client_save(jack_nframes_t time, const char *path, const char *fmt, osc_data_t *buf, void *dat)
+_nsm_client_save(osc_time_t time, const char *path, const char *fmt, osc_data_t *buf, void *dat)
 {
 	Tjost_NSM *nsm = dat;
 
@@ -131,7 +131,7 @@ _nsm_client_save(jack_nframes_t time, const char *path, const char *fmt, osc_dat
 	return 1;
 }
 
-static OSC_Method methods [] = {
+static osc_method_t methods [] = {
 	{"/reply", NULL, _nsm_reply},
 	{"/error", "sis", _nsm_error},
 	

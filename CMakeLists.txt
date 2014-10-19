@@ -10,6 +10,8 @@ include_directories("${PROJECT_SOURCE_DIR}")
 include_directories("${PROJECT_BINARY_DIR}")
 include_directories("${PROJECT_SOURCE_DIR}/tlsf-3.0")
 include_directories("${PROJECT_SOURCE_DIR}/jackey")
+include_directories("${PROJECT_SOURCE_DIR}/libosc")
+include_directories("${PROJECT_SOURCE_DIR}/jack_osc")
 
 # libuv
 pkg_search_module(UV REQUIRED libuv)
@@ -59,20 +61,7 @@ include_directories(${EINA_INCLUDE_DIRS})
 set(LIBS ${LIBS} ${EINA_LDFLAGS})
 
 # shared lib
-add_library(osc SHARED osc.c)
-target_link_libraries(osc ${JACK_LDFLAGS})
-install(TARGETS osc DESTINATION lib)
-
-# lib header
-install(FILES osc.h DESTINATION include)
-
-# pkg config file
-set(prefix ${CMAKE_INSTALL_PREFIX})
-set(exec_prefix ${CMAKE_INSTALL_PREFIX})
-set(libdir ${CMAKE_INSTALL_PREFIX}/lib)
-set(includedir ${CMAKE_INSTALL_PREFIX}/include)
-configure_file(${PROJECT_SOURCE_DIR}/osc.pc.in ${PROJECT_BINARY_DIR}/osc.pc @ONLY)
-install(FILES ${PROJECT_BINARY_DIR}/osc.pc DESTINATION lib/pkgconfig)
+add_library(osc libosc/osc.c)
 
 # tjost
 add_executable(tjost tjost.c tjost_lua.c tjost_uplink.c tjost_nsm.c tjost_slip.c tjost_pipe.c netaddr_udp.c netaddr_tcp.c tlsf-3.0/tlsf.c)
@@ -95,12 +84,12 @@ set_target_properties(loopback PROPERTIES PREFIX "")
 install(TARGETS loopback DESTINATION lib/tjost)
 
 # mod_osc_in
-add_library(osc_in MODULE mod_osc_in.c)
+add_library(osc_in MODULE mod_osc_in.c mod_osc.c)
 set_target_properties(osc_in PROPERTIES PREFIX "")
 install(TARGETS osc_in DESTINATION lib/tjost)
 
 # mod_osc_out
-add_library(osc_out MODULE mod_osc_out.c)
+add_library(osc_out MODULE mod_osc_out.c mod_osc.c)
 set_target_properties(osc_out PROPERTIES PREFIX "")
 install(TARGETS osc_out DESTINATION lib/tjost)
 

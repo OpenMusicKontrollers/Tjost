@@ -39,7 +39,7 @@ struct _Data {
 };
 
 static int
-_midi(jack_nframes_t time, const char *path, const char *fmt, osc_data_t *buf, void *arg)
+_midi(osc_time_t time, const char *path, const char *fmt, osc_data_t *buf, void *arg)
 {
 	Tjost_Module *module = arg;
 	Data *dat = module->dat;
@@ -53,7 +53,7 @@ _midi(jack_nframes_t time, const char *path, const char *fmt, osc_data_t *buf, v
 	for(type=fmt; *type!='\0'; type++)
 		switch(*type)
 		{
-			case 'm':
+			case OSC_MIDI:
 				ptr = osc_get_midi(ptr, &M);
 				m[0] = M[0] | M[1];
 				m[1] = M[2];
@@ -71,7 +71,7 @@ _midi(jack_nframes_t time, const char *path, const char *fmt, osc_data_t *buf, v
 	return 1;
 }
 
-static OSC_Method methods [] = {
+static osc_method_t methods [] = {
 	{NULL, NULL, _midi},
 	{NULL, NULL, NULL}
 };

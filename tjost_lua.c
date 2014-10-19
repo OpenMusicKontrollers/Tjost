@@ -31,36 +31,36 @@
 #define TJOST_BUNDLE_POP_FMT 		""
 
 static osc_data_t *
-_push(Tjost_Host *host, char type, osc_data_t *ptr)
+_push(Tjost_Host *host, osc_type_t type, osc_data_t *ptr)
 {
 	lua_State *L = host->L;
 
 	switch(type)
 	{
-		case 'i':
+		case OSC_INT32:
 		{
 			int32_t i;
 			ptr = osc_get_int32(ptr, &i);
 			lua_pushnumber(L, i);
 			return ptr;
 		}
-		case 'f':
+		case OSC_FLOAT:
 		{
 			float f;
 			ptr = osc_get_float(ptr, &f);
 			lua_pushnumber(L, f);
 			return ptr;
 		}
-		case 's':
+		case OSC_STRING:
 		{
 			const char *s;
 			ptr = osc_get_string(ptr, &s);
 			lua_pushstring(L, s);
 			return ptr;
 		}
-		case 'b':
+		case OSC_BLOB:
 		{
-			OSC_Blob b;
+			osc_blob_t b;
 			ptr = osc_get_blob(ptr, &b);
 
 			Tjost_Blob *tb = lua_newuserdata(L, sizeof(Tjost_Blob) + b.size);
@@ -72,21 +72,21 @@ _push(Tjost_Host *host, char type, osc_data_t *ptr)
 			return ptr;
 		}
 
-		case 'h':
+		case OSC_INT64:
 		{
 			int64_t h;
 			ptr = osc_get_int64(ptr, &h);
 			lua_pushnumber(L, h);
 			return ptr;
 		}
-		case 'd':
+		case OSC_DOUBLE:
 		{
 			double d;
 			ptr = osc_get_double(ptr, &d);
 			lua_pushnumber(L, d);
 			return ptr;
 		}
-		case 't':
+		case OSC_TIMETAG:
 		{
 			uint64_t t;
 			ptr = osc_get_timetag(ptr, &t);
@@ -94,34 +94,34 @@ _push(Tjost_Host *host, char type, osc_data_t *ptr)
 			return ptr;
 		}
 
-		case 'T':
+		case OSC_TRUE:
 			lua_pushboolean(L, 1);
 			return ptr;
-		case 'F':
+		case OSC_FALSE:
 			lua_pushboolean(L, 0);
 			return ptr;
-		case 'I':
+		case OSC_BANG:
 			lua_pushnumber(L, INT32_MAX);
 			return ptr;
-		case 'N':
+		case OSC_NIL:
 			lua_pushnil(L);
 			return ptr;
 
-		case 'S':
+		case OSC_SYMBOL:
 		{
 			const char *S;
 			ptr = osc_get_symbol(ptr, &S);
 			lua_pushstring(L, S);
 			return ptr;
 		}
-		case 'c':
+		case OSC_CHAR:
 		{
 			char c;
 			ptr = osc_get_char(ptr, &c);
 			lua_pushnumber(L, c);
 			return ptr;
 		}
-		case 'm':
+		case OSC_MIDI:
 		{
 			uint8_t *m;
 			ptr = osc_get_midi(ptr, &m);
@@ -144,7 +144,7 @@ _push(Tjost_Host *host, char type, osc_data_t *ptr)
 }
 
 static int
-_deserialize(jack_nframes_t time, const char *path, const char *fmt, osc_data_t *buf, void *dat)
+_deserialize(osc_time_t time, const char *path, const char *fmt, osc_data_t *buf, void *dat)
 {
 	Tjost_Module *module = dat;
 	Tjost_Host *host = module->host;
@@ -174,13 +174,13 @@ _deserialize(jack_nframes_t time, const char *path, const char *fmt, osc_data_t 
 	return 1;
 }
 
-static OSC_Method methods [] = {
+static osc_method_t methods [] = {
 	{NULL, NULL, _deserialize},
 	{NULL, NULL, NULL}
 };
 
 static void
-_bundle_in(jack_nframes_t time, void *dat)
+_bundle_in(osc_time_t time, void *dat)
 {
 	Tjost_Module *module = dat;
 	Tjost_Host *host = module->host;
@@ -199,7 +199,7 @@ _bundle_in(jack_nframes_t time, void *dat)
 }
 
 static void
-_bundle_out(jack_nframes_t time, void *dat)
+_bundle_out(osc_time_t time, void *dat)
 {
 	Tjost_Module *module = dat;
 	Tjost_Host *host = module->host;
@@ -297,48 +297,48 @@ _serialize_packet(lua_State *L, Tjost_Module *module)
 		for(type=fmt; *type!='\0'; type++, p++)
 			switch(*type)
 			{
-				case 'i':
+				case OSC_INT32:
 					buf_ptr = osc_set_int32(buf_ptr, luaL_checkinteger(L, p));
 					break;
-				case 'f':
+				case OSC_FLOAT:
 					buf_ptr = osc_set_float(buf_ptr, luaL_checknumber(L, p));
 					break;
-				case 's':
+				case OSC_STRING:
 					buf_ptr = osc_set_string(buf_ptr, luaL_checkstring(L, p));
 					break;
-				case 'b':
+				case OSC_BLOB:
 					{
 						Tjost_Blob *tb = luaL_checkudata(L, p, "Tjost_Blob");
 						buf_ptr = osc_set_blob(buf_ptr, tb->size, tb->buf);
 					}
 					break;
 
-				case 'h':
+				case OSC_INT64:
 					buf_ptr = osc_set_int64(buf_ptr, luaL_checknumber(L, p));
 					break;
-				case 'd':
+				case OSC_DOUBLE:
 					buf_ptr = osc_set_double(buf_ptr, luaL_checknumber(L, p));
 					break;
-				case 't':
+				case OSC_TIMETAG:
 					buf_ptr = osc_set_timetag(buf_ptr, luaL_checknumber(L, p));
 					break;
 
-				case 'T':
-				case 'F':
-				case 'N':
-				case 'I':
+				case OSC_TRUE:
+				case OSC_FALSE:
+				case OSC_NIL:
+				case OSC_BANG:
 					break;
 
-				case 'S':
+				case OSC_SYMBOL:
 					buf_ptr = osc_set_symbol(buf_ptr, luaL_checkstring(L, p));
 					break;
-				case 'm':
+				case OSC_MIDI:
 					{
 						Tjost_Midi *tm = luaL_checkudata(L, p, "Tjost_Midi");
 						buf_ptr = osc_set_midi(buf_ptr, tm->buf);
 					}
 					break;
-				case 'c':
+				case OSC_CHAR:
 					buf_ptr = osc_set_char(buf_ptr, luaL_checknumber(L, p));
 					break;
 
