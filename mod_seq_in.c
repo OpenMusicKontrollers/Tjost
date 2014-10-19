@@ -80,7 +80,7 @@ _poll(uv_poll_t *handle, int status, int events)
 		return;
 	}
 
-	uint8_t m [4];
+	uint8_t m [4] = {0x0};
 	snd_seq_event_t *sev;
 
 	do
@@ -88,9 +88,6 @@ _poll(uv_poll_t *handle, int status, int events)
 		snd_seq_event_input(dat->seq, &sev);
 		if(snd_midi_event_decode(dat->trans, &m[1], 0x10, sev) == 3)
 		{
-			m[0] = m[1] & 0x0f;
-			m[1] = m[1] & 0xf0;
-
 			osc_data_t buf [20];
 			osc_data_t *ptr = buf;
 			ptr = osc_set_path(ptr, "/midi");

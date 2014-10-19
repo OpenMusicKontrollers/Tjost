@@ -77,11 +77,9 @@ _poll(uv_poll_t *handle, int status, int events)
 		return;
 	}
 
-	uint8_t m [4];
+	uint8_t m [4] = {0x0};
 	if(snd_rawmidi_read(dat->dev, &m[1], 3) != 3)
 		fprintf(stderr, MOD_NAME": reading MIDI failed\n");
-	m[0] = m[1] & 0x0f;
-	m[1] = m[1] & 0xf0;
 
 	osc_data_t buf [20];
 	osc_data_t *ptr = buf;

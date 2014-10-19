@@ -87,10 +87,8 @@ process_in(jack_nframes_t nframes, void *arg)
 			{
 				jack_midi_event_get(&mev, port_buf, j);
 
-				uint8_t m[4];
-
-				m[0] = mev.buffer[0] & 0x0f; // extract channel nibble
-				m[1] = mev.buffer[0] & 0xf0; // extract status nibble
+				uint8_t m[4] = {0x0};
+				m[1] = mev.buffer[0];
 				m[2] = mev.buffer[1];
 				m[3] = mev.buffer[2];
 

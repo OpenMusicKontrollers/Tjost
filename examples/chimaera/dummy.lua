@@ -67,6 +67,7 @@ success = function(time, uuid, path, ...)
 			chim(0, '/engines/offset', 'if', id(), 0.0025)
 			chim(0, '/engines/reset', 'i', id())
 			chim(0, '/engines/dummy/enabled', 'ii', id(), 1)
+			chim(0, '/engines/dummy/redundancy', 'ii', id(), 1)
 		end
 	}
 
@@ -92,8 +93,8 @@ sc1 = scsynth:new({
 
 md1 = midi:new({
 	port = 'midi.1',
-	effect = SOUND_EFFECT_5
-	--effect = VOLUME
+	--effect = SOUND_EFFECT_5
+	effect = VOLUME
 })
 
 dr1 = drum:new({
