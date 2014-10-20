@@ -43,18 +43,14 @@ end)
 success = function(time, uuid, path, ...)
 	local methods = {
 		['/sensors/number'] = function(time, n)
-			local bot = 2*12 - 0.5 - (n % 18 / 6);
-			local range = n/3
-
 			--md1.map = map_poly_step:new({n=n, oct=2, order=3})
 			md1.map = map_linear:new({n=n, oct=2})
-			message(time, '/number', 'iff', n, bot, range)
 		end,
 
 		['/engines/mode'] = function(time)
 			chim(0, '/engines/enabled', 'ii', id(), 1)
 		end,
-	
+
 		['/comm/address'] = function(time)
 			chim(0, '/sensors/number', 'i', id())
 			chim(0, '/sensors/rate', 'ii', id(), rate)
@@ -63,9 +59,11 @@ success = function(time, uuid, path, ...)
 			chim(0, '/sensors/group/attributes/1', 'iffiii', id(), 0.0, 1.0, 1, 0, 0)
 
 			chim(0, '/engines/enabled', 'ii', id(), 0)
+			chim(0, '/engines/server', 'ii', id(), 0)
 			chim(0, '/engines/mode', 'is', id(), 'osc.tcp')
 			chim(0, '/engines/offset', 'if', id(), 0.0025)
 			chim(0, '/engines/reset', 'i', id())
+
 			chim(0, '/engines/dummy/enabled', 'ii', id(), 1)
 			chim(0, '/engines/dummy/redundancy', 'ii', id(), 0)
 		end

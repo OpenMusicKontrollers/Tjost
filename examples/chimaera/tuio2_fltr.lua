@@ -34,7 +34,7 @@ local tuio2 = class:new({
 	end,
 
 	['/tuio2/frm'] = function(self, time, fid, stamp)
-		if ( (fid > self.last_fid) and (time > self.last_time) or (fid == 1) ) then
+		if ( (fid > self.last_fid) and (time >= self.last_time) or (fid == 1) ) then
 			self.ignore = false
 			self.last_fid = fid
 			self.last_time = time
@@ -101,9 +101,9 @@ local tuio2 = class:new({
 			end
 			local b = self.blobs[w]
 			if found then
-				self.cb(time, '/set', 'iiiff', unpack(b))
+				self.cb(time, '/set', 'iff', b[1], b[4], b[5])
 			else
-				self.cb(time, '/on', 'iff', b[1], b[4], b[5])
+				self.cb(time, '/on', 'iiiff', unpack(b))
 			end
 		end
 	end

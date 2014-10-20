@@ -24,8 +24,8 @@
 --]]
 
 message = tjost.plugin({name='dump'})
-status = tjost.plugin({name='osc_out', port='osc.jack://status'})
---data = tjost.plugin({name='osc_out', port='osc.jack://data'})
+status = tjost.plugin({name='osc_out', port='status'})
+data = tjost.plugin({name='osc_out', port='data'})
 chim = tjost.plugin({name='net_out', uri='osc.udp://chimaera.local:4444'})
 
 id = require('id')
@@ -33,21 +33,23 @@ tuio2 = require('tuio2_fltr')
 scsynth = require('scsynth_out')
 midi = require('midi_out')
 drum = require('drum_out')
+map = require('map')
 
 rate = 3000
 
-control = tjost.plugin({name='osc_in', port='osc.jack://control'}, function(time, path, fmt, ...)
+control = tjost.plugin({name='osc_in', port='control'}, function(time, path, fmt, ...)
 	chim(time, path, fmt, ...)
 end)
 
 success = function(time, uuid, path, ...)
 	local methods = {
 		['/sensors/number'] = function(time, n)
-			local bot = 2*12 - 0.5 - (n % 18 / 6);
-			local range = n/3
-			midi.bot = bot
-			midi.range = range
-			message(time, '/number', 'iff', n, bot, range)
+			--md1.map = map_poly_step:new({n=n, oct=2, order=3})
+			md1.map = map_linear:new({n=n, oct=2})
+		end,
+
+		['/engines/mode'] = function(time)
+			chim(0, '/engines/enabled', 'ii', id(), 1)
 		end,
 
 		['/comm/address'] = function(time)
@@ -57,9 +59,14 @@ success = function(time, uuid, path, ...)
 			chim(0, '/sensors/group/attributes/0', 'iffiii', id(), 0.0, 1.0, 0, 1, 0)
 			chim(0, '/sensors/group/attributes/1', 'iffiii', id(), 0.0, 1.0, 1, 0, 0)
 
-			chim(0, '/engines/offset', 'if', id(), 0.002)
+			chim(0, '/engines/enabled', 'ii', id(), 0)
+			chim(0, '/engines/server', 'ii', id(), 0)
+			chim(0, '/engines/mode', 'is', id(), 'osc.udp')
+			chim(0, '/engines/offset', 'if', id(), 0.0025)
 			chim(0, '/engines/reset', 'i', id())
+
 			chim(0, '/engines/tuio2/enabled', 'ii', id(), 1)
+			chim(0, '/engines/tuio2/long_header', 'ii', id(), 0)
 		end
 	}
 
@@ -85,7 +92,8 @@ sc1 = scsynth:new({
 
 md1 = midi:new({
 	port = 'midi.1',
-	effect = SOUND_EFFECT_5
+	--effect = SOUND_EFFECT_5
+	effect = VOLUME
 })
 
 dr1 = drum:new({
@@ -99,7 +107,7 @@ tu1 = tuio2:new({}, function(...)
 end)
 
 stream = tjost.plugin({name='net_in', uri='osc.udp://:3333', rtprio=60, unroll='full'}, tu1)
---tjost.chain(stream, data)
+tjost.chain(stream, data)
 
 hostname = tjost.hostname()
 chim(0, '/comm/address', 'is', id(), hostname..'.local')
