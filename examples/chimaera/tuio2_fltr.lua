@@ -24,9 +24,9 @@
 local class = require('class')
 
 local tuio2 = class:new({
-	tstamp = 0,
 	ignore = false,
 	last_fid = 0,
+	last_time = 0,
 
 	init = function(self, cb)
 		self.blobs = {}
@@ -34,11 +34,12 @@ local tuio2 = class:new({
 	end,
 
 	['/tuio2/frm'] = function(self, time, fid, stamp)
-		if fid > self.last_fid then
+		if ( (fid > self.last_fid) and (time > self.last_time) or (fid == 1) ) then
 			self.ignore = false
 			self.last_fid = fid
+			self.last_time = time
 		else
-			print('ignore: '..fid)
+			print('tuio2_fltr: ignoring out-of-order frame #'..fid)
 			self.ignore = true
 			return
 		end
@@ -49,14 +50,15 @@ local tuio2 = class:new({
 	['/tuio2/tok'] = function(self, time, sid, pid, gid, x, y, a)
 		if self.ignore then return end
 
+		-- add blob to hash
 		local elmnt
-		elmnt = self.blobs[sid] or {0, 0, 0, 0, 0, 0}
+		elmnt = self.blobs[sid] or {0, 0, 0, 0, 0}
 		elmnt[1] = sid
 		elmnt[2] = gid
 		elmnt[3] = pid
 		elmnt[4] = x
 		elmnt[5] = y
-		elmnt[6] = a
+		-- a is ignored
 		self.blobs[sid] = elmnt
 	end,
 
@@ -66,11 +68,13 @@ local tuio2 = class:new({
 		local v, w
 		self.new_blobs = {...}
 
+		-- are there any blobs active?
 		if #self.new_blobs == 0 and #self.old_blobs == 0 then
 			self.cb(time, '/idle', '')
 			return
 		end
 
+		-- have any blobs disappeared?
 		for _, v in ipairs(self.old_blobs) do
 			local found = false
 			for _, w in ipairs(self.new_blobs) do
@@ -81,11 +85,12 @@ local tuio2 = class:new({
 			end
 			if not found then
 				local b = self.blobs[v]
-				self.cb(time, '/off', 'iii', unpack(b, 1, 3))
+				self.cb(time, '/off', 'i', b[1])
 				self.blobs[v] = nil
 			end
 		end
 
+		-- have any blobs appeared or need updating?
 		for _, w in ipairs(self.new_blobs) do
 			local found = false
 			for _, v in ipairs(self.old_blobs) do
@@ -96,9 +101,9 @@ local tuio2 = class:new({
 			end
 			local b = self.blobs[w]
 			if found then
-				self.cb(time, '/set', 'iiifff', unpack(b))
+				self.cb(time, '/set', 'iiiff', unpack(b))
 			else
-				self.cb(time, '/on', 'iiifff', unpack(b))
+				self.cb(time, '/on', 'iff', b[1], b[4], b[5])
 			end
 		end
 	end

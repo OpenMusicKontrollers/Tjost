@@ -39,17 +39,17 @@ local scsynth = class:new({
 		sid = sid%self.wrap + self.sid_offset
 		self.serv(0, '/s_new', 'siiisisi',
 			self.inst[gid+1], sid, 0, gid+self.gid_offset, 'out', gid+self.out_offset, 'gate', 0)
-		self.serv(time, '/n_set', 'iififsi',
-			sid, 0, x, 1, y, 'gate', 1)
+		self.serv(time, '/n_set', 'iififiisi',
+			sid, 0, x, 1, y, 2, pid, 'gate', 1)
 	end,
 
-	['/off'] = function(self, time, sid, gid, pid)
+	['/off'] = function(self, time, sid)
 		sid = sid%self.wrap + self.sid_offset
 		self.serv(time, '/n_set', 'isi',
 			sid, 'gate', 0)
 	end,
 
-	['/set'] = function(self, time, sid, gid, pid, x, y)
+	['/set'] = function(self, time, sid, x, y)
 		sid = sid%self.wrap + self.sid_offset
 		self.serv(time, '/n_set', 'iifif',
 			sid, 0, x, 1, y)

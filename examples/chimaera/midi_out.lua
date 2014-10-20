@@ -44,10 +44,6 @@ local midi = class:new({
 	map = map_linear,
 	effect = VOLUME,
 	gid_offset = 0,
-	ltable = {
-		[0] = {0},
-		[1] = {1}
-	},
 
 	init = function(self)
 		self.bases = {}
@@ -68,9 +64,6 @@ local midi = class:new({
 		}
 	
 		self.serv = tjost.plugin({name='midi_out', port=self.port})
-
-		self.sids = {}
-		self.channels = {}
 	end,
 
 	['/on'] = function(self, time, sid, gid, pid, x, y)
@@ -83,14 +76,6 @@ local midi = class:new({
 
 		local raw = self.raw
 		local m = self.m
-		--for _, i in ipairs(self.ltable[gid]) do
-		--	if not self.channels[i] then
-		--		self.channels[i] = true
-		--		gid = i
-		--		self.sids[sid] = gid
-		--		break
-		--	end
-		--end
 
 		gid = gid + self.gid_offset
 
@@ -125,42 +110,31 @@ local midi = class:new({
 			self.serv(time, mpath, 'mmm', unpack(m, 1, 3))
 		end
 
-		self.bases[sid] = base
+		self.bases[sid] = {base, gid}
 	end,
 
-	['/off'] = function(self, time, sid, gid, pid)
-		local base = self.bases[sid]
+	['/off'] = function(self, time, sid)
+		local base, gid = unpack(self.bases[sid])
 		local raw = self.raw
 		local m = self.m
-		--gid = self.sids[sid]
 		
-		gid = gid + self.gid_offset
-
 		raw[1][0] = 0x00
 		raw[1][1] = bit32.bor(0x80, gid)
 		raw[1][2] = base
 		raw[1][3] = 0x00
 
-		--self.channels[gid] = false
-		--self.sids[sid] = nil
 		self.bases[sid] = nil
 
 		self.serv(time, mpath, 'm', unpack(m, 1, 1))
 	end,
 
-	['/set'] = function(self, time, sid, gid, pid, x, y)
-		local key, base, bend, eff
-
-		key = self.map(x)
-		base = self.bases[sid]
-		bend = (key-base)/self.map.range*0x2000 + 0x1fff
-		eff = y * 0x3fff
-
+	['/set'] = function(self, time, sid, x, y)
+		local key = self.map(x)
+		local base, gid = unpack(self.bases[sid])
+		local bend = (key-base)/self.map.range*0x2000 + 0x1fff
+		local eff = y * 0x3fff
 		local raw = self.raw
 		local m = self.m
-		--gid = self.sids[sid]
-		
-		gid = gid + self.gid_offset
 
 		raw[1][0] = 0x00
 		raw[1][1] = bit32.bor(PITCHBEND, gid)
