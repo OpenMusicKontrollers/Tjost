@@ -129,18 +129,6 @@ set_target_properties(midi_out PROPERTIES PREFIX "")
 install(TARGETS midi_out DESTINATION lib/tjost)
 
 if(USE_ALSA)
-	# mod_raw_in
-	add_library(raw_in MODULE mod_raw_in.c)
-	set_target_properties(raw_in PROPERTIES PREFIX "")
-	target_link_libraries(raw_in ${ALSA_LDFLAGS})
-	install(TARGETS raw_in DESTINATION lib/tjost)
-
-	# mod_raw_out
-	add_library(raw_out MODULE mod_raw_out.c)
-	set_target_properties(raw_out PROPERTIES PREFIX "")
-	target_link_libraries(raw_out ${ALSA_LDFLAGS})
-	install(TARGETS raw_out DESTINATION lib/tjost)
-
 	# mod_seq_in
 	add_library(seq_in MODULE mod_seq_in.c)
 	set_target_properties(seq_in PROPERTIES PREFIX "")

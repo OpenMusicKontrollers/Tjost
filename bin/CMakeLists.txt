@@ -16,8 +16,6 @@ set(scripts ${scripts} tjost_read)
 set(scripts ${scripts} tjost_serial)
 
 if(USE_ALSA)
-	set(scripts ${scripts} tjost_raw2osc)
-	set(scripts ${scripts} tjost_osc2raw)
 	set(scripts ${scripts} tjost_seq2osc)
 	set(scripts ${scripts} tjost_osc2seq)
 endif()
