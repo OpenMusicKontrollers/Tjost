@@ -6,4 +6,4 @@
 	url = https://github.com/ventosus/jack_osc.git
 [submodule "libosc"]
 	path = libosc
-	url = git@github.com:OpenMusicKontrollers/libosc.git
+	url = https://github.com/OpenMusicKontrollers/libosc.git
