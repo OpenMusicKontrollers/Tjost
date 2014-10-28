@@ -419,6 +419,7 @@ del(Tjost_Module *module)
 	Data *dat = module->dat;
 
 	uv_close((uv_handle_t *)&dat->asio, NULL);
+	uv_read_stop((uv_stream_t *)&dat->serial_in);
 	uv_close((uv_handle_t *)&dat->serial_in, NULL);
 	uv_close((uv_handle_t *)&dat->serial_out, NULL);
 
