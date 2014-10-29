@@ -30,4 +30,4 @@ else
 end
 
 dump = tjost.plugin({name='dump', verbose=verbose})
-osc_in = tjost.plugin({name='osc_in', port='osc.dump'}, dump)
+osc_in = tjost.plugin({name='osc_in', port='osc_dump', pretty='OSC Dump'}, dump)

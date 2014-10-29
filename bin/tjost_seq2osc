@@ -25,5 +25,5 @@
 
 device = argv[3]
 
-osc_out = tjost.plugin({name='osc_out', port='osc.midi'})
+osc_out = tjost.plugin({name='osc_out'})
 midi_in = tjost.plugin({name='seq_in', device=device}, osc_out)

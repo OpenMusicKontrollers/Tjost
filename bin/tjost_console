@@ -23,8 +23,8 @@
 --     distribution.
 --]]
 
-osc_out = tjost.plugin({name='osc_out', port='osc.console.out'})
+osc_out = tjost.plugin({name='osc_out', port='osc_console_out', pretty='OSC Console Output'})
 dump = tjost.plugin({name='dump'})
 
-osc_in = tjost.plugin({name='osc_in', port='osc.console.in'}, dump)
+osc_in = tjost.plugin({name='osc_in', port='osc_console_in', pretty='OSC Console Input'}, dump)
 send = tjost.plugin({name='send'}, function(...) osc_out(...) end)

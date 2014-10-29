@@ -22,8 +22,8 @@
  */
 
 #include <tjost.h>
-#include <mod_osc.h>
 
+#include <jackey.h>
 #include <jack_osc.h>
 
 #define MOD_NAME "osc_out"
@@ -78,14 +78,23 @@ add(Tjost_Module *module, int argc, const char **argv)
 	jack_port_t *port = NULL;
 
 	lua_getfield(L, 1, "port");
-	const char *portn = luaL_optstring(L, -1, "osc.out");
+	const char *portn = luaL_optstring(L, -1, "osc_out");
 	lua_pop(L, 1);
 
 	if(!(port = jack_port_register(module->host->client, portn, JACK_DEFAULT_OSC_TYPE, JackPortIsOutput, 0)))
 		MOD_ADD_ERR(module->host, MOD_NAME, "could not register jack port");
 
-	if(osc_mark_port(module->host->client, port))
-		MOD_ADD_ERR(module->host, MOD_NAME, "could not set event type");
+#ifdef HAS_METADATA_API
+	lua_getfield(L, 1, "pretty");
+	const char *pretty = luaL_optstring(L, -1, "OSC Output");
+	lua_pop(L, 1);
+
+	jack_uuid_t uuid = jack_port_uuid(port);
+	if(jack_set_property(module->host->client, uuid, JACK_METADATA_PRETTY_NAME, pretty, "text/plain"))
+		MOD_ADD_ERR(module->host, MOD_NAME, "could not set prettyname");
+	if(jack_set_property(module->host->client, uuid, JACKEY_EVENT_TYPES, JACK_EVENT_TYPE__OSC, "text/plain"))
+		MOD_ADD_ERR(module->host, MOD_NAME, "could not set OSC event type");
+#endif // HAS_METADATA_API
 
 	module->dat = port;
 	module->type = TJOST_MODULE_OUTPUT;
@@ -100,7 +109,11 @@ del(Tjost_Module *module)
 
 	if(port)
 	{
-		osc_unmark_port(module->host->client, port);
+#ifdef HAS_METADATA_API
+		jack_uuid_t uuid = jack_port_uuid(port);
+		jack_remove_property(module->host->client, uuid, JACK_METADATA_PRETTY_NAME);
+		jack_remove_property(module->host->client, uuid, JACKEY_EVENT_TYPES);
+#endif
 		jack_port_unregister(module->host->client, port);
 	}
 }

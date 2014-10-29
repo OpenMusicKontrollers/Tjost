@@ -26,5 +26,5 @@
 device = argv[3]
 api = argv[4]
 
-osc_out = tjost.plugin({name='osc_out', port='osc.midi'})
+osc_out = tjost.plugin({name='osc_out'})
 midi_in = tjost.plugin({name='rtmidi_in', device=device, api=api}, osc_out)

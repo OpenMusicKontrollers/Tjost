@@ -25,5 +25,5 @@
 
 file = argv[3]
 
-osc_out = tjost.plugin({name='osc_out', port='osc.out'})
+osc_out = tjost.plugin({name='osc_out', port='osc_read', pretty='OSC Read'})
 read = tjost.plugin({name='read', path=file}, osc_out)

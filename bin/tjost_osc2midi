@@ -23,5 +23,5 @@
 --     distribution.
 --]]
 
-midi_out = tjost.plugin({name='midi_out', port='midi'})
-osc_in = tjost.plugin({name='osc_in', port='osc.midi'}, midi_out)
+midi_out = tjost.plugin({name='midi_out'})
+osc_in = tjost.plugin({name='osc_in', port='osc_midi_in', pretty='OSC MIDI Input'}, midi_out)

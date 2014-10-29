@@ -26,4 +26,4 @@
 file = argv[3]
 
 write = tjost.plugin({name='write', path=file})
-osc_in = tjost.plugin({name='osc_in', port='osc.in'}, write)
+osc_in = tjost.plugin({name='osc_in', port='osc_write', pretty='OSC Write'}, write)

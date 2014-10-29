@@ -22,6 +22,7 @@
  */
 
 #include <tjost.h>
+
 #include <jackey.h>
 
 #include <mod_cv.h>
@@ -73,15 +74,23 @@ add(Tjost_Module *module)
 	jack_port_t *port = NULL;
 
 	lua_getfield(L, 1, "port");
-	const char *portn = luaL_optstring(L, -1, "cv.in");
+	const char *portn = luaL_optstring(L, -1, "cv_in");
 	lua_pop(L, 1);
 
 	if(!(port = jack_port_register(module->host->client, portn, JACK_DEFAULT_AUDIO_TYPE, JackPortIsInput, 0)))
 		MOD_ADD_ERR(module->host, MOD_NAME, "could not register jack port");
+
 #ifdef HAS_METADATA_API
+	lua_getfield(L, 1, "pretty");
+	const char *pretty = luaL_optstring(L, -1, "Control Input");
+	lua_pop(L, 1);
+
 	jack_uuid_t uuid = jack_port_uuid(port);
-	jack_set_property(module->host->client, uuid, JACKEY_SIGNAL_TYPE, "CV", "text/plain");
-#endif
+	if(jack_set_property(module->host->client, uuid, JACK_METADATA_PRETTY_NAME, pretty, "text/plain"))
+		MOD_ADD_ERR(module->host, MOD_NAME, "could not set prettyname");
+	if(jack_set_property(module->host->client, uuid, JACKEY_SIGNAL_TYPE, "CV", "text/plain"))
+		MOD_ADD_ERR(module->host, MOD_NAME, "could not set CV event type");
+#endif // HAS_METADATA_API
 
 	module->dat = port;
 
@@ -99,6 +108,7 @@ del(Tjost_Module *module)
 	{
 #ifdef HAS_METADATA_API
 		jack_uuid_t uuid = jack_port_uuid(port);
+		jack_remove_property(module->host->client, uuid, JACK_METADATA_PRETTY_NAME);
 		jack_remove_property(module->host->client, uuid, JACKEY_SIGNAL_TYPE);
 #endif
 		jack_port_unregister(module->host->client, port);

@@ -28,11 +28,11 @@ rtprio = argv[4]
 unroll = argv[5]
 
 if host then
-	osc_out = tjost.plugin({name='osc_out', port=host})
+	osc_out = tjost.plugin({name='osc_out', port="osc_net_rx", pretty=host})
 	net_io = tjost.plugin({name='net_in', uri=host, rtprio=rtprio, unroll=unroll}, osc_out)
 
 	if string.match(host, 'osc.tcp[46]*://') or string.match(host, 'osc.slip.tcp[46]*://') then
-	osc_in = tjost.plugin({name='osc_in', port='osc.net.tx'}, net_io)
+	osc_in = tjost.plugin({name='osc_in', port='osc_net_tx', pretty='OSC Net TX'}, net_io)
 	end
 else
 	print('FAIL: no uri given')

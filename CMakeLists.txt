@@ -84,17 +84,17 @@ set_target_properties(loopback PROPERTIES PREFIX "")
 install(TARGETS loopback DESTINATION lib/tjost)
 
 # mod_osc_in
-add_library(osc_in MODULE mod_osc_in.c mod_osc.c)
+add_library(osc_in MODULE mod_osc_in.c)
 set_target_properties(osc_in PROPERTIES PREFIX "")
 install(TARGETS osc_in DESTINATION lib/tjost)
 
 # mod_osc_out
-add_library(osc_out MODULE mod_osc_out.c mod_osc.c)
+add_library(osc_out MODULE mod_osc_out.c)
 set_target_properties(osc_out PROPERTIES PREFIX "")
 install(TARGETS osc_out DESTINATION lib/tjost)
 
 # mod_transport
-add_library(transport MODULE mod_transport.c mod_osc.c)
+add_library(transport MODULE mod_transport.c)
 set_target_properties(transport PROPERTIES PREFIX "")
 install(TARGETS transport DESTINATION lib/tjost)
 

@@ -23,5 +23,5 @@
 --     distribution.
 --]]
 
-osc_out = tjost.plugin({name='osc_out', port='osc.audio'})
-audio_in = tjost.plugin({name='audio_in', port='audio'}, osc_out)
+osc_out = tjost.plugin({name='osc_out'})
+audio_in = tjost.plugin({name='audio_in'}, osc_out)
