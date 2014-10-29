@@ -66,26 +66,28 @@ process_in(jack_nframes_t nframes, void *arg)
 }
 
 static void
-_rtmidic_cb(double timestamp, size_t len, uint8_t* message, void **cb)
+_rtmidic_cb(double timestamp, size_t size, uint8_t* message, void **cb)
 {
 	Data *dat = (Data *)((uint8_t *)cb - offsetof(Data, cb));
 
-	// TODO assert(len <= 4)
+	// TODO assert(size <= 4)
 	uint8_t m [4] = {0x0};
 	m[1] = message[0];
 	m[2] = message[1];
 	m[3] = message[2];
 
-	osc_data_t buf [20];
+	const size_t len = 16;
+	osc_data_t buf [len];
 	osc_data_t *ptr = buf;
-	ptr = osc_set_path(ptr, "/midi");
-	ptr = osc_set_fmt(ptr, "m");
-	ptr = osc_set_midi(ptr, m);
-	size_t size = ptr - buf;
+	osc_data_t *end = ptr + len;
 
-	if(osc_message_check(buf, size))
+	ptr = osc_set_path(ptr, end, "/midi");
+	ptr = osc_set_fmt(ptr, end, "m");
+	ptr = osc_set_midi(ptr, end, m);
+
+	if(ptr && osc_check_message(buf, len))
 	{
-		if(tjost_pipe_produce(&dat->pipe, 0, size, buf))
+		if(tjost_pipe_produce(&dat->pipe, 0, len, buf))
 			fprintf(stderr, MOD_NAME": tjost_pipe_produce error\n");
 	}
 	else

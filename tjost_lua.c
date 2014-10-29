@@ -144,7 +144,7 @@ _push(Tjost_Host *host, osc_type_t type, osc_data_t *ptr)
 }
 
 static int
-_deserialize(osc_time_t time, const char *path, const char *fmt, osc_data_t *buf, void *dat)
+_deserialize(osc_time_t time, const char *path, const char *fmt, osc_data_t *buf, size_t size, void *dat)
 {
 	Tjost_Module *module = dat;
 	Tjost_Host *host = module->host;
@@ -220,14 +220,15 @@ _bundle_out(osc_time_t time, void *dat)
 void
 tjost_lua_deserialize(Tjost_Event *tev)
 {
-	osc_method_dispatch(tev->time, tev->buf, tev->size, methods, _bundle_in, _bundle_out, tev->module);
+	osc_dispatch_method(tev->time, tev->buf, tev->size, methods, _bundle_in, _bundle_out, tev->module);
 }
 
 static inline int
 _serialize_packet(lua_State *L, Tjost_Module *module)
 {
 	Tjost_Host *host = module->host;
-	osc_data_t *buf_ptr = module->buf_ptr;
+	osc_data_t *ptr = module->buf_ptr;
+	osc_data_t *end = module->buffer + TJOST_BUF_SIZE;
 
 	int has_timestamp = lua_isnumber(L, 2);
 	int pos = 2 + has_timestamp;
@@ -242,29 +243,29 @@ _serialize_packet(lua_State *L, Tjost_Module *module)
 	{
 		int bundle_element = eina_inlist_count(module->bndls) > 0;
 		if(!bundle_element)
-			buf_ptr = module->buffer;
+			ptr = module->buffer;
 		else // bundle_element
-			buf_ptr = osc_start_bundle_item(buf_ptr, &module->itm);
+			ptr = osc_start_bundle_item(ptr, end, &module->itm);
 		Tjost_Bundle *bndl = tjost_alloc(host, sizeof(Tjost_Bundle));
 		module->bndls = eina_inlist_prepend(module->bndls, EINA_INLIST_GET(bndl));
 		//bndl->time = time;
-		buf_ptr = osc_start_bundle(buf_ptr, OSC_IMMEDIATE, &bndl->ptr); //FIXME how to handle timestamp?
+		ptr = osc_start_bundle(ptr, end, OSC_IMMEDIATE, &bndl->ptr); //FIXME how to handle timestamp?
 	}
 	else if(!strcmp(path, TJOST_BUNDLE_POP_PATH) && !strcmp(fmt, TJOST_BUNDLE_POP_FMT))
 	{
 		Tjost_Bundle *bndl = EINA_INLIST_CONTAINER_GET(module->bndls, Tjost_Bundle);
 		module->bndls = eina_inlist_remove(module->bndls, EINA_INLIST_GET(bndl));
-		buf_ptr = osc_end_bundle(buf_ptr, bndl->ptr);
+		ptr = osc_end_bundle(ptr, end, bndl->ptr);
 		
 		int bundle_element = eina_inlist_count(module->bndls) > 0;
 		if(!bundle_element)
 		{
-			size_t size = buf_ptr - module->buffer;
+			size_t size = ptr - module->buffer;
 			if(size > 0)
 				tjost_module_schedule(module, time, size, module->buffer);
 		}
 		else // bundle_element
-			buf_ptr = osc_end_bundle_item(buf_ptr, module->itm);
+			ptr = osc_end_bundle_item(ptr, end, module->itm);
 
 		tjost_free(host, bndl);
 	}
@@ -274,23 +275,23 @@ _serialize_packet(lua_State *L, Tjost_Module *module)
 
 		int bundle_element = eina_inlist_count(module->bndls) > 0;
 		if(!bundle_element)
-			buf_ptr = module->buffer;
+			ptr = module->buffer;
 		else // bundle_element
-			buf_ptr = osc_start_bundle_item(buf_ptr, &itm);
+			ptr = osc_start_bundle_item(ptr, end, &itm);
 
 		if(!osc_check_path(path))
 		{
 			tjost_host_message_push(host, "Lua: invalid OSC path %s", path);
 			return 0;
 		}
-		buf_ptr = osc_set_path(buf_ptr, path);
+		ptr = osc_set_path(ptr, end, path);
 
 		if(!osc_check_fmt(fmt, 0))
 		{
 			tjost_host_message_push(host, "Lua: invalid OSC format %s", fmt);
 			return 0;
 		}
-		buf_ptr = osc_set_fmt(buf_ptr, fmt);
+		ptr = osc_set_fmt(ptr, end, fmt);
 
 		int p = pos+2;
 		const char *type;
@@ -298,29 +299,29 @@ _serialize_packet(lua_State *L, Tjost_Module *module)
 			switch(*type)
 			{
 				case OSC_INT32:
-					buf_ptr = osc_set_int32(buf_ptr, luaL_checkinteger(L, p));
+					ptr = osc_set_int32(ptr, end, luaL_checkinteger(L, p));
 					break;
 				case OSC_FLOAT:
-					buf_ptr = osc_set_float(buf_ptr, luaL_checknumber(L, p));
+					ptr = osc_set_float(ptr, end, luaL_checknumber(L, p));
 					break;
 				case OSC_STRING:
-					buf_ptr = osc_set_string(buf_ptr, luaL_checkstring(L, p));
+					ptr = osc_set_string(ptr, end, luaL_checkstring(L, p));
 					break;
 				case OSC_BLOB:
 					{
 						Tjost_Blob *tb = luaL_checkudata(L, p, "Tjost_Blob");
-						buf_ptr = osc_set_blob(buf_ptr, tb->size, tb->buf);
+						ptr = osc_set_blob(ptr, end, tb->size, tb->buf);
 					}
 					break;
 
 				case OSC_INT64:
-					buf_ptr = osc_set_int64(buf_ptr, luaL_checknumber(L, p));
+					ptr = osc_set_int64(ptr, end, luaL_checknumber(L, p));
 					break;
 				case OSC_DOUBLE:
-					buf_ptr = osc_set_double(buf_ptr, luaL_checknumber(L, p));
+					ptr = osc_set_double(ptr, end, luaL_checknumber(L, p));
 					break;
 				case OSC_TIMETAG:
-					buf_ptr = osc_set_timetag(buf_ptr, luaL_checknumber(L, p));
+					ptr = osc_set_timetag(ptr, end, luaL_checknumber(L, p));
 					break;
 
 				case OSC_TRUE:
@@ -330,16 +331,16 @@ _serialize_packet(lua_State *L, Tjost_Module *module)
 					break;
 
 				case OSC_SYMBOL:
-					buf_ptr = osc_set_symbol(buf_ptr, luaL_checkstring(L, p));
+					ptr = osc_set_symbol(ptr, end, luaL_checkstring(L, p));
 					break;
 				case OSC_MIDI:
 					{
 						Tjost_Midi *tm = luaL_checkudata(L, p, "Tjost_Midi");
-						buf_ptr = osc_set_midi(buf_ptr, tm->buf);
+						ptr = osc_set_midi(ptr, end, tm->buf);
 					}
 					break;
 				case OSC_CHAR:
-					buf_ptr = osc_set_char(buf_ptr, luaL_checknumber(L, p));
+					ptr = osc_set_char(ptr, end, luaL_checknumber(L, p));
 					break;
 
 				default:
@@ -349,15 +350,15 @@ _serialize_packet(lua_State *L, Tjost_Module *module)
 
 		if(!bundle_element)
 		{
-			size_t size = buf_ptr - module->buffer;
-			if(size > 0)
+			size_t size = ptr - module->buffer;
+			if(ptr && (size > 0))
 				tjost_module_schedule(module, time, size, module->buffer);
 		}
 		else // bundle_element
-			buf_ptr = osc_end_bundle_item(buf_ptr, itm);
+			ptr = osc_end_bundle_item(ptr, end, itm);
 	}
 	
-	module->buf_ptr = buf_ptr;
+	module->buf_ptr = ptr;
 
 	return 0;
 }

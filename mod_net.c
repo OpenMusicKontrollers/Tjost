@@ -75,7 +75,7 @@ _inject_message(osc_data_t *buf, size_t len, void *dat)
 
 	jack_nframes_t tstamp = net->tstamp;
 
-	if(osc_message_check(buf, len))
+	if(osc_check_message(buf, len))
 	{
 		Tjost_Event tev;
 		tev.module = module;
@@ -103,9 +103,9 @@ _inject_bundle(osc_data_t *buf, size_t len, void *dat)
 	Tjost_Module *module = dat;
 	Mod_Net *net = module->dat;
 	
-	if(osc_bundle_check(buf, len))
+	if(osc_check_bundle(buf, len))
 	{
-		uint64_t timetag = ntohll(*(uint64_t *)(buf + 8));
+		uint64_t timetag = be64toh(*(uint64_t *)(buf + 8));
 		_inject_stamp(timetag, dat);
 		jack_nframes_t tstamp = net->tstamp;
 
@@ -140,7 +140,7 @@ mod_net_recv_cb(osc_data_t *buf, size_t len, void *data)
 	Tjost_Module *module = data;
 	Mod_Net *net = module->dat;
 
-	if(!osc_packet_unroll(buf, len, net->unroll, &inject, data))
+	if(!osc_unroll_packet(buf, len, net->unroll, &inject, data))
 		fprintf(stderr, MOD_NAME": not an OSC packet\n");
 }
 
@@ -191,8 +191,8 @@ _next(Tjost_Module *module)
 				sec = 0UL;
 				frac = 1UL;
 			}
-			sec = htonl(sec);
-			frac = htonl(frac);
+			sec = htobe32(sec);
+			frac = htobe32(frac);
 		
 			char ch;
 			jack_ringbuffer_peek(net->rb.out, &ch, 1);
@@ -202,7 +202,7 @@ _next(Tjost_Module *module)
 				{
 					static int32_t psize;
 					psize = size;
-					psize = ntohl(psize);
+					psize = be32toh(psize);
 
 					uv_buf_t msg [3];
 					msg[0].base = (char *)&psize;
@@ -248,7 +248,7 @@ _next(Tjost_Module *module)
 				}
 				case '/':
 				{
-					uint32_t nsize = htonl(size);
+					uint32_t nsize = htobe32(size);
 
 					static uint8_t header [20];
 					memcpy(header, bundle_str, 8);
@@ -258,7 +258,7 @@ _next(Tjost_Module *module)
 				
 					static int32_t psize;
 					psize = size + sizeof(header); // packet size for TCP preamble
-					psize = ntohl(psize);
+					psize = htobe32(psize);
 
 					uv_buf_t msg [4];
 					msg[0].base = (char *)&psize;

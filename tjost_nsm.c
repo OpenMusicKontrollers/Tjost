@@ -47,7 +47,7 @@ _nsm_send_cb(size_t len, void *arg)
 }
 
 static int
-_nsm_reply(osc_time_t time, const char *path, const char *fmt, osc_data_t *buf, void *dat)
+_nsm_reply(osc_time_t time, const char *path, const char *fmt, osc_data_t *buf, size_t size, void *dat)
 {
 	Tjost_NSM *nsm = dat;
 	const char *msg;
@@ -65,7 +65,7 @@ _nsm_reply(osc_time_t time, const char *path, const char *fmt, osc_data_t *buf, 
 }
 
 static int
-_nsm_error(osc_time_t time, const char *path, const char *fmt, osc_data_t *buf, void *dat)
+_nsm_error(osc_time_t time, const char *path, const char *fmt, osc_data_t *buf, size_t size, void *dat)
 {
 	Tjost_NSM *nsm = dat;
 	const char *msg;
@@ -83,7 +83,7 @@ _nsm_error(osc_time_t time, const char *path, const char *fmt, osc_data_t *buf, 
 }
 
 static int
-_nsm_client_open(osc_time_t time, const char *path, const char *fmt, osc_data_t *buf, void *dat)
+_nsm_client_open(osc_time_t time, const char *path, const char *fmt, osc_data_t *buf, size_t size, void *dat)
 {
 	Tjost_NSM *nsm = dat;
 
@@ -100,7 +100,8 @@ _nsm_client_open(osc_time_t time, const char *path, const char *fmt, osc_data_t 
 
 	nsm->id = strdup(id);
 
-	size_t len = osc_vararg_set(nsm->buf, "/reply", "ss", "/nsm/client/open", "opened");
+	osc_data_t *ptr = osc_set_vararg(nsm->buf, nsm->buf+TJOST_BUF_SIZE, "/reply", "ss", "/nsm/client/open", "opened");
+	size_t len = ptr - nsm->buf;
 
 	uv_buf_t msg = {
 		.base = (char *)nsm->buf,
@@ -113,13 +114,14 @@ _nsm_client_open(osc_time_t time, const char *path, const char *fmt, osc_data_t 
 }
 
 static int
-_nsm_client_save(osc_time_t time, const char *path, const char *fmt, osc_data_t *buf, void *dat)
+_nsm_client_save(osc_time_t time, const char *path, const char *fmt, osc_data_t *buf, size_t size, void *dat)
 {
 	Tjost_NSM *nsm = dat;
 
 	// there is nothing to do here
 
-	size_t len = osc_vararg_set(nsm->buf, "/reply", "ss", "/nsm/client/save", "saved");
+	osc_data_t *ptr = osc_set_vararg(nsm->buf, nsm->buf+TJOST_BUF_SIZE, "/reply", "ss", "/nsm/client/save", "saved");
+	size_t len = ptr - nsm->buf;
 
 	uv_buf_t msg = {
 		.base = (char *)nsm->buf,
@@ -144,7 +146,7 @@ static osc_method_t methods [] = {
 static void
 _nsm_recv_cb(osc_data_t *buf, size_t len, void *data)
 {
-	osc_method_dispatch(0, buf, len, methods, NULL, NULL, data);
+	osc_dispatch_method(0, buf, len, methods, NULL, NULL, data);
 }
 
 const char *
@@ -171,8 +173,8 @@ tjost_nsm_init(int argc, const char **argv)
 
 	// send announce message
 	pid_t pid = getpid();
-	size_t len = osc_vararg_set(nsm->buf, "/nsm/server/announce", "sssiii",
-		call, ":message:", call, 1, 2, pid);
+	osc_data_t *ptr = osc_set_vararg(nsm->buf, nsm->buf + TJOST_BUF_SIZE, "/nsm/server/announce", "sssiii", call, ":message:", call, 1, 2, pid);
+	size_t len = ptr - nsm->buf;
 
 	uv_buf_t msg = {
 		.base = (char *)nsm->buf,

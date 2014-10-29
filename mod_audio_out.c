@@ -34,7 +34,7 @@ struct _Data {
 };
 
 static int
-_audio(osc_time_t time, const char *path, const char *fmt, osc_data_t *buf, void *dat)
+_audio(osc_time_t time, const char *path, const char *fmt, osc_data_t *buf, size_t size, void *dat)
 {
 	Data *data = dat;
 
@@ -74,7 +74,7 @@ _audio(osc_time_t time, const char *path, const char *fmt, osc_data_t *buf, void
 			int i;
 			for(i=0; i<b.size/sizeof(uint16_t); i++)
 			{
-				load[i] = ntohs(load[i]); // in-place byte-swapping
+				load[i] = be16toh(load[i]); // in-place byte-swapping
 				port_buf_out[i] = (jack_default_audio_sample_t)load[i] / 0xfffU;
 			}
 			break;
@@ -85,7 +85,7 @@ _audio(osc_time_t time, const char *path, const char *fmt, osc_data_t *buf, void
 			int i;
 			for(i=0; i<b.size/sizeof(int16_t); i++)
 			{
-				load[i] = ntohs(load[i]); // in-place byte-swapping
+				load[i] = be16toh(load[i]); // in-place byte-swapping
 				port_buf_out[i] = (jack_default_audio_sample_t)load[i] / 0x7ff;
 			}
 			break;
@@ -97,7 +97,7 @@ _audio(osc_time_t time, const char *path, const char *fmt, osc_data_t *buf, void
 			int i;
 			for(i=0; i<b.size/sizeof(uint16_t); i++)
 			{
-				load[i] = ntohs(load[i]); // in-place byte-swapping
+				load[i] = be16toh(load[i]); // in-place byte-swapping
 				port_buf_out[i] = (jack_default_audio_sample_t)load[i] / 0xffffU;
 			}
 			break;
@@ -108,7 +108,7 @@ _audio(osc_time_t time, const char *path, const char *fmt, osc_data_t *buf, void
 			int i;
 			for(i=0; i<b.size/sizeof(int16_t); i++)
 			{
-				load[i] = ntohs(load[i]); // in-place byte-swapping
+				load[i] = be16toh(load[i]); // in-place byte-swapping
 				port_buf_out[i] = (jack_default_audio_sample_t)load[i] / 0x7fff;
 			}
 			break;
@@ -120,7 +120,7 @@ _audio(osc_time_t time, const char *path, const char *fmt, osc_data_t *buf, void
 			int i;
 			for(i=0; i<b.size/sizeof(uint32_t); i++)
 			{
-				load[i] = ntohl(load[i]); // in-place byte-swapping
+				load[i] = be32toh(load[i]); // in-place byte-swapping
 				port_buf_out[i] = (jack_default_audio_sample_t)load[i] / 0xffffffUL;
 			}
 			break;
@@ -131,7 +131,7 @@ _audio(osc_time_t time, const char *path, const char *fmt, osc_data_t *buf, void
 			int i;
 			for(i=0; i<b.size/sizeof(int32_t); i++)
 			{
-				load[i] = ntohl(load[i]); // in-place byte-swapping
+				load[i] = be32toh(load[i]); // in-place byte-swapping
 				port_buf_out[i] = (jack_default_audio_sample_t)load[i] / 0x7fffffL;
 			}
 			break;
@@ -143,7 +143,7 @@ _audio(osc_time_t time, const char *path, const char *fmt, osc_data_t *buf, void
 			int i;
 			for(i=0; i<b.size/sizeof(uint32_t); i++)
 			{
-				load[i] = ntohl(load[i]); // in-place byte-swapping
+				load[i] = be32toh(load[i]); // in-place byte-swapping
 				port_buf_out[i] = (jack_default_audio_sample_t)load[i] / 0xffffffffUL;
 			}
 			break;
@@ -154,7 +154,7 @@ _audio(osc_time_t time, const char *path, const char *fmt, osc_data_t *buf, void
 			int i;
 			for(i=0; i<b.size/sizeof(int32_t); i++)
 			{
-				load[i] = ntohl(load[i]); // in-place byte-swapping
+				load[i] = be32toh(load[i]); // in-place byte-swapping
 				port_buf_out[i] = (jack_default_audio_sample_t)load[i] / 0x7fffffffL;
 			}
 			break;
@@ -167,7 +167,7 @@ _audio(osc_time_t time, const char *path, const char *fmt, osc_data_t *buf, void
 			for(i=0; i<b.size/sizeof(float); i++)
 			{
 				//uint32_t *s = (uint32_t *)&load[i];
-				//*s = ntohl(*s); // in-place byte-swapping
+				//*s = be32toh(*s); // in-place byte-swapping
 				port_buf_out[i] = (jack_default_audio_sample_t)load[i];
 			}
 			break;
@@ -179,7 +179,7 @@ _audio(osc_time_t time, const char *path, const char *fmt, osc_data_t *buf, void
 			for(i=0; i<b.size/sizeof(float); i++)
 			{
 				uint64_t *s = (uint64_t *)&load[i];
-				*s = ntohll(*s); // in-place byte-swapping
+				*s = be64toh(*s); // in-place byte-swapping
 				port_buf_out[i] = (jack_default_audio_sample_t)load[i];
 			}
 			break;
@@ -230,7 +230,7 @@ process_out(jack_nframes_t nframes, void *arg)
 			tev->time = last;
 		}
 
-		osc_method_dispatch(tev->time - last, tev->buf, tev->size, methods, NULL, NULL, &data);
+		osc_dispatch_method(tev->time - last, tev->buf, tev->size, methods, NULL, NULL, &data);
 
 		module->queue = eina_inlist_remove(module->queue, EINA_INLIST_GET(tev));
 		tjost_free(host, tev);

@@ -24,6 +24,8 @@
 #include <tjost.h>
 
 static osc_data_t buf_rx [TJOST_BUF_SIZE] __attribute__((aligned (8)));
+static const osc_data_t *end_rx = buf_rx + TJOST_BUF_SIZE;
+
 static osc_data_t buf_tx [TJOST_BUF_SIZE] __attribute__((aligned (8)));
 
 // non real time
@@ -45,7 +47,7 @@ tjost_uplink_rx_push(Tjost_Host *host, Tjost_Module *module, osc_data_t *buf, si
 }
 
 static int
-_connect(osc_time_t time, const char *path, const char *fmt, osc_data_t *buf, void *dat)
+_connect(osc_time_t time, const char *path, const char *fmt, osc_data_t *buf, size_t size, void *dat)
 {
 	Tjost_Event *tev = dat;
 	Tjost_Module *module = tev->module;
@@ -63,7 +65,7 @@ _connect(osc_time_t time, const char *path, const char *fmt, osc_data_t *buf, vo
 }
 
 static int
-_disconnect(osc_time_t time, const char *path, const char *fmt, osc_data_t *buf, void *dat)
+_disconnect(osc_time_t time, const char *path, const char *fmt, osc_data_t *buf, size_t size, void *dat)
 {
 	Tjost_Event *tev = dat;
 	Tjost_Module *module = tev->module;
@@ -81,7 +83,7 @@ _disconnect(osc_time_t time, const char *path, const char *fmt, osc_data_t *buf,
 }
 
 static int
-_ports(osc_time_t time, const char *path, const char *fmt, osc_data_t *buf, void *dat)
+_ports(osc_time_t time, const char *path, const char *fmt, osc_data_t *buf, size_t size, void *dat)
 {
 	Tjost_Event *tev = dat;
 	Tjost_Module *module = tev->module;
@@ -93,8 +95,9 @@ _ports(osc_time_t time, const char *path, const char *fmt, osc_data_t *buf, void
 	{
 		const char **name;
 		osc_data_t *ptr = buf_rx;
+		osc_data_t *end = ptr + TJOST_BUF_SIZE;
 
-		ptr = osc_set_path(ptr, "/jack/ports");
+		ptr = osc_set_path(ptr, end, "/jack/ports");
 
 		char *fmt = (char *)ptr;
 		char *fmt_ptr = fmt;
@@ -108,26 +111,30 @@ _ports(osc_time_t time, const char *path, const char *fmt, osc_data_t *buf, void
 		ptr = (osc_data_t *)fmt_ptr;
 
 		for(name=ports; *name; name++)
-			ptr = osc_set_string(ptr, *name);
+			ptr = osc_set_string(ptr, end, *name);
 
 		jack_free(ports);
 		size_t len = ptr-buf_rx;
-		tjost_uplink_rx_push(host, module, buf_rx, len);
+		if(ptr)
+			tjost_uplink_rx_push(host, module, buf_rx, len);
 	}
 	else
 	{
 		osc_data_t *ptr = buf_rx;
-		ptr = osc_set_path(ptr, "/jack/ports");
-		ptr = osc_set_fmt(ptr, "");
+		osc_data_t *end = ptr + TJOST_BUF_SIZE;
+
+		ptr = osc_set_path(ptr, end, "/jack/ports");
+		ptr = osc_set_fmt(ptr, end, "");
 		size_t len = ptr-buf_rx;
-		tjost_uplink_rx_push(host, module, buf_rx, len);
+		if(ptr)
+			tjost_uplink_rx_push(host, module, buf_rx, len);
 	}
 
 	return 1;
 }
 
 static int
-_connections(osc_time_t time, const char *path, const char *fmt, osc_data_t *buf, void *dat)
+_connections(osc_time_t time, const char *path, const char *fmt, osc_data_t *buf, size_t size, void *dat)
 {
 	Tjost_Event *tev = dat;
 	Tjost_Module *module = tev->module;
@@ -146,8 +153,9 @@ _connections(osc_time_t time, const char *path, const char *fmt, osc_data_t *buf
 	{
 		const char **name;
 		osc_data_t *ptr = buf_rx;
+		osc_data_t *end = ptr + TJOST_BUF_SIZE;
 
-		ptr = osc_set_path(ptr, "/jack/connections");
+		ptr = osc_set_path(ptr, end, "/jack/connections");
 
 		char *fmt = (char *)ptr;
 		char *fmt_ptr = fmt;
@@ -161,22 +169,26 @@ _connections(osc_time_t time, const char *path, const char *fmt, osc_data_t *buf
 
 		ptr = (osc_data_t *)fmt_ptr;
 
-		ptr = osc_set_string(ptr, port_name);
+		ptr = osc_set_string(ptr, end, port_name);
 		for(name=connections; *name; name++)
-			ptr = osc_set_string(ptr, *name);
+			ptr = osc_set_string(ptr, end, *name);
 
 		jack_free(connections);
 		size_t len = ptr-buf_rx;
-		tjost_uplink_rx_push(host, module, buf_rx, len);
+		if(ptr)
+			tjost_uplink_rx_push(host, module, buf_rx, len);
 	}
 	else
 	{
 		osc_data_t *ptr = buf_rx;
-		ptr = osc_set_path(ptr, "/jack/connections");
-		ptr = osc_set_fmt(ptr, "s");
-		ptr = osc_set_string(ptr, port_name);
+		osc_data_t *end = ptr + TJOST_BUF_SIZE;
+		ptr = osc_set_path(ptr, end, "/jack/connections");
+		ptr = osc_set_fmt(ptr, end, "s");
+
+		ptr = osc_set_string(ptr, end, port_name);
 		size_t len = ptr-buf_rx;
-		tjost_uplink_rx_push(host, module, buf_rx, len);
+		if(ptr)
+			tjost_uplink_rx_push(host, module, buf_rx, len);
 	}
 
 	return 1;
@@ -208,7 +220,7 @@ tjost_uplink_tx_drain(uv_async_t *handle)
 			jack_ringbuffer_read_advance(host->rb_uplink_tx, sizeof(Tjost_Event));
 			jack_ringbuffer_read(host->rb_uplink_tx, (char *)buf_tx, tev.size);
 
-			osc_method_dispatch(tev.time, buf_tx, tev.size, methods, NULL, NULL, &tev);
+			osc_dispatch_method(tev.time, buf_tx, tev.size, methods, NULL, NULL, &tev);
 		}
 		else
 			break;
@@ -257,13 +269,15 @@ void
 tjost_client_registration(const char *name, int state, void *arg)
 {
 	Tjost_Host *host = arg;
+	osc_data_t *ptr;
 
 	size_t len;
 	if(state)
-		len = osc_vararg_set(buf_rx, "/jack/client/registration", "sT", name);
+		ptr = osc_set_vararg(buf_rx, end_rx, "/jack/client/registration", "sT", name);
 	else
-		len = osc_vararg_set(buf_rx, "/jack/client/registration", "sF", name);
-	tjost_uplink_rx_push(host, TJOST_MODULE_BROADCAST, buf_rx, len);
+		ptr = osc_set_vararg(buf_rx, end_rx, "/jack/client/registration", "sF", name);
+	if(ptr)
+		tjost_uplink_rx_push(host, TJOST_MODULE_BROADCAST, buf_rx, ptr-buf_rx);
 }
 
 // non real time
@@ -271,6 +285,7 @@ void
 tjost_port_registration(jack_port_id_t id, int state, void *arg)
 {
 	Tjost_Host *host = arg;
+	osc_data_t *ptr;
 
 	const jack_port_t *port = jack_port_by_id(host->client, id);
 	if(port) //TODO can be (null), is this a bug in jack1?
@@ -279,10 +294,11 @@ tjost_port_registration(jack_port_id_t id, int state, void *arg)
 
 		size_t len;
 		if(state)
-			len = osc_vararg_set(buf_rx, "/jack/port/registration", "sT", name);
+			ptr = osc_set_vararg(buf_rx, end_rx, "/jack/port/registration", "sT", name);
 		else
-			len = osc_vararg_set(buf_rx, "/jack/port/registration", "sF", name);
-		tjost_uplink_rx_push(host, TJOST_MODULE_BROADCAST, buf_rx, len);
+			ptr = osc_set_vararg(buf_rx, end_rx, "/jack/port/registration", "sF", name);
+		if(ptr)
+			tjost_uplink_rx_push(host, TJOST_MODULE_BROADCAST, buf_rx, ptr-buf_rx);
 	}
 }
 
@@ -291,6 +307,7 @@ void
 tjost_port_connect(jack_port_id_t id_a, jack_port_id_t id_b, int state, void *arg)
 {
 	Tjost_Host *host = arg;
+	osc_data_t *ptr;
 
 	const jack_port_t *port_a = jack_port_by_id(host->client, id_a);
 	const jack_port_t *port_b = jack_port_by_id(host->client, id_b);
@@ -299,10 +316,11 @@ tjost_port_connect(jack_port_id_t id_a, jack_port_id_t id_b, int state, void *ar
 
 	size_t len;
 	if(state)
-		len = osc_vararg_set(buf_rx, "/jack/port/connect", "ssT", name_a, name_b);
+		ptr = osc_set_vararg(buf_rx, end_rx, "/jack/port/connect", "ssT", name_a, name_b);
 	else
-		len = osc_vararg_set(buf_rx, "/jack/port/connect", "ssF", name_a, name_b);
-	tjost_uplink_rx_push(host, TJOST_MODULE_BROADCAST, buf_rx, len);
+		ptr = osc_set_vararg(buf_rx, end_rx, "/jack/port/connect", "ssF", name_a, name_b);
+	if(ptr)
+		tjost_uplink_rx_push(host, TJOST_MODULE_BROADCAST, buf_rx, ptr-buf_rx);
 }
 
 // non real time
@@ -310,9 +328,11 @@ void
 tjost_port_rename(jack_port_id_t port, const char *old_name, const char *new_name, void *arg)
 {
 	Tjost_Host *host = arg;
+	osc_data_t *ptr;
 
-	size_t len = osc_vararg_set(buf_rx, "/jack/graph/rename", "iss", port, old_name, new_name);
-	tjost_uplink_rx_push(host, TJOST_MODULE_BROADCAST, buf_rx, len);
+	ptr = osc_set_vararg(buf_rx, end_rx, "/jack/graph/rename", "iss", port, old_name, new_name);
+	if(ptr)
+		tjost_uplink_rx_push(host, TJOST_MODULE_BROADCAST, buf_rx, ptr-buf_rx);
 }
 
 // non real time
@@ -320,9 +340,11 @@ int
 tjost_graph_order(void *arg)
 {
 	Tjost_Host *host = arg;
+	osc_data_t *ptr;
 
-	size_t len = osc_vararg_set(buf_rx, "/jack/graph/order", "");
-	tjost_uplink_rx_push(host, TJOST_MODULE_BROADCAST, buf_rx, len);
+	ptr = osc_set_vararg(buf_rx, end_rx, "/jack/graph/order", "");
+	if(ptr)
+		tjost_uplink_rx_push(host, TJOST_MODULE_BROADCAST, buf_rx, ptr-buf_rx);
 
 	return 0;
 }

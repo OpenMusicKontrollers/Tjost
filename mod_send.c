@@ -58,6 +58,7 @@ _tty_recv_cb(uv_stream_t *stream, ssize_t nread, const uv_buf_t *buf)
 		char *s = buf->base;
 
 		osc_data_t *ptr = dat->buffer;
+		osc_data_t *endptr = ptr + TJOST_BUF_SIZE;
 		char *cur;
 		char *end;
 		char *path;
@@ -74,7 +75,7 @@ _tty_recv_cb(uv_stream_t *stream, ssize_t nread, const uv_buf_t *buf)
 			fprintf(stderr, MOD_NAME": invalid path: %s\n", path);
 			return;
 		}
-		ptr = osc_set_path(ptr, path);
+		ptr = osc_set_path(ptr, endptr, path);
 
 		// skip whitespace
 		while( (end < s+nread) && isspace(*end))
@@ -96,7 +97,7 @@ _tty_recv_cb(uv_stream_t *stream, ssize_t nread, const uv_buf_t *buf)
 			fprintf(stderr, MOD_NAME": invalid format: %s\n", fmt);
 			return;
 		}
-		ptr = osc_set_fmt(ptr, fmt);
+		ptr = osc_set_fmt(ptr, endptr, fmt);
 
 		// skip whitespace
 		while( (end < s+nread) && isspace(*end))
@@ -129,7 +130,7 @@ _tty_recv_cb(uv_stream_t *stream, ssize_t nread, const uv_buf_t *buf)
 				{
 					int32_t i;
 					if(sscanf(cur, "%"SCNi32, &i))
-						ptr = osc_set_int32(ptr, i);
+						ptr = osc_set_int32(ptr, endptr, i);
 					else
 						fprintf(stderr, MOD_NAME": type mismatch at '%c'\n", *type);
 					break;
@@ -138,7 +139,7 @@ _tty_recv_cb(uv_stream_t *stream, ssize_t nread, const uv_buf_t *buf)
 				{
 					float f;
 					if(sscanf(cur, "%f", &f))
-						ptr = osc_set_float(ptr, f);
+						ptr = osc_set_float(ptr, endptr, f);
 					else
 						fprintf(stderr, MOD_NAME": type mismatch at '%c'\n", *type);
 					break;
@@ -146,7 +147,7 @@ _tty_recv_cb(uv_stream_t *stream, ssize_t nread, const uv_buf_t *buf)
 				case OSC_STRING:
 				{
 					char *s = cur;
-					ptr = osc_set_string(ptr, s);
+					ptr = osc_set_string(ptr, endptr, s);
 					break;
 				}
 				case OSC_BLOB:
@@ -157,7 +158,7 @@ _tty_recv_cb(uv_stream_t *stream, ssize_t nread, const uv_buf_t *buf)
 					for(i=0; i<size; i++)
 						if(!sscanf(cur+i*2, "%02"SCNx8, payload+i))
 							fprintf(stderr, MOD_NAME": type mismatch at '%c'\n", *type);
-					ptr = osc_set_blob(ptr, size, payload);
+					ptr = osc_set_blob(ptr, endptr, size, payload);
 					free(payload);
 					break;
 				}
@@ -172,7 +173,7 @@ _tty_recv_cb(uv_stream_t *stream, ssize_t nread, const uv_buf_t *buf)
 				{
 					int64_t h;
 					if(sscanf(cur, "%"SCNi64, &h))
-						ptr = osc_set_int64(ptr, h);
+						ptr = osc_set_int64(ptr, endptr, h);
 					else
 						fprintf(stderr, MOD_NAME": type mismatch at '%c'\n", *type);
 					break;
@@ -181,7 +182,7 @@ _tty_recv_cb(uv_stream_t *stream, ssize_t nread, const uv_buf_t *buf)
 				{
 					double d;
 					if(sscanf(cur, "%lf", &d))
-						ptr = osc_set_double(ptr, d);
+						ptr = osc_set_double(ptr, endptr, d);
 					else
 						fprintf(stderr, MOD_NAME": type mismatch at '%c'\n", *type);
 					break;
@@ -193,7 +194,7 @@ _tty_recv_cb(uv_stream_t *stream, ssize_t nread, const uv_buf_t *buf)
 					if(sscanf(cur, "%"SCNx32".%"SCNx32, &sec, &frac))
 					{
 						t = (((uint64_t)sec<<32)) | frac;
-						ptr = osc_set_timetag(ptr, t);
+						ptr = osc_set_timetag(ptr, endptr, t);
 					}
 					else
 						fprintf(stderr, MOD_NAME": type mismatch at '%c'\n", *type);
@@ -203,20 +204,20 @@ _tty_recv_cb(uv_stream_t *stream, ssize_t nread, const uv_buf_t *buf)
 				case OSC_SYMBOL:
 				{
 					char *S = cur;
-					ptr = osc_set_symbol(ptr, S);
+					ptr = osc_set_symbol(ptr, endptr, S);
 					break;
 				}
 				case OSC_CHAR:
 				{
 					char c = *cur;
-					ptr = osc_set_char(ptr, c);
+					ptr = osc_set_char(ptr, endptr, c);
 					break;
 				}
 				case OSC_MIDI:
 				{
 					uint8_t m [4];
 					if(sscanf(cur, "%02"SCNx8"%02"SCNx8"%02"SCNx8"%02"SCNx8, m, m+1, m+2, m+3))
-						ptr = osc_set_midi(ptr, m);
+						ptr = osc_set_midi(ptr, endptr, m);
 					else
 						fprintf(stderr, MOD_NAME": type mismatch at '%c'\n", *type);
 					break;
@@ -228,7 +229,7 @@ _tty_recv_cb(uv_stream_t *stream, ssize_t nread, const uv_buf_t *buf)
 		}
 
 		size_t len = ptr - dat->buffer;
-		if(osc_message_check(dat->buffer, len))
+		if(ptr && osc_check_message(dat->buffer, len))
 		{
 			if(tjost_pipe_produce(&dat->pipe, 0, len, dat->buffer))
 				fprintf(stderr, MOD_NAME": tjost_pipe_produce error\n");

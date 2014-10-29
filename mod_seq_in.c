@@ -88,14 +88,16 @@ _poll(uv_poll_t *handle, int status, int events)
 		snd_seq_event_input(dat->seq, &sev);
 		if(snd_midi_event_decode(dat->trans, &m[1], 0x10, sev) == 3)
 		{
-			osc_data_t buf [20];
+			const size_t len = 16;
+			osc_data_t buf [len];
 			osc_data_t *ptr = buf;
-			ptr = osc_set_path(ptr, "/midi");
-			ptr = osc_set_fmt(ptr, "m");
-			ptr = osc_set_midi(ptr, m);
-			size_t len = ptr - buf;
+			osc_data_t *end = ptr + len;
 
-			if(osc_message_check(buf, len))
+			ptr = osc_set_path(ptr, end, "/midi");
+			ptr = osc_set_fmt(ptr, end, "m");
+			ptr = osc_set_midi(ptr, end, m);
+
+			if(ptr && osc_check_message(buf, len))
 			{
 				if(tjost_pipe_produce(&dat->pipe, 0, len, buf))
 					fprintf(stderr, MOD_NAME": tjost_pipe_produce error\n");

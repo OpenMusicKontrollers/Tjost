@@ -91,13 +91,14 @@ process_in(jack_nframes_t nframes, void *arg)
 	size_t len = osc_strlen(AUDIO_PATH)
 						 + osc_fmtlen(AUDIO_FMT)
 						 + 3 * sizeof(int32_t)
-						 + round_to_four_bytes(size);
+						 + osc_padded_size(size);
 	osc_data_t *ptr = tjost_host_schedule_inline(host, module, last, len);
-	ptr = osc_set_path(ptr, AUDIO_PATH);
-	ptr = osc_set_fmt(ptr, AUDIO_FMT);
-	ptr = osc_set_int32(ptr, last);
-	ptr = osc_set_int32(ptr, sample_type);
-	ptr = osc_set_blob_inline(ptr, size, &payload);
+	osc_data_t *end = ptr + len;
+	ptr = osc_set_path(ptr, end, AUDIO_PATH);
+	ptr = osc_set_fmt(ptr, end, AUDIO_FMT);
+	ptr = osc_set_int32(ptr, end, last);
+	ptr = osc_set_int32(ptr, end, sample_type);
+	ptr = osc_set_blob_inline(ptr, end, size, &payload);
 
 	switch(sample_type)
 	{
@@ -125,7 +126,7 @@ process_in(jack_nframes_t nframes, void *arg)
 			for(i=0; i<nframes; i++)
 			{
 				load[i] = port_buf[i] * 0xfffU;
-				load[i] = htons(load[i]); // in-place byte-swapping
+				load[i] = htobe16(load[i]); // in-place byte-swapping
 			}
 			break;
 		}
@@ -136,7 +137,7 @@ process_in(jack_nframes_t nframes, void *arg)
 			for(i=0; i<nframes; i++)
 			{
 				load[i] = port_buf[i] * 0x7ff;
-				load[i] = htons(load[i]); // in-place byte-swapping
+				load[i] = htobe16(load[i]); // in-place byte-swapping
 			}
 			break;
 		}
@@ -148,7 +149,7 @@ process_in(jack_nframes_t nframes, void *arg)
 			for(i=0; i<nframes; i++)
 			{
 				load[i] = port_buf[i] * 0xffffU;
-				load[i] = htons(load[i]); // in-place byte-swapping
+				load[i] = htobe16(load[i]); // in-place byte-swapping
 			}
 			break;
 		}
@@ -159,7 +160,7 @@ process_in(jack_nframes_t nframes, void *arg)
 			for(i=0; i<nframes; i++)
 			{
 				load[i] = port_buf[i] * 0x7fff;
-				load[i] = htons(load[i]); // in-place byte-swapping
+				load[i] = htobe16(load[i]); // in-place byte-swapping
 			}
 			break;
 		}
@@ -171,7 +172,7 @@ process_in(jack_nframes_t nframes, void *arg)
 			for(i=0; i<nframes; i++)
 			{
 				load[i] = port_buf[i] * 0xffffffUL;
-				load[i] = htonl(load[i]); // in-place byte-swapping
+				load[i] = htobe32(load[i]); // in-place byte-swapping
 			}
 			break;
 		}
@@ -182,7 +183,7 @@ process_in(jack_nframes_t nframes, void *arg)
 			for(i=0; i<nframes; i++)
 			{
 				load[i] = port_buf[i] * 0x7fffffL;
-				load[i] = htonl(load[i]); // in-place byte-swapping
+				load[i] = htobe32(load[i]); // in-place byte-swapping
 			}
 			break;
 		}
@@ -194,7 +195,7 @@ process_in(jack_nframes_t nframes, void *arg)
 			for(i=0; i<nframes; i++)
 			{
 				load[i] = port_buf[i] * 0xffffffffUL;
-				load[i] = htonl(load[i]); // in-place byte-swapping
+				load[i] = htobe32(load[i]); // in-place byte-swapping
 			}
 			break;
 		}
@@ -205,7 +206,7 @@ process_in(jack_nframes_t nframes, void *arg)
 			for(i=0; i<nframes; i++)
 			{
 				load[i] = port_buf[i] * 0x7fffffffL;
-				load[i] = htonl(load[i]); // in-place byte-swapping
+				load[i] = htobe32(load[i]); // in-place byte-swapping
 			}
 			break;
 		}
@@ -218,7 +219,7 @@ process_in(jack_nframes_t nframes, void *arg)
 			{
 				load[i] = (float)port_buf[i];
 				//uint32_t *s = (uint32_t *)&load[i];
-				//*s = htonl(*s); // in-place byte-swapping
+				//*s = htobe32(*s); // in-place byte-swapping
 			}
 			break;
 		}
@@ -230,7 +231,7 @@ process_in(jack_nframes_t nframes, void *arg)
 			{
 				load[i] = (double)port_buf[i];
 				uint64_t *s = (uint64_t *)&load[i];
-				*s = htonll(*s); // in-place byte-swapping
+				*s = htobe64(*s); // in-place byte-swapping
 			}
 			break;
 		}

@@ -144,7 +144,7 @@ _serialize_bundle(osc_data_t *buffer, size_t len, int indent, int verbose)
 	osc_data_t *end = buffer + len;
 	osc_data_t *ptr = buffer;
 
-	uint64_t timetag = ntohll(*(uint64_t *)(ptr + 8));
+	uint64_t timetag = be64toh(*(uint64_t *)(ptr + 8));
 
 	uint32_t sec = timetag >> 32;
 	uint32_t frac = timetag & 0xFFFFFFFF;
@@ -157,7 +157,7 @@ _serialize_bundle(osc_data_t *buffer, size_t len, int indent, int verbose)
 	while(ptr < end)
 	{
 		int32_t *size = (int32_t *)ptr;
-		int32_t hsize = htonl(*size);
+		int32_t hsize = be32toh(*size);
 		ptr += sizeof(int32_t);
 
 		char c = *(char *)ptr;
@@ -193,13 +193,13 @@ _serialize_packet(jack_nframes_t time, osc_data_t *buffer, size_t size, int verb
 	switch(*buffer)
 	{
 		case '#':
-			if(osc_bundle_check(buffer, size))
+			if(osc_check_bundle(buffer, size))
 				_serialize_bundle(buffer, size, 0, verbose);
 			else
 				fprintf(stderr, MOD_NAME": tx OSC bundle invalid\n");
 			break;
 		case '/':
-			if(osc_message_check(buffer, size))
+			if(osc_check_message(buffer, size))
 				_serialize_message(buffer, size, verbose);
 			else
 				fprintf(stderr, MOD_NAME": tx OSC message invalid\n");

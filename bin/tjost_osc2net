@@ -26,11 +26,11 @@
 host = argv[3]
 rtprio = argv[4]
 unroll = argv[5]
-offset = argv[5]
+offset = argv[6]
 
 if host then
-	osc_out = tjost.plugin({name='osc_out', port='osc.net'})
-	net_io = tjost.plugin({name='net_out', uri=host, rtprio=rtprio, urnoll=unroll, offset=offset}, osc_out)
+	osc_out = tjost.plugin({name='osc_out', port='osc.net.rx'})
+	net_io = tjost.plugin({name='net_out', uri=host, rtprio=rtprio, unroll=unroll, offset=offset}, osc_out)
 	osc_in = tjost.plugin({name='osc_in', port=host}, net_io)
 else
 	print('FAIL: no uri given')

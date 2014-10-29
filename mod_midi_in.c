@@ -66,10 +66,13 @@ process_in(jack_nframes_t nframes, void *arg)
 
 			uint32_t N = i-last_i;
 
-			size_t len = osc_strlen(midi_path) + (quads(N+2) + N)*sizeof(uint32_t);
+			size_t len	= osc_strlen(midi_path) // path len
+									+ osc_padded_size(N+2) // fmt len
+									+ N*4; // N*midi len
 			osc_data_t *ptr = tjost_host_schedule_inline(module->host, module, mev.time + last, len);
+			osc_data_t *end = ptr + len;
 
-			ptr = osc_set_path(ptr, midi_path);
+			ptr = osc_set_path(ptr, end, midi_path);
 
 			char *fmt = (char *)ptr;
 			char *fmt_ptr = fmt;
@@ -92,7 +95,7 @@ process_in(jack_nframes_t nframes, void *arg)
 				m[2] = mev.buffer[1];
 				m[3] = mev.buffer[2];
 
-				ptr = osc_set_midi(ptr, m);
+				ptr = osc_set_midi(ptr, end, m);
 			}
 		
 			last_i = i;

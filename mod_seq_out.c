@@ -40,7 +40,7 @@ struct _Data {
 };
 
 static int
-_midi(osc_time_t time, const char *path, const char *fmt, osc_data_t *buf, void *arg)
+_midi(osc_time_t time, const char *path, const char *fmt, osc_data_t *buf, size_t size, void *arg)
 {
 	Tjost_Module *module = arg;
 	Data *dat = module->dat;
@@ -105,7 +105,7 @@ _sched(jack_nframes_t timestamp, osc_data_t *buf, size_t len, void *arg)
 {
 	Tjost_Module *module = arg;
 
-	osc_method_dispatch(timestamp, buf, len, methods, NULL, NULL, module);
+	osc_dispatch_method(timestamp, buf, len, methods, NULL, NULL, module);
 
 	return 0; // reload
 }

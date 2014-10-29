@@ -49,12 +49,13 @@ process_in(jack_nframes_t nframes, void *arg)
 	size_t len = osc_strlen(CV_PATH)
 						 + osc_fmtlen(CV_FMT) + 1
 						 + 2 * sizeof(int32_t)
-						 + round_to_four_bytes(size);
+						 + osc_padded_size(size);
 	osc_data_t *ptr = tjost_host_schedule_inline(host, module, last, len);
-	ptr = osc_set_path(ptr, CV_PATH);
-	ptr = osc_set_fmt(ptr, CV_FMT);
-	ptr = osc_set_int32(ptr, last);
-	ptr = osc_set_blob_inline(ptr, size, &payload);
+	osc_data_t *end = ptr + len;
+	ptr = osc_set_path(ptr, end, CV_PATH);
+	ptr = osc_set_fmt(ptr, end, CV_FMT);
+	ptr = osc_set_int32(ptr, end, last);
+	ptr = osc_set_blob_inline(ptr, end, size, &payload);
 
 	jack_default_audio_sample_t *load = payload;
 	jack_nframes_t i;

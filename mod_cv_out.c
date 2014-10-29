@@ -36,7 +36,7 @@ struct _Data {
 };
 
 static int
-_cv(osc_time_t time, const char *path, const char *fmt, osc_data_t *buf, void *dat)
+_cv(osc_time_t time, const char *path, const char *fmt, osc_data_t *buf, size_t size, void *dat)
 {
 	Data *data = dat;
 
@@ -96,7 +96,7 @@ process_out(jack_nframes_t nframes, void *arg)
 			tev->time = last;
 		}
 
-		osc_method_dispatch(tev->time - last, tev->buf, tev->size, methods, NULL, NULL, &data);
+		osc_dispatch_method(tev->time - last, tev->buf, tev->size, methods, NULL, NULL, &data);
 
 		module->queue = eina_inlist_remove(module->queue, EINA_INLIST_GET(tev));
 		tjost_free(host, tev);

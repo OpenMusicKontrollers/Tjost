@@ -23,17 +23,8 @@
 --     distribution.
 --]]
 
-host = argv[3]
-rtprio = argv[4]
-unroll = argv[5]
+osc_out = tjost.plugin({name='osc_out', port='osc.console.out'})
+dump = tjost.plugin({name='dump'})
 
-if host then
-	osc_out = tjost.plugin({name='osc_out', port=host})
-	net_io = tjost.plugin({name='net_in', uri=host, rtprio=rtprio, unroll=unroll}, osc_out)
-
-	if string.match(host, 'osc.tcp[46]*://') or string.match(host, 'osc.slip.tcp[46]*://') then
-	osc_in = tjost.plugin({name='osc_in', port='osc.net.tx'}, net_io)
-	end
-else
-	print('FAIL: no uri given')
-end
+osc_in = tjost.plugin({name='osc_in', port='osc.console.in'}, dump)
+send = tjost.plugin({name='send'}, function(...) osc_out(...) end)

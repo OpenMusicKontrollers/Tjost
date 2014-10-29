@@ -110,7 +110,7 @@ _inject_message(osc_data_t *buf, size_t len, void *dat)
 	Tjost_Module *module = dat;
 	Data *net = module->dat;
 
-	if(osc_message_check(buf, len))
+	if(osc_check_message(buf, len))
 		_rx_push(net->rb_in, net->tstamp, buf, len);
 	else
 		fprintf(stderr, MOD_NAME": rx OSC message invalid\n");
@@ -123,9 +123,9 @@ _inject_bundle(osc_data_t *buf, size_t len, void *dat)
 	Tjost_Module *module = dat;
 	Data *net = module->dat;
 	
-	if(osc_bundle_check(buf, len))
+	if(osc_check_bundle(buf, len))
 	{
-		uint64_t timetag = ntohll(*(uint64_t *)(buf + 8));
+		uint64_t timetag = be64toh(*(uint64_t *)(buf + 8));
 		_inject_stamp(timetag, dat);
 		
 		_rx_push(net->rb_in, net->tstamp, buf, len);
@@ -145,7 +145,7 @@ _serial_recv_cb(Tjost_Module *module, osc_data_t * buf, size_t size)
 {
 	Data *dat = module->dat;
 
-	if(!osc_packet_unroll(buf, size, dat->unroll, &inject, module))
+	if(!osc_unroll_packet(buf, size, dat->unroll, &inject, module))
 		fprintf(stderr, MOD_NAME": OSC packet unroll failed\n");
 }
 

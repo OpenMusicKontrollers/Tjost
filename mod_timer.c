@@ -67,13 +67,15 @@ _timeup(uv_timer_t *handle)
 	Tjost_Module *module = handle->data;
 	Data *dat = module->dat;
 
-	osc_data_t buf [12];
+	const size_t len = 12;
+	osc_data_t buf [len];
 	osc_data_t *ptr = buf;
-	ptr = osc_set_path(ptr, "/timeup");
-	ptr = osc_set_fmt(ptr, "");
-	size_t len = ptr - buf;
+	osc_data_t *end = ptr + len;
 
-	if(osc_message_check(buf, len))
+	ptr = osc_set_path(ptr, end, "/timeup");
+	ptr = osc_set_fmt(ptr, end, "");
+
+	if(ptr && osc_check_message(buf, len))
 	{
 		if(tjost_pipe_produce(&dat->pipe, 0, len, buf))
 			fprintf(stderr, MOD_NAME": tjost_pipe_produce error\n");

@@ -46,11 +46,11 @@ if(USE_LUAJIT)
 	pkg_search_module(LUAJIT REQUIRED luajit)
 	include_directories(${LUAJIT_INCLUDE_DIRS})
 	set(LIBS ${LIBS} ${LUAJIT_LDFLAGS})
-else(USE_LUAJIT)
+else()
 	pkg_search_module(LUA REQUIRED lua)
 	include_directories(${LUA_INCLUDE_DIRS})
 	set(LIBS ${LIBS} ${LUA_LDFLAGS})
-endif(USE_LUAJIT)
+endif()
 
 # configure file
 configure_file(${PROJECT_SOURCE_DIR}/tjost_config.h.in ${PROJECT_BINARY_DIR}/tjost_config.h @ONLY)
@@ -60,7 +60,7 @@ pkg_search_module(EINA REQUIRED eina)
 include_directories(${EINA_INCLUDE_DIRS})
 set(LIBS ${LIBS} ${EINA_LDFLAGS})
 
-# shared lib
+# static lib
 add_library(osc libosc/osc.c)
 
 # tjost

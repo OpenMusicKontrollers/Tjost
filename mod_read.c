@@ -95,7 +95,7 @@ _asio(uv_async_t *handle)
 		tev.time = ntime;
 		tev.size = nsize;
 
-		if(osc_message_check(dat->buffer, tev.size))
+		if(osc_check_message(dat->buffer, tev.size))
 		{
 			if(tjost_pipe_produce(&dat->pipe, ntime, nsize, dat->buffer))
 				fprintf(stderr, MOD_NAME": tjost_pipe_produce error\n");
