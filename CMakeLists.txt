@@ -93,6 +93,11 @@ add_library(osc_out MODULE mod_osc_out.c mod_osc.c)
 set_target_properties(osc_out PROPERTIES PREFIX "")
 install(TARGETS osc_out DESTINATION lib/tjost)
 
+# mod_transport
+add_library(transport MODULE mod_transport.c mod_osc.c)
+set_target_properties(transport PROPERTIES PREFIX "")
+install(TARGETS transport DESTINATION lib/tjost)
+
 # mod_dump
 add_library(dump MODULE mod_dump.c)
 set_target_properties(dump PROPERTIES PREFIX "")
