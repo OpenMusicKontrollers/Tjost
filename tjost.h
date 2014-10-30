@@ -151,7 +151,7 @@ struct _Tjost_Host {
 
 	lua_State *L;
 
-	uv_signal_t sigterm, sigquit, sigint;
+	uv_signal_t sigint;
 	uv_async_t quit;
 
 	jack_ringbuffer_t *rb_msg;
@@ -174,6 +174,10 @@ struct _Tjost_Host {
 	Eina_Inlist *uplinks; // uplink module instances
 
 	Eina_Inlist *queue; // host event queue
+
+	char *server_name;
+	char *mod_path;
+	jack_uuid_t uuid;
 };
 
 typedef osc_data_t *(*Tjost_Pipe_Alloc_Cb)(jack_nframes_t timestamp, size_t len, void *arg);

@@ -390,12 +390,11 @@ _clear(Tjost_Module *module)
 	Tjost_Host *host = module->host;
 
 	// drain event queue
-	Eina_Inlist *itm;
-	EINA_INLIST_FREE(module->queue, itm)
+	Eina_Inlist *l;
+	Tjost_Event *tev;
+	EINA_INLIST_FOREACH_SAFE(module->queue, l, tev)
 	{
-		Tjost_Event *tev = EINA_INLIST_CONTAINER_GET(itm, Tjost_Event);
-
-		module->queue = eina_inlist_remove(module->queue, itm);
+		module->queue = eina_inlist_remove(module->queue, EINA_INLIST_GET(tev));
 		tjost_free(host, tev);
 	}
 }
@@ -416,11 +415,11 @@ _gc_input(lua_State *L)
 	module->del(module);
 	host->modules = eina_inlist_remove(host->modules, EINA_INLIST_GET(module));
 
-	Eina_Inlist *itm;
-	EINA_INLIST_FREE(module->children, itm)
+	Eina_Inlist *l;
+	Tjost_Child *child;
+	EINA_INLIST_FOREACH_SAFE(module->children, l, child)
 	{
-		Tjost_Child *child = EINA_INLIST_CONTAINER_GET(itm, Tjost_Child);
-		module->children = eina_inlist_remove(module->children, itm);
+		module->children = eina_inlist_remove(module->children, EINA_INLIST_GET(child));
 		tjost_free(host, child);
 	}
 
@@ -464,11 +463,11 @@ _gc_in_out(lua_State *L)
 	_clear(module);
 	host->modules = eina_inlist_remove(host->modules, EINA_INLIST_GET(module));
 
-	Eina_Inlist *itm;
-	EINA_INLIST_FREE(module->children, itm)
+	Eina_Inlist *l;
+	Tjost_Child *child;
+	EINA_INLIST_FOREACH_SAFE(module->children, l, child)
 	{
-		Tjost_Child *child = EINA_INLIST_CONTAINER_GET(itm, Tjost_Child);
-		module->children = eina_inlist_remove(module->children, itm);
+		module->children = eina_inlist_remove(module->children, EINA_INLIST_GET(child));
 		tjost_free(host, child);
 	}
 
@@ -661,33 +660,35 @@ _plugin(lua_State *L)
 	module->host = host;
 
 	// has a responder function ? TODO check Output of Uplink
-	int has_callback = 0;
-	switch(lua_type(L, 2))
-	{
-		case LUA_TTABLE: // TODO check for__call metamethod
-		case LUA_TFUNCTION:
+	if(lua_gettop(L) > 2)
+		switch(lua_type(L, 2))
 		{
-			has_callback = 1;
-			module->has_lua_callback = 1;
+			case LUA_TTABLE: // TODO check for__call metamethod
+			case LUA_TFUNCTION:
+			{
+				module->has_lua_callback = 1;
 
-			lua_pushlightuserdata(L, module);
-			lua_pushvalue(L, 2); // responder function
-			lua_rawset(L, LUA_REGISTRYINDEX);
-			break;
-		}
-		case LUA_TUSERDATA:
-		{
-			has_callback = 1;
+				lua_pushlightuserdata(L, module);
+				lua_pushvalue(L, 2); // responder function
+				lua_rawset(L, LUA_REGISTRYINDEX);
+				break;
+			}
+			case LUA_TUSERDATA:
+			{
+				module->has_lua_callback = 0;
 
-			Tjost_Module *mod_out = lua_touserdata(L, 2);
-			Tjost_Child *child = tjost_alloc(host, sizeof(Tjost_Child));
-			child->module = mod_out;
-			module->children = eina_inlist_append(module->children, EINA_INLIST_GET(child));
-			break;
+				Tjost_Module *mod_out = lua_touserdata(L, 2);
+				if(mod_out->type & TJOST_MODULE_OUTPUT)
+				{
+					Tjost_Child *child = tjost_alloc(host, sizeof(Tjost_Child));
+					child->module = mod_out;
+					module->children = eina_inlist_append(module->children, EINA_INLIST_GET(child));
+				}
+				break;
+			}
+			default:
+				break;
 		}
-		default:
-			break;
-	}
 
 	if(module->add(module))
 	{
@@ -906,6 +907,8 @@ tjost_lua_deinit(Tjost_Host *host)
 
 	if(L)
 		lua_close(L);
+
+	host-> L = NULL;
 }
 
 void

@@ -33,16 +33,21 @@
 
 #include <tjost.h>
 
+static void _tjost_deinit(Tjost_Host *host);
+
 static void
 _sig(uv_signal_t *handle, int signum)
 {
-	uv_stop(handle->loop);
+	Tjost_Host *host = handle->data;
+	_tjost_deinit(host);
 }
 
 static void
 _quit(uv_async_t *handle)
 {
-	uv_stop(handle->loop);
+
+	Tjost_Host *host = handle->data;
+	_tjost_deinit(host);
 }
 
 static void
@@ -70,14 +75,19 @@ static void *
 _alloc(void *ud, void *ptr, size_t osize, size_t nsize)
 {
 	Tjost_Host *host = ud;
-	(void)osize;  // not used
+	(void)osize;
 
 	if(nsize == 0) {
-		tjost_free(host, ptr);
+		if(ptr)
+			tjost_free(host, ptr);
 		return NULL;
 	}
-	else
-		return tjost_realloc(host, nsize, ptr);
+	else {
+		if(ptr)
+			return tjost_realloc(host, nsize, ptr);
+		else
+			return tjost_alloc(host, nsize);
+	}
 }
 
 static int
@@ -196,8 +206,11 @@ tjost_map_memory_chunk(size_t size)
 static void
 tjost_unmap_memory_chunk(Tjost_Mem_Chunk *chunk)
 {
-	munmap(chunk->area, chunk->size);
-	free(chunk);
+	if(chunk)
+	{
+		//munmap(chunk->area, chunk->size); // done automatically at process end
+		free(chunk);
+	}
 }
 
 static void
@@ -240,13 +253,13 @@ tjost_add_memory(Tjost_Host *host)
 static void
 tjost_free_memory(Tjost_Host *host)
 {
-	Eina_Inlist *itm;
-	EINA_INLIST_FREE(host->rtmem_chunks, itm)
+	Eina_Inlist *l;
+	Tjost_Mem_Chunk *chunk;
+	EINA_INLIST_FOREACH_SAFE(host->rtmem_chunks, l, chunk)
 	{
-		Tjost_Mem_Chunk *chunk = EINA_INLIST_CONTAINER_GET(itm, Tjost_Mem_Chunk);
-		//tlsf_remove_pool(host->tlsf, chunk->pool); //FIXME
+		tlsf_remove_pool(host->tlsf, chunk->pool);
 		host->rtmem_sum -= chunk->size;
-		host->rtmem_chunks = eina_inlist_remove(host->rtmem_chunks, itm);
+		host->rtmem_chunks = eina_inlist_remove(host->rtmem_chunks, EINA_INLIST_GET(chunk));
 		tjost_unmap_memory_chunk(chunk);
 	}
 }
@@ -393,217 +406,243 @@ _print(lua_State *L)
 {
 	Tjost_Host *host = lua_touserdata(L, lua_upvalueindex(1));
 	tjost_host_message_push(host, "Lua print redirect: %s", lua_tostring(L, 1));
+	//FIXME support multiple arguments
 
 	return 0;
+}
+
+#define FAIL(...) \
+{ \
+	fprintf(stderr, "FAIL: "__VA_ARGS__); \
+	return -1; \
+}
+
+static int
+_tjost_init(uv_loop_t *loop, Tjost_Host *host, int argc, const char **argv)
+{
+	// init Non Session Management
+	const char *id = tjost_nsm_init(argc, argv);
+	
+	// init memory pool
+	Tjost_Mem_Chunk *chunk;
+	if(!(chunk = tjost_map_memory_chunk(area_size)))
+		FAIL("could not allocate RT memory chunk\n");
+	if(!(host->tlsf = tlsf_create_with_pool(chunk->area, chunk->size)))
+		FAIL("could not initialize TLSF memory pool\n");
+	chunk->pool = tlsf_get_pool(host->tlsf);
+	host->rtmem_chunks = eina_inlist_prepend(host->rtmem_chunks, EINA_INLIST_GET(chunk));
+	host->rtmem_sum = area_size;
+	
+	// init jack
+	host->server_name = NULL; //FIXME
+	jack_options_t options = host->server_name ? JackNullOption | JackServerName : JackNullOption;
+	jack_status_t status;
+	if(!(host->client = jack_client_open(id, options, &status, host->server_name)))
+		FAIL("could not open client\n");
+	if(jack_set_process_callback(host->client, _process, host))
+		FAIL("could not set process callback\n");
+	jack_on_shutdown(host->client, _shutdown, host);
+
+	if(jack_set_client_registration_callback(host->client, tjost_client_registration, host))
+		FAIL("could not set client_registration callback\n");
+	if(jack_set_port_registration_callback(host->client, tjost_port_registration, host))
+		FAIL("could not set port_registration callback\n");
+	if(jack_set_port_connect_callback(host->client, tjost_port_connect, host))
+		FAIL("could not set port_connect callback\n");
+	//if(jack_set_port_rename_callback(host->client, tjost_port_rename, host))
+	//	FAIL("could not set port_rename callback\n");
+	if(jack_set_graph_order_callback(host->client, tjost_graph_order, host))
+		FAIL("could not set graph_order callback\n");
+#ifdef HAS_METADATA_API
+	jack_uuid_parse(jack_get_uuid_for_client_name(host->client, jack_get_client_name(host->client)), &host->uuid);
+	if(jack_set_property(host->client, host->uuid, JACK_METADATA_PRETTY_NAME, "Tjost", "text/plain"))
+		FAIL("could not set client pretty name\n");
+
+	if(jack_set_property_change_callback(host->client, tjost_property_change, host))
+		FAIL("could not set property_change callback\n");
+#endif // HAS_METADATA_API
+
+	// init message ringbuffer
+	if(!(host->rb_msg = jack_ringbuffer_create(TJOST_RINGBUF_SIZE)))
+		FAIL("could not initialize ringbuffer\n");
+
+	// init uplink ringbuffer
+	if(!(host->rb_uplink_rx = jack_ringbuffer_create(TJOST_RINGBUF_SIZE)))
+		FAIL("could not initialize ringbuffer\n");
+	if(!(host->rb_uplink_tx = jack_ringbuffer_create(TJOST_RINGBUF_SIZE)))
+		FAIL("could not initialize ringbuffer\n");
+
+	// init realtime memory ringbuffer
+	if(!(host->rb_rtmem = jack_ringbuffer_create(sizeof(Tjost_Mem_Chunk)*2+1)))
+		FAIL("could not initialize ringbuffer\n");
+
+	host->srate = jack_get_sample_rate(host->client);
+
+	// init and load modules
+	host->mod_path = NULL; //FIXME
+	host->arr = eina_module_list_get(NULL, "/usr/local/lib/tjost", EINA_FALSE, NULL, NULL);
+	if(host->arr)
+		eina_module_list_load(host->arr);
+
+	// init libuv
+	int err;
+	host->sigint.data = host;
+	if((err = uv_signal_init(loop, &host->sigint)))
+		FAIL("uv error: %s\n", uv_err_name(err));
+	if((err = uv_signal_start(&host->sigint, _sig, SIGINT)))
+		FAIL("uv error: %s\n", uv_err_name(err));
+
+	host->quit.data = host;
+	if((err = uv_async_init(loop, &host->quit, _quit)))
+		FAIL("uv error: %s\n", uv_err_name(err));
+
+	host->msg.data = host;
+	if((err = uv_async_init(loop, &host->msg, _msg)))
+		FAIL("uv error: %s\n", uv_err_name(err));
+
+	host->uplink_tx.data = host;
+	if((err = uv_async_init(loop, &host->uplink_tx, tjost_uplink_tx_drain)))
+		FAIL("uv error: %s\n", uv_err_name(err));
+
+	host->rtmem.data = host;
+	if((err = uv_async_init(loop, &host->rtmem, tjost_request_memory)))
+		FAIL("uv error: %s\n", uv_err_name(err));
+
+	// init Lua
+	if(!(host->L = lua_newstate(_alloc, host)))
+		FAIL("could not initialize Lua\n");
+	tjost_lua_init(host, argc, argv);
+
+	// load file
+	if(argv[1] && luaL_dofile(host->L, argv[1]))
+		FAIL("error loading file: %s\n", lua_tostring(host->L, -1));
+	lua_gc(host->L, LUA_GCSTOP, 0); // disable automatic garbage collection
+
+	tjost_lua_deregister(host);
+	
+	// activate JACK
+	if(jack_activate(host->client))
+		FAIL("could not activate jack client\n");
+
+	return 0;
+}
+
+static void
+_tjost_deinit(Tjost_Host *host)
+{
+	// deactivate jack
+	if(host->client)
+		jack_deactivate(host->client);
+
+	// deinit Lua
+	tjost_lua_deinit(host);
+
+	// deinit libuv
+	uv_close((uv_handle_t *)&host->rtmem, NULL);
+	uv_close((uv_handle_t *)&host->uplink_tx, NULL);
+	uv_close((uv_handle_t *)&host->msg, NULL);
+	uv_close((uv_handle_t *)&host->quit, NULL);
+
+	int err;
+	if((err = uv_signal_stop(&host->sigint)))
+		fprintf(stderr, "uv error: %s\n", uv_err_name(err));
+
+	// drain main queue
+	Eina_Inlist *l;
+	Tjost_Event *tev;
+	EINA_INLIST_FOREACH_SAFE(host->queue, l, tev)
+	{
+		host->queue = eina_inlist_remove(host->queue, EINA_INLIST_GET(tev));
+		tjost_free(host, tev);
+	}
+
+	// unload, deinit and free modules
+	if(host->arr)
+	{
+		eina_module_list_unload(host->arr);
+		eina_module_list_free(host->arr);
+		host->arr = NULL;
+	}
+
+	// free module path string
+	if(host->mod_path)
+	{
+		free(host->mod_path);
+		host->mod_path = NULL;
+	}
+
+	// deinit ringbuffers
+	if(host->rb_rtmem)
+	{
+		jack_ringbuffer_free(host->rb_rtmem);
+		host->rb_rtmem = NULL;
+	}
+	if(host->rb_uplink_tx)
+	{
+		jack_ringbuffer_free(host->rb_uplink_tx);
+		host->rb_uplink_tx = NULL;
+	}
+	if(host->rb_uplink_rx)
+	{
+		jack_ringbuffer_free(host->rb_uplink_rx);
+		host->rb_uplink_rx = NULL;
+	}
+	if(host->rb_msg)
+	{
+		jack_ringbuffer_free(host->rb_msg);
+		host->rb_msg = NULL;
+	}
+
+	// close jack
+	if(host->client)
+	{
+#ifdef HAS_METADATA_API
+		jack_remove_property(host->client, host->uuid, JACK_METADATA_PRETTY_NAME);
+#endif
+		jack_client_close(host->client);
+		host->client = NULL;
+	}
+
+	// free server name string
+	if(host->server_name)
+	{
+		free(host->server_name);
+		host->server_name = NULL;
+	}
+
+	// deinit Rt memory pool
+	if(host->tlsf)
+	{
+		tjost_free_memory(host);
+		tlsf_destroy(host->tlsf);
+		host->tlsf = NULL;
+	}
+
+	// deinit Non Session Management
+	tjost_nsm_deinit();
 }
 
 int
 main(int argc, const char **argv)
 {
 	static Tjost_Host host;
-	char *mod_path = NULL;
-	char *server_name = NULL;
-
-#define FAIL(...) \
-{ \
-	fprintf(stderr, "FAIL: "__VA_ARGS__); \
-	goto cleanup; \
-}
 
 	// init eina
 	eina_init();
 
+	// get default loop
 	uv_loop_t *loop = uv_default_loop();
 
-	// init Non Session Management
-	const char *id = tjost_nsm_init(argc, argv);
-
-	// init memory pool
-	Tjost_Mem_Chunk *chunk;
-	if(!(chunk = tjost_map_memory_chunk(area_size)))
-		FAIL("could not allocate RT memory chunk\n");
-	if(!(host.tlsf = tlsf_create_with_pool(chunk->area, chunk->size)))
-		FAIL("could not initialize TLSF memory pool\n");
-	chunk->pool = tlsf_get_pool(host.tlsf);
-	host.rtmem_chunks = eina_inlist_prepend(host.rtmem_chunks, EINA_INLIST_GET(chunk));
-	host.rtmem_sum = area_size;
-	
-	// init jack
-	jack_options_t options = server_name ? JackNullOption | JackServerName : JackNullOption;
-	jack_status_t status;
-	if(!(host.client = jack_client_open(id, options, &status, server_name)))
-		FAIL("could not open client\n");
-	if(jack_set_process_callback(host.client, _process, &host))
-		FAIL("could not set process callback\n");
-	jack_on_shutdown(host.client, _shutdown, &host);
-
-	if(jack_set_client_registration_callback(host.client, tjost_client_registration, &host))
-		FAIL("could not set client_registration callback\n");
-	if(jack_set_port_registration_callback(host.client, tjost_port_registration, &host))
-		FAIL("could not set port_registration callback\n");
-	if(jack_set_port_connect_callback(host.client, tjost_port_connect, &host))
-		FAIL("could not set port_connect callback\n");
-	/*
-	if(jack_set_port_rename_callback(host.client, tjost_port_rename, &host))
-		FAIL("could not set port_rename callback\n");
-	*/
-	if(jack_set_graph_order_callback(host.client, tjost_graph_order, &host))
-		FAIL("could not set graph_order callback\n");
-#ifdef HAS_METADATA_API
-	jack_uuid_t uuid;
-	jack_uuid_parse(jack_get_uuid_for_client_name(host.client, jack_get_client_name(host.client)), &uuid);
-	if(jack_set_property(host.client, uuid, JACK_METADATA_PRETTY_NAME, "Tjost", "text/plain"))
-		FAIL("could not set client pretty name\n");
-
-	if(jack_set_property_change_callback(host.client, tjost_property_change, &host))
-		FAIL("could not set property_change callback\n");
-#endif // HAS_METADATA_API
-
-	// init message ringbuffer
-	if(!(host.rb_msg = jack_ringbuffer_create(TJOST_RINGBUF_SIZE)))
-		FAIL("could not initialize ringbuffer\n");
-
-	// init uplink ringbuffer
-	if(!(host.rb_uplink_rx = jack_ringbuffer_create(TJOST_RINGBUF_SIZE)))
-		FAIL("could not initialize ringbuffer\n");
-	if(!(host.rb_uplink_tx = jack_ringbuffer_create(TJOST_RINGBUF_SIZE)))
-		FAIL("could not initialize ringbuffer\n");
-
-	// init realtime memory ringbuffer
-	if(!(host.rb_rtmem = jack_ringbuffer_create(sizeof(Tjost_Mem_Chunk)*2+1)))
-		FAIL("could not initialize ringbuffer\n");
-
-	host.srate = jack_get_sample_rate(host.client);
-
-	// init and load modules
-	host.arr = eina_module_list_get(NULL, "/usr/local/lib/tjost", EINA_FALSE, NULL, NULL);
-	if(host.arr)
-		eina_module_list_load(host.arr);
-
-	// init libuv
-	int err;
-	if((err = uv_signal_init(loop, &host.sigterm)))
-		FAIL("uv error: %s\n", uv_err_name(err));
-	if((err = uv_signal_start(&host.sigterm, _sig, SIGTERM)))
-		FAIL("uv error: %s\n", uv_err_name(err));
-
-	if((err = uv_signal_init(loop, &host.sigquit)))
-		FAIL("uv error: %s\n", uv_err_name(err));
-	if((err = uv_signal_start(&host.sigquit, _sig, SIGQUIT)))
-		FAIL("uv error: %s\n", uv_err_name(err));
-
-	if((err = uv_signal_init(loop, &host.sigint)))
-		FAIL("uv error: %s\n", uv_err_name(err));
-	if((err = uv_signal_start(&host.sigint, _sig, SIGINT)))
-		FAIL("uv error: %s\n", uv_err_name(err));
-
-	if((err = uv_async_init(loop, &host.quit, _quit)))
-		FAIL("uv error: %s\n", uv_err_name(err));
-
-	host.msg.data = &host;
-	if((err = uv_async_init(loop, &host.msg, _msg)))
-		FAIL("uv error: %s\n", uv_err_name(err));
-
-	host.uplink_tx.data = &host;
-	if((err = uv_async_init(loop, &host.uplink_tx, tjost_uplink_tx_drain)))
-		FAIL("uv error: %s\n", uv_err_name(err));
-
-	host.rtmem.data = &host;
-	if((err = uv_async_init(loop, &host.rtmem, tjost_request_memory)))
-		FAIL("uv error: %s\n", uv_err_name(err));
-
-	// init Lua
-	if(!(host.L = lua_newstate(_alloc, &host)))
-		FAIL("could not initialize Lua\n");
-	tjost_lua_init(&host, argc, argv);
-
-	// load file
-	if(argv[1] && luaL_dofile(host.L, argv[1]))
-		FAIL("error loading file: %s\n", lua_tostring(host.L, -1));
-	lua_gc(host.L, LUA_GCSTOP, 0); // disable automatic garbage collection
-
-	tjost_lua_deregister(&host);
-
-	// activate JACK
-	if(jack_activate(host.client))
-		FAIL("could not activate jack client\n");
-
-	// run libuv
-	uv_run(loop, UV_RUN_DEFAULT);
-
-cleanup:
-
-	// deinit libuv
-	uv_close((uv_handle_t *)&host.rtmem, NULL);
-	uv_close((uv_handle_t *)&host.uplink_tx, NULL);
-	uv_close((uv_handle_t *)&host.msg, NULL);
-	uv_close((uv_handle_t *)&host.quit, NULL);
-
-	if((err = uv_signal_stop(&host.sigterm)))
-		fprintf(stderr, "uv error: %s\n", uv_err_name(err));
-	if((err = uv_signal_stop(&host.sigquit)))
-		fprintf(stderr, "uv error: %s\n", uv_err_name(err));
-	if((err = uv_signal_stop(&host.sigint)))
-		fprintf(stderr, "uv error: %s\n", uv_err_name(err));
-	
-	if(host.client)
-		jack_deactivate(host.client);
-
-	// deinit Lua
-	tjost_lua_deinit(&host);
-
-	// drain queue
-	Eina_Inlist *itm;
-	EINA_INLIST_FREE(host.queue, itm)
+	if(_tjost_init(loop, &host, argc, argv)) // init Tjost
 	{
-		Tjost_Event *tev = EINA_INLIST_CONTAINER_GET(itm, Tjost_Event);
-		host.queue = eina_inlist_remove(host.queue, itm);
-		tjost_free(&host, tev);
+		fprintf(stderr, "_tjost_init failed\n");
+
+		// deinit Tjost
+		_tjost_deinit(&host);
+		return -1;
 	}
-
-	// unload, deinit and free modules
-	if(host.arr)
-	{
-		eina_module_list_unload(host.arr);
-		eina_module_list_free(host.arr);
-	}
-
-	// deinit jack
-	if(host.client)
-	{
-#ifdef HAS_METADATA_API
-		jack_remove_property(host.client, uuid, JACK_METADATA_PRETTY_NAME);
-#endif
-		jack_client_close(host.client);
-	}
-
-	// deinit message ringbuffer
-	if(host.rb_msg)
-		jack_ringbuffer_free(host.rb_msg);
-
-	// deinit message ringbuffer
-	if(host.rb_uplink_rx)
-		jack_ringbuffer_free(host.rb_uplink_rx);
-	if(host.rb_uplink_tx)
-		jack_ringbuffer_free(host.rb_uplink_tx);
-
-	// free server name string
-	if(server_name)
-		free(server_name);
-
-	// free module path string
-	if(mod_path)
-		free(mod_path);
-
-	// deinit Rt memory pool
-	if(host.tlsf)
-	{
-		tjost_free_memory(&host);
-		tlsf_destroy(host.tlsf);
-	}
-
-	// deinit Non Session Management
-	tjost_nsm_deinit();
+	else
+		uv_run(loop, UV_RUN_DEFAULT); // run event loop
 
 	// deinit eina
 	eina_shutdown();
