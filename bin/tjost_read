@@ -23,7 +23,18 @@
 --     distribution.
 --]]
 
-file = argv[3]
+file = nil
 
-osc_out = tjost.plugin({name='osc_out', port='osc_read', pretty='OSC Read'})
-read = tjost.plugin({name='read', path=file}, osc_out)
+if argv then
+	for _, v in ipairs(argv) do
+		local f = loadstring(v)
+		if f then f() end
+	end
+end
+
+if file then
+	osc_out = tjost.plugin({name='osc_out', port='osc_read', pretty='OSC Read'})
+	read = tjost.plugin({name='read', path=file}, osc_out)
+else
+	print('FAIL: no file given')
+end

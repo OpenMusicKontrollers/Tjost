@@ -23,7 +23,14 @@
 --     distribution.
 --]]
 
-device = argv[3]
+device = nil
+
+if argv then
+	for _, v in ipairs(argv) do
+		local f = loadstring(v)
+		if f then f() end
+	end
+end
 
 if device then
 	osc_out = tjost.plugin({name='osc_out', port='osc_serial_rx', pretty=device..' RX'})

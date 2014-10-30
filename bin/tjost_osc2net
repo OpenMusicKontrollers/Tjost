@@ -23,15 +23,22 @@
 --     distribution.
 --]]
 
-host = argv[3]
-rtprio = argv[4]
-unroll = argv[5]
-offset = argv[6]
+url = nil
+rtprio = 50
+unroll = 'none'
+offset = 0
 
-if host then
+if argv then
+	for _, v in ipairs(argv) do
+		local f = loadstring(v)
+		if f then f() end
+	end
+end
+
+if url then
 	osc_out = tjost.plugin({name='osc_out', port='osc_net_rx', pretty='OSC Net RX'})
-	net_io = tjost.plugin({name='net_out', uri=host, rtprio=rtprio, unroll=unroll, offset=offset}, osc_out)
-	osc_in = tjost.plugin({name='osc_in', port='osc_net_tx', pretty=host}, net_io)
+	net_io = tjost.plugin({name='net_out', uri=url, rtprio=rtprio, unroll=unroll, offset=offset}, osc_out)
+	osc_in = tjost.plugin({name='osc_in', port='osc_net_tx', pretty=url}, net_io)
 else
 	print('FAIL: no uri given')
 end

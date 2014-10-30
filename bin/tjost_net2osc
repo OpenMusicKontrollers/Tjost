@@ -23,15 +23,22 @@
 --     distribution.
 --]]
 
-host = argv[3]
-rtprio = argv[4]
-unroll = argv[5]
+url = nil
+rtprio = 50
+unroll = 'none'
 
-if host then
-	osc_out = tjost.plugin({name='osc_out', port="osc_net_rx", pretty=host})
-	net_io = tjost.plugin({name='net_in', uri=host, rtprio=rtprio, unroll=unroll}, osc_out)
+if argv then
+	for _, v in ipairs(argv) do
+		local f = loadstring(v)
+		if f then f() end
+	end
+end
 
-	if string.match(host, 'osc.tcp[46]*://') or string.match(host, 'osc.slip.tcp[46]*://') then
+if url then
+	osc_out = tjost.plugin({name='osc_out', port="osc_net_rx", pretty=url})
+	net_io = tjost.plugin({name='net_in', uri=url, rtprio=rtprio, unroll=unroll}, osc_out)
+
+	if string.match(url, 'osc.tcp[46]*://') or string.match(url, 'osc.slip.tcp[46]*://') then
 	osc_in = tjost.plugin({name='osc_in', port='osc_net_tx', pretty='OSC Net TX'}, net_io)
 	end
 else

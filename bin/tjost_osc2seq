@@ -23,7 +23,14 @@
 --     distribution.
 --]]
 
-device = argv[3]
+device = 'virtual'
+
+if argv then
+	for _, v in ipairs(argv) do
+		local f = loadstring(v)
+		if f then f() end
+	end
+end
 
 midi_out = tjost.plugin({name='seq_out', device=device})
 osc_in = tjost.plugin({name='osc_in'}, midi_out)

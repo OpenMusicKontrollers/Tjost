@@ -23,7 +23,18 @@
 --     distribution.
 --]]
 
-file = argv[3]
+file = nil
 
-write = tjost.plugin({name='write', path=file})
-osc_in = tjost.plugin({name='osc_in', port='osc_write', pretty='OSC Write'}, write)
+if argv then
+	for _, v in ipairs(argv) do
+		local f = loadstring(v)
+		if f then f() end
+	end
+end
+
+if file then
+	write = tjost.plugin({name='write', path=file})
+	osc_in = tjost.plugin({name='osc_in', port='osc_write', pretty='OSC Write'}, write)
+else
+	print('FAIL: no file given')
+end

@@ -23,8 +23,15 @@
 --     distribution.
 --]]
 
-device = argv[3]
-api = argv[4]
+device = 'virtual'
+api = 'alsa'
+
+if argv then
+	for _, v in ipairs(argv) do
+		local f = loadstring(v)
+		if f then f() end
+	end
+end
 
 midi_out = tjost.plugin({name='rtmidi_out', device=device, api=api})
 osc_in = tjost.plugin({name='osc_in'}, midi_out)

@@ -23,10 +23,13 @@
 --     distribution.
 --]]
 
-if argv[3] == 'verbose' then
-	verbose = 1
-else
-	verbose = 0
+verbose=0
+
+if argv then
+	for _, v in ipairs(argv) do
+		local f = loadstring(v)
+		if f then f() end
+	end
 end
 
 dump = tjost.plugin({name='dump', verbose=verbose})

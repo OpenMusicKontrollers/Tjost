@@ -893,9 +893,9 @@ tjost_lua_init(Tjost_Host *host, int argc, const char **argv)
 	// push command line arguments
 	lua_createtable(L, argc, 0);
 	int i;
-	for(i=0; i<argc; i++) {
+	for(i=2; i<argc; i++) {
 		lua_pushstring(L, argv[i]);
-		lua_rawseti(L, -2, i+1);
+		lua_rawseti(L, -2, i-1);
 	}
 	lua_setglobal(L, "argv");
 }
