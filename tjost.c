@@ -417,8 +417,6 @@ main(int argc, const char **argv)
 
 	// init Non Session Management
 	const char *id = tjost_nsm_init(argc, argv);
-	if(!id)
-		id = "Tjost";
 
 	// init memory pool
 	Tjost_Mem_Chunk *chunk;
@@ -452,6 +450,11 @@ main(int argc, const char **argv)
 	if(jack_set_graph_order_callback(host.client, tjost_graph_order, &host))
 		FAIL("could not set graph_order callback\n");
 #ifdef HAS_METADATA_API
+	jack_uuid_t uuid;
+	jack_uuid_parse(jack_get_uuid_for_client_name(host.client, jack_get_client_name(host.client)), &uuid);
+	if(jack_set_property(host.client, uuid, JACK_METADATA_PRETTY_NAME, "Tjost", "text/plain"))
+		FAIL("could not set client pretty name\n");
+
 	if(jack_set_property_change_callback(host.client, tjost_property_change, &host))
 		FAIL("could not set property_change callback\n");
 #endif // HAS_METADATA_API
@@ -567,7 +570,12 @@ cleanup:
 
 	// deinit jack
 	if(host.client)
+	{
+#ifdef HAS_METADATA_API
+		jack_remove_property(host.client, uuid, JACK_METADATA_PRETTY_NAME);
+#endif
 		jack_client_close(host.client);
+	}
 
 	// deinit message ringbuffer
 	if(host.rb_msg)

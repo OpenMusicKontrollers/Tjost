@@ -152,9 +152,15 @@ _nsm_recv_cb(osc_data_t *buf, size_t len, void *data)
 const char *
 tjost_nsm_init(int argc, const char **argv)
 {
+	const char *call = strrchr(argv[1], '/');
+	if(call)
+		call = call+1; // skip '/'
+	else
+		call = argv[1];
+
 	nsm->NSM_URL = getenv("NSM_URL");
 	if(!nsm->NSM_URL)
-		return NULL;
+		return call;
 
 	uv_loop_t *loop = uv_default_loop();
 
@@ -164,12 +170,6 @@ tjost_nsm_init(int argc, const char **argv)
 	
 	if(netaddr_udp_sender_init(&nsm->netaddr, loop, nsm->NSM_URL, _nsm_recv_cb, nsm))
 		fprintf(stderr, "tjost_nsm: could not create UDP Sender");
-
-	const char *call = strrchr(argv[1], '/');
-	if(call)
-		call = call+1; // skip '/'
-	else
-		call = argv[1];
 
 	// send announce message
 	pid_t pid = getpid();
