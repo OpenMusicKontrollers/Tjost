@@ -190,7 +190,9 @@ struct _Tjost_Host {
 
 	char *server_name;
 	char *mod_path;
+#ifdef HAS_METADATA_API
 	jack_uuid_t uuid;
+#endif
 };
 
 // in tjost.c
