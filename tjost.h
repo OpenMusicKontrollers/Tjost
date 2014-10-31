@@ -68,10 +68,13 @@ typedef struct _Tjost_Pipe Tjost_Pipe;
 typedef int (*Tjost_Module_Add_Cb)(Tjost_Module *module);
 typedef void (*Tjost_Module_Del_Cb)(Tjost_Module *module);
 
+typedef osc_data_t *(*Tjost_Pipe_Alloc_Cb)(Tjost_Event *tev, void *arg);
+typedef int (*Tjost_Pipe_Sched_Cb)(Tjost_Event *tev, osc_data_t *buf, void *arg);
+
 #define TJOST_MODULE_INPUT	0b001
 #define TJOST_MODULE_OUTPUT 0b010
 #define TJOST_MODULE_IN_OUT (TJOST_MODULE_INPUT | TJOST_MODULE_OUTPUT)
-#define TJOST_MODULE_UPLINK 0b100
+#define TJOST_MODULE_UPLINK 0b110
 
 #define TJOST_MODULE_BROADCAST NULL
 #define TJOST_BUF_SIZE (0x4000)
@@ -144,6 +147,16 @@ struct _Tjost_Mem_Chunk {
 	pool_t pool;
 };
 
+struct _Tjost_Pipe {
+	jack_ringbuffer_t *rb;
+
+	// rx
+	uv_async_t asio;
+	Tjost_Pipe_Alloc_Cb alloc_cb;
+	Tjost_Pipe_Sched_Cb sched_cb;
+	void *arg;
+};
+
 struct _Tjost_Host {
 	jack_client_t *client;
 
@@ -157,9 +170,9 @@ struct _Tjost_Host {
 	jack_ringbuffer_t *rb_msg;
 	uv_async_t msg;
 
-	jack_ringbuffer_t *rb_uplink_tx;
-	jack_ringbuffer_t *rb_uplink_rx;
-	uv_async_t uplink_tx;
+	int pipe_uplink_tx_count;
+	Tjost_Pipe pipe_uplink_tx;
+	Tjost_Pipe pipe_uplink_rx;
 
 	jack_ringbuffer_t *rb_rtmem;
 	uv_async_t rtmem;
@@ -180,19 +193,6 @@ struct _Tjost_Host {
 	jack_uuid_t uuid;
 };
 
-typedef osc_data_t *(*Tjost_Pipe_Alloc_Cb)(jack_nframes_t timestamp, size_t len, void *arg);
-typedef int (*Tjost_Pipe_Sched_Cb)(jack_nframes_t timestamp, osc_data_t *buf, size_t len, void *arg);
-
-struct _Tjost_Pipe {
-	jack_ringbuffer_t *rb;
-
-	// rx
-	uv_async_t asio;
-	Tjost_Pipe_Alloc_Cb alloc_cb;
-	Tjost_Pipe_Sched_Cb sched_cb;
-	void *arg;
-};
-
 // in tjost.c
 void *tjost_alloc(Tjost_Host *host, size_t len);
 void *tjost_realloc(Tjost_Host *host, size_t len, void *buf);
@@ -209,7 +209,7 @@ int tjost_host_message_pull(Tjost_Host *host, char *str);
 int tjost_pipe_init(Tjost_Pipe *pipe);
 int tjost_pipe_deinit(Tjost_Pipe *pipe);
 size_t tjost_pipe_space(Tjost_Pipe *pipe);
-int tjost_pipe_produce(Tjost_Pipe *pipe, jack_nframes_t timestamp, size_t len, osc_data_t *buf);
+int tjost_pipe_produce(Tjost_Pipe *pipe, Tjost_Module *module, jack_nframes_t timestamp, size_t len, osc_data_t *buf);
 int tjost_pipe_flush(Tjost_Pipe *pipe);
 int tjost_pipe_consume(Tjost_Pipe *pipe, Tjost_Pipe_Alloc_Cb alloc_cb, Tjost_Pipe_Sched_Cb sched_cb, void *arg);
 int tjost_pipe_listen_start(Tjost_Pipe *pipe, uv_loop_t *loop, Tjost_Pipe_Alloc_Cb alloc_cb, Tjost_Pipe_Sched_Cb sched_cb, void *arg);
@@ -229,7 +229,8 @@ void tjost_lua_deinit(Tjost_Host *host);
 void tjost_lua_deregister(Tjost_Host *host);
 
 // in tjost_uplink.c
-void tjost_uplink_tx_drain(uv_async_t *handle);
+osc_data_t * tjost_uplink_tx_drain_alloc(Tjost_Event *tev, void *arg);
+int tjost_uplink_tx_drain_sched(Tjost_Event *tev, osc_data_t *buf, void *arg);
 void tjost_uplink_tx_push(Tjost_Host *host, Tjost_Event *tev);
 void tjost_uplink_rx_drain(Tjost_Host *host, int ignore);
 

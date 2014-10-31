@@ -58,9 +58,10 @@ tjost_pipe_space(Tjost_Pipe *pipe)
 }
 
 int
-tjost_pipe_produce(Tjost_Pipe *pipe, jack_nframes_t timestamp, size_t len, osc_data_t *buf)
+tjost_pipe_produce(Tjost_Pipe *pipe, Tjost_Module *module, jack_nframes_t timestamp, size_t len, osc_data_t *buf)
 {
 	Tjost_Event tev;
+	tev.module = module,
 	tev.time = timestamp;
 	tev.size = len;
 
@@ -100,13 +101,13 @@ tjost_pipe_consume(Tjost_Pipe *pipe, Tjost_Pipe_Alloc_Cb alloc_cb, Tjost_Pipe_Sc
 		{
 			jack_ringbuffer_read_advance(pipe->rb, sizeof(Tjost_Event));
 
-			osc_data_t *buffer = alloc_cb(tev.time, tev.size, arg);
+			osc_data_t *buffer = alloc_cb(&tev, arg);
 			//FIXME check return
 
 			if(jack_ringbuffer_read(pipe->rb, (char *)buffer, tev.size) != tev.size)
 				return -1;
 
-			if(sched_cb(tev.time, buffer, tev.size, arg))
+			if(sched_cb(&tev, buffer, arg))
 				break;
 		}
 	}

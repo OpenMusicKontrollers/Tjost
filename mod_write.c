@@ -38,29 +38,29 @@ struct _Data {
 };
 
 static osc_data_t *
-_alloc(jack_nframes_t timestamp, size_t len, void *arg)
+_alloc(Tjost_Event *tev, void *arg)
 {
-	Tjost_Module *module = arg;
+	Tjost_Module *module = tev->module;
 	Data *dat = module->dat;
 
 	return dat->buffer;
 }
 
 static int
-_sched(jack_nframes_t timestamp, osc_data_t *buf, size_t len, void *arg)
+_sched(Tjost_Event *tev, osc_data_t *buf, void *arg)
 {
-	Tjost_Module *module = arg;
+	Tjost_Module *module = tev->module;
 	Data *dat = module->dat;
 
-	uint32_t ntime = timestamp;
-	uint32_t nsize = len;
+	uint32_t ntime = tev->time;
+	uint32_t nsize = tev->size;
 
 	ntime = htonl(ntime);
 	nsize = htonl(nsize);
 
 	fwrite(&ntime, sizeof(uint32_t), 1, dat->f);
 	fwrite(&nsize, sizeof(uint32_t), 1, dat->f);
-	fwrite(buf, len, 1, dat->f);
+	fwrite(buf, tev->size, 1, dat->f);
 
 	return 0; // reload
 }
@@ -95,7 +95,7 @@ process_out(jack_nframes_t nframes, void *arg)
 		}
 
 		tev->time -= dat->offset; // relative time to first written event
-		if(tjost_pipe_produce(&dat->pipe, tev->time, tev->size, tev->buf))
+		if(tjost_pipe_produce(&dat->pipe, module, tev->time, tev->size, tev->buf))
 			tjost_host_message_push(host, MOD_NAME": %s", "tjost_pipe_produce error");
 
 		module->queue = eina_inlist_remove(module->queue, EINA_INLIST_GET(tev));
@@ -141,7 +141,7 @@ add(Tjost_Module *module)
 
 	if(tjost_pipe_init(&dat->pipe))
 		MOD_ADD_ERR(module->host, MOD_NAME, "could not initialize tjost pipe");
-	tjost_pipe_listen_start(&dat->pipe, loop, _alloc, _sched, module);
+	tjost_pipe_listen_start(&dat->pipe, loop, _alloc, _sched, NULL);
 
 	module->dat = dat;
 	module->type = TJOST_MODULE_OUTPUT;

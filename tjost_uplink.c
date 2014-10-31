@@ -23,27 +23,14 @@
 
 #include <tjost.h>
 
-static osc_data_t buf_rx [TJOST_BUF_SIZE] __attribute__((aligned (8)));
-static const osc_data_t *end_rx = buf_rx + TJOST_BUF_SIZE;
-
-static osc_data_t buf_tx [TJOST_BUF_SIZE] __attribute__((aligned (8)));
+static osc_data_t buf_rx [TJOST_BUF_SIZE];
 
 // non real time
 static void
 tjost_uplink_rx_push(Tjost_Host *host, Tjost_Module *module, osc_data_t *buf, size_t size)
 {
-	Tjost_Event tev;
-	tev.module = module;
-	tev.time = 0; // schedule for immediate execution
-	tev.size = size;
-
-	if(jack_ringbuffer_write_space(host->rb_uplink_rx) < sizeof(Tjost_Event) + tev.size)
-		fprintf(stderr, "Tjost uplink buffer overflow");
-	else
-	{
-		jack_ringbuffer_write(host->rb_uplink_rx, (const char *)&tev, sizeof(Tjost_Event));
-		jack_ringbuffer_write(host->rb_uplink_rx, (const char *)buf, tev.size);
-	}
+	if(tjost_pipe_produce(&host->pipe_uplink_rx, module, 0, size, buf))
+		fprintf(stderr, "tjost_uplink_rx_push: tjost_pipe_produce error\n");
 }
 
 static int
@@ -205,63 +192,53 @@ static osc_method_t methods [] = {
 };
 
 // non real time
-void
-tjost_uplink_tx_drain(uv_async_t *handle)
+osc_data_t *
+tjost_uplink_tx_drain_alloc(Tjost_Event *tev, void *arg)
 {
-	Tjost_Host *host = handle->data;
+	static osc_data_t buf_tx [TJOST_BUF_SIZE];
 
-	// Rx
-	Tjost_Event tev;
-	while(jack_ringbuffer_read_space(host->rb_uplink_tx) >= sizeof(Tjost_Event))
-	{
-		jack_ringbuffer_peek(host->rb_uplink_tx, (char *)&tev, sizeof(Tjost_Event));
-		if(jack_ringbuffer_read_space(host->rb_uplink_tx) >= sizeof(Tjost_Event) + tev.size)
-		{
-			jack_ringbuffer_read_advance(host->rb_uplink_tx, sizeof(Tjost_Event));
-			jack_ringbuffer_read(host->rb_uplink_tx, (char *)buf_tx, tev.size);
-
-			osc_dispatch_method(tev.time, buf_tx, tev.size, methods, NULL, NULL, &tev);
-		}
-		else
-			break;
-	}
+	return buf_tx;
 }
 
+int
+tjost_uplink_tx_drain_sched(Tjost_Event *tev, osc_data_t *buf, void *arg)
+{
+	osc_dispatch_method(tev->time, buf, tev->size, methods, NULL, NULL, tev);
+
+	return 0;
+}
+
+// real time
 void
 tjost_uplink_tx_push(Tjost_Host *host, Tjost_Event *tev)
 {
-	if(jack_ringbuffer_write_space(host->rb_uplink_tx) < sizeof(Tjost_Event) + tev->size)
-		tjost_host_message_push(host, "uplink: %s", "ringbuffer overflow");
-	else
-	{
-		jack_ringbuffer_write(host->rb_uplink_tx, (const char *)tev, sizeof(Tjost_Event));
-		jack_ringbuffer_write(host->rb_uplink_tx, (const char *)tev->buf, tev->size);
-	}
+	host->pipe_uplink_tx_count++;
+	if(tjost_pipe_produce(&host->pipe_uplink_tx, tev->module, tev->time, tev->size, tev->buf))
+		tjost_host_message_push(tev->module->host, "tjost_uplink_tx_push: tjost_pipe_produce failed");
+}
+
+// real time
+static osc_data_t *
+_tjost_uplink_rx_drain_alloc(Tjost_Event *tev, void *arg)
+{
+	Tjost_Host *host = arg;
+	return tjost_host_schedule_inline(host, tev->module, tev->time, tev->size);
+}
+
+// real time
+static int
+_tjost_uplink_rx_drain_sched(Tjost_Event *tev, osc_data_t *buf, void *arg)
+{
+	return 0;
 }
 
 // real time
 void
 tjost_uplink_rx_drain(Tjost_Host *host, int ignore)
 {
-	Tjost_Event tev;
-	while(jack_ringbuffer_read_space(host->rb_uplink_rx) >= sizeof(Tjost_Event))
-	{
-		jack_ringbuffer_peek(host->rb_uplink_rx, (char *)&tev, sizeof(Tjost_Event));
-		if(jack_ringbuffer_read_space(host->rb_uplink_rx) >= sizeof(Tjost_Event) + tev.size)
-		{
-			jack_ringbuffer_read_advance(host->rb_uplink_rx, sizeof(Tjost_Event));
-
-			if(ignore)
-				jack_ringbuffer_read_advance(host->rb_uplink_rx, tev.size);
-			else
-			{
-				osc_data_t *bf = tjost_host_schedule_inline(host, tev.module, tev.time, tev.size);
-				jack_ringbuffer_read(host->rb_uplink_rx, (char *)bf, tev.size);
-			}
-		}
-		else
-			break;
-	}
+	if(tjost_pipe_consume(&host->pipe_uplink_rx,
+			_tjost_uplink_rx_drain_alloc, _tjost_uplink_rx_drain_sched, host))
+		tjost_host_message_push(host, "tjost_uplink_rx_drain: tjost_pipe_consume failed");
 }
 
 // non real time
@@ -273,9 +250,9 @@ tjost_client_registration(const char *name, int state, void *arg)
 
 	size_t len;
 	if(state)
-		ptr = osc_set_vararg(buf_rx, end_rx, "/jack/client/registration", "sT", name);
+		ptr = osc_set_vararg(buf_rx, buf_rx + TJOST_BUF_SIZE, "/jack/client/registration", "sT", name);
 	else
-		ptr = osc_set_vararg(buf_rx, end_rx, "/jack/client/registration", "sF", name);
+		ptr = osc_set_vararg(buf_rx, buf_rx + TJOST_BUF_SIZE, "/jack/client/registration", "sF", name);
 	if(ptr)
 		tjost_uplink_rx_push(host, TJOST_MODULE_BROADCAST, buf_rx, ptr-buf_rx);
 }
@@ -294,9 +271,9 @@ tjost_port_registration(jack_port_id_t id, int state, void *arg)
 
 		size_t len;
 		if(state)
-			ptr = osc_set_vararg(buf_rx, end_rx, "/jack/port/registration", "sT", name);
+			ptr = osc_set_vararg(buf_rx, buf_rx + TJOST_BUF_SIZE, "/jack/port/registration", "sT", name);
 		else
-			ptr = osc_set_vararg(buf_rx, end_rx, "/jack/port/registration", "sF", name);
+			ptr = osc_set_vararg(buf_rx, buf_rx + TJOST_BUF_SIZE, "/jack/port/registration", "sF", name);
 		if(ptr)
 			tjost_uplink_rx_push(host, TJOST_MODULE_BROADCAST, buf_rx, ptr-buf_rx);
 	}
@@ -316,9 +293,9 @@ tjost_port_connect(jack_port_id_t id_a, jack_port_id_t id_b, int state, void *ar
 
 	size_t len;
 	if(state)
-		ptr = osc_set_vararg(buf_rx, end_rx, "/jack/port/connect", "ssT", name_a, name_b);
+		ptr = osc_set_vararg(buf_rx, buf_rx + TJOST_BUF_SIZE, "/jack/port/connect", "ssT", name_a, name_b);
 	else
-		ptr = osc_set_vararg(buf_rx, end_rx, "/jack/port/connect", "ssF", name_a, name_b);
+		ptr = osc_set_vararg(buf_rx, buf_rx + TJOST_BUF_SIZE, "/jack/port/connect", "ssF", name_a, name_b);
 	if(ptr)
 		tjost_uplink_rx_push(host, TJOST_MODULE_BROADCAST, buf_rx, ptr-buf_rx);
 }
@@ -330,7 +307,7 @@ tjost_port_rename(jack_port_id_t port, const char *old_name, const char *new_nam
 	Tjost_Host *host = arg;
 	osc_data_t *ptr;
 
-	ptr = osc_set_vararg(buf_rx, end_rx, "/jack/graph/rename", "iss", port, old_name, new_name);
+	ptr = osc_set_vararg(buf_rx, buf_rx + TJOST_BUF_SIZE, "/jack/graph/rename", "iss", port, old_name, new_name);
 	if(ptr)
 		tjost_uplink_rx_push(host, TJOST_MODULE_BROADCAST, buf_rx, ptr-buf_rx);
 }
@@ -342,7 +319,7 @@ tjost_graph_order(void *arg)
 	Tjost_Host *host = arg;
 	osc_data_t *ptr;
 
-	ptr = osc_set_vararg(buf_rx, end_rx, "/jack/graph/order", "");
+	ptr = osc_set_vararg(buf_rx, buf_rx + TJOST_BUF_SIZE, "/jack/graph/order", "");
 	if(ptr)
 		tjost_uplink_rx_push(host, TJOST_MODULE_BROADCAST, buf_rx, ptr-buf_rx);
 

@@ -75,20 +75,20 @@ static osc_method_t methods [] = {
 };
 
 static osc_data_t *
-_alloc(jack_nframes_t timestamp, size_t len, void *arg)
+_alloc(Tjost_Event *tev, void *arg)
 {
-	Tjost_Module *module = arg;
+	Tjost_Module *module = tev->module;
 	Data *dat = module->dat;
 
 	return dat->buffer;
 }
 
 static int
-_sched(jack_nframes_t timestamp, osc_data_t *buf, size_t len, void *arg)
+_sched(Tjost_Event *tev, osc_data_t *buf, void *arg)
 {
-	Tjost_Module *module = arg;
+	Tjost_Module *module = tev->module;
 
-	osc_dispatch_method(timestamp, buf, len, methods, NULL, NULL, module);
+	osc_dispatch_method(tev->time, buf, tev->size, methods, NULL, NULL, module);
 
 	return 0; // reload
 }
@@ -120,7 +120,7 @@ process_out(jack_nframes_t nframes, void *arg)
 		}
 
 		tev->time -= last; // time relative to current period
-		if(tjost_pipe_produce(&dat->pipe, tev->time, tev->size, tev->buf))
+		if(tjost_pipe_produce(&dat->pipe, module, tev->time, tev->size, tev->buf))
 			tjost_host_message_push(host, MOD_NAME": %s", "tjost_pipe_produce error");
 
 		module->queue = eina_inlist_remove(module->queue, EINA_INLIST_GET(tev));
@@ -161,7 +161,7 @@ add(Tjost_Module *module)
 
 	if(tjost_pipe_init(&dat->pipe))
 		MOD_ADD_ERR(module->host, MOD_NAME, "could not initialize tjost pipe");
-	tjost_pipe_listen_start(&dat->pipe, loop, _alloc, _sched, module);
+	tjost_pipe_listen_start(&dat->pipe, loop, _alloc, _sched, NULL);
 
 	module->dat = dat;
 	module->type = TJOST_MODULE_OUTPUT;

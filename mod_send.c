@@ -231,7 +231,7 @@ _tty_recv_cb(uv_stream_t *stream, ssize_t nread, const uv_buf_t *buf)
 		size_t len = ptr - dat->buffer;
 		if(ptr && osc_check_message(dat->buffer, len))
 		{
-			if(tjost_pipe_produce(&dat->pipe, 0, len, dat->buffer))
+			if(tjost_pipe_produce(&dat->pipe, module, 0, len, dat->buffer))
 				fprintf(stderr, MOD_NAME": tjost_pipe_produce error\n");
 		}
 		else
@@ -248,17 +248,17 @@ _tty_recv_cb(uv_stream_t *stream, ssize_t nread, const uv_buf_t *buf)
 }
 
 static osc_data_t *
-_alloc(jack_nframes_t timestamp, size_t len, void *arg)
+_alloc(Tjost_Event *tev, void *arg)
 {
-	Tjost_Module *module = arg;
+	Tjost_Module *module = tev->module;
 	Tjost_Host *host = module->host;
 	Data *dat = module->dat;
 
-	return tjost_host_schedule_inline(host, module, timestamp, len);
+	return tjost_host_schedule_inline(host, module, tev->time, tev->size);
 }
 
 static int
-_sched(jack_nframes_t timestamp, osc_data_t *buf, size_t len, void *arg)
+_sched(Tjost_Event *tev, osc_data_t *buf, void *arg)
 {
 	return 0; // reload
 }
@@ -270,7 +270,7 @@ process_in(jack_nframes_t nframes, void *arg)
 	Tjost_Host *host = module->host;
 	Data *dat = module->dat;
 
-	if(tjost_pipe_consume(&dat->pipe, _alloc, _sched, module))
+	if(tjost_pipe_consume(&dat->pipe, _alloc, _sched, NULL))
 		tjost_host_message_push(host, MOD_NAME": %s", "tjost_pipe_consume error");
 
 	return 0;
