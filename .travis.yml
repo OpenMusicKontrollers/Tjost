@@ -1,5 +1,6 @@
 language:
  - c
+ - cpp
 os:
  - linux
 compiler:
@@ -14,6 +15,6 @@ install:
  - pushd libuv-1.0.0-rc2 && sh autogen.sh && ./configure --prefix=/usr && make && sudo make install && popd
  - sudo apt-get install -y libjack-dev libasound2-dev libluajit-5.1-dev libefl-dev
 before_script:
- - mkdir build && pushd build && cmake -DUSE_RTMIDI=0 .. && popd
+ - mkdir build && pushd build && cmake -DCMAKE_C_FLAGS="-std=gnu99" -DCMAKE_CXX_FLAGS="-std=gnu++98" -DUSE_RTMIDI=0 .. && popd
 script:
  - pushd build && make && sudo make install && popd
