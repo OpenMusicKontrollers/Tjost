@@ -2,6 +2,10 @@
 
 ## {T}jost is {J}ackified {O}pen{S}oundControl {T}ransmission
 
+### Build status
+
+[![Build Status](https://travis-ci.org/OpenMusicKontrollers/Tjost.svg?branch=master)](https://travis-ci.org/OpenMusicKontrollers/Tjost)
+
 ### About
 
 ### Dependencies
