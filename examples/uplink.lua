@@ -66,4 +66,4 @@ uplink = tjost.plugin({name='uplink'}, function(time, path, fmt, ...)
 	end
 end)
 
-osc_in = tjost.plugin({name='osc_in', port='osc.uplink'}, uplink)
+send = tjost.plugin({name='send'}, uplink)

@@ -327,6 +327,9 @@ _process(jack_nframes_t nframes, void *arg)
 	// receive from uplink ringbuffer
 	tjost_uplink_rx_drain(host, 0);
 
+	// reset uplink TX message counter
+	host->pipe_uplink_tx_count = 0;
+
 	// receive on all inputs
 	EINA_INLIST_FOREACH(host->modules, module)
 		if(module->type & TJOST_MODULE_INPUT)
@@ -391,9 +394,9 @@ _process(jack_nframes_t nframes, void *arg)
 		module->process_out(nframes, module);
 
 	// write uplink events to rinbbuffer
-	int err;
-	if((err = uv_async_send(&host->uplink_tx))) //TODO check if needed
-		tjost_host_message_push(host, "%s", uv_err_name(err));
+	if(host->pipe_uplink_tx_count > 0)
+		if(tjost_pipe_flush(&host->pipe_uplink_tx))
+			tjost_host_message_push(host, "tjost_pipe_flush failed");
 
 	// run garbage collection step
 	lua_gc(host->L, LUA_GCSTEP, 0); //TODO check if needed
@@ -462,16 +465,18 @@ _tjost_init(uv_loop_t *loop, Tjost_Host *host, int argc, const char **argv)
 		FAIL("could not set property_change callback\n");
 #endif // HAS_METADATA_API
 
+	// init pipes
+	if(tjost_pipe_init(&host->pipe_uplink_rx))
+		FAIL("could not initialize uplink RX pipe\n");
+	if(tjost_pipe_init(&host->pipe_uplink_tx))
+		FAIL("could not initialize uplink TX pipe\n");
+	if(tjost_pipe_listen_start(&host->pipe_uplink_tx, loop,
+			tjost_uplink_tx_drain_alloc, tjost_uplink_tx_drain_sched, NULL))
+		FAIL("could not initialize listening on uplink RX pipe\n");
+
 	// init message ringbuffer
 	if(!(host->rb_msg = jack_ringbuffer_create(TJOST_RINGBUF_SIZE)))
 		FAIL("could not initialize ringbuffer\n");
-
-	// init uplink ringbuffer
-	if(!(host->rb_uplink_rx = jack_ringbuffer_create(TJOST_RINGBUF_SIZE)))
-		FAIL("could not initialize ringbuffer\n");
-	if(!(host->rb_uplink_tx = jack_ringbuffer_create(TJOST_RINGBUF_SIZE)))
-		FAIL("could not initialize ringbuffer\n");
-
 	// init realtime memory ringbuffer
 	if(!(host->rb_rtmem = jack_ringbuffer_create(sizeof(Tjost_Mem_Chunk)*2+1)))
 		FAIL("could not initialize ringbuffer\n");
@@ -498,10 +503,6 @@ _tjost_init(uv_loop_t *loop, Tjost_Host *host, int argc, const char **argv)
 
 	host->msg.data = host;
 	if((err = uv_async_init(loop, &host->msg, _msg)))
-		FAIL("uv error: %s\n", uv_err_name(err));
-
-	host->uplink_tx.data = host;
-	if((err = uv_async_init(loop, &host->uplink_tx, tjost_uplink_tx_drain)))
 		FAIL("uv error: %s\n", uv_err_name(err));
 
 	host->rtmem.data = host;
@@ -539,7 +540,6 @@ _tjost_deinit(Tjost_Host *host)
 
 	// deinit libuv
 	uv_close((uv_handle_t *)&host->rtmem, NULL);
-	uv_close((uv_handle_t *)&host->uplink_tx, NULL);
 	uv_close((uv_handle_t *)&host->msg, NULL);
 	uv_close((uv_handle_t *)&host->quit, NULL);
 
@@ -577,21 +577,16 @@ _tjost_deinit(Tjost_Host *host)
 		jack_ringbuffer_free(host->rb_rtmem);
 		host->rb_rtmem = NULL;
 	}
-	if(host->rb_uplink_tx)
-	{
-		jack_ringbuffer_free(host->rb_uplink_tx);
-		host->rb_uplink_tx = NULL;
-	}
-	if(host->rb_uplink_rx)
-	{
-		jack_ringbuffer_free(host->rb_uplink_rx);
-		host->rb_uplink_rx = NULL;
-	}
 	if(host->rb_msg)
 	{
 		jack_ringbuffer_free(host->rb_msg);
 		host->rb_msg = NULL;
 	}
+
+	// deinit pipes
+	tjost_pipe_listen_stop(&host->pipe_uplink_tx);
+	tjost_pipe_deinit(&host->pipe_uplink_tx);
+	tjost_pipe_deinit(&host->pipe_uplink_rx);
 
 	// close jack
 	if(host->client)

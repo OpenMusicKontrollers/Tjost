@@ -39,18 +39,17 @@ struct _Data {
 };
 
 static osc_data_t *
-_alloc(jack_nframes_t timestamp, size_t len, void *arg)
+_alloc(Tjost_Event *tev, void *arg)
 {
-	Tjost_Module *module = arg;
+	Tjost_Module *module = tev->module;
 	Tjost_Host *host = module->host;
 	Data *dat = module->dat;
 
-	timestamp += dat->offset;
-	return tjost_host_schedule_inline(host, module, timestamp, len);
+	return tjost_host_schedule_inline(host, module, tev->time + dat->offset, tev->size);
 }
 
 static int
-_sched(jack_nframes_t timestamp, osc_data_t *buf, size_t len, void *arg)
+_sched(Tjost_Event *tev, osc_data_t *buf, void *arg)
 {
 	return 0; // reload
 }
@@ -65,7 +64,7 @@ process_in(jack_nframes_t nframes, void *arg)
 	if(dat->offset == 0) //TODO add way to reset this
 		dat->offset = jack_last_frame_time(host->client);
 
-	if(tjost_pipe_consume(&dat->pipe, _alloc, _sched, module))
+	if(tjost_pipe_consume(&dat->pipe, _alloc, _sched, NULL))
 		tjost_host_message_push(host, MOD_NAME": %s", "tjost_pipe_consume error");
 
 	int err;
@@ -97,7 +96,7 @@ _asio(uv_async_t *handle)
 
 		if(osc_check_message(dat->buffer, tev.size))
 		{
-			if(tjost_pipe_produce(&dat->pipe, ntime, nsize, dat->buffer))
+			if(tjost_pipe_produce(&dat->pipe, module, ntime, nsize, dat->buffer))
 				fprintf(stderr, MOD_NAME": tjost_pipe_produce error\n");
 		}
 		else
