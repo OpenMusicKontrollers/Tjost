@@ -8,10 +8,11 @@ compiler:
 before_install:
  - wget https://github.com/joyent/libuv/archive/v1.0.0-rc2.tar.gz
  - tar xzf v1.0.0-rc2.tar.gz
- - sudo apt-get -qq update
+ - sudo add-apt-repository -y ppa:enlightenment-git/ppa
+ - sudo apt-get -q update
 install:
  - pushd libuv-1.0.0-rc2 && sh autogen.sh && ./configure --prefix=/usr && make && sudo make install && popd
- - sudo apt-get install -y libjack-dev libasound2-dev libluajit-5.1-dev libeina-dev
+ - sudo apt-get install -y libjack-dev libasound2-dev libluajit-5.1-dev libefl-dev
 before_script:
  - mkdir build && pushd build && cmake -DUSE_RTMIDI=0 .. && popd
 script:
