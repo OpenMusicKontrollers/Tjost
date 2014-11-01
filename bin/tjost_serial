@@ -23,19 +23,17 @@
 --     distribution.
 --]]
 
-device = nil
+cli = require('tjost_cli')
 
-if argv then
-	for _, v in ipairs(argv) do
-		local f = loadstring(v)
-		if f then f() end
-	end
-end
+conf = cli:new({
+	device = '/dev/ttyACM0'
+})
+conf:parse(argv)
 
-if device then
-	osc_out = tjost.plugin({name='osc_out', port='osc_serial_rx', pretty=device..' RX'})
-	serial_io = tjost.plugin({name='serial', device=device}, osc_out)
-	osc_in = tjost.plugin({name='osc_in', port='osc_serial_tx', pretty=device..' TX'}, serial_io)
+if conf.device then
+	osc_out = tjost.plugin({name='osc_out', port='osc_serial_rx', pretty=conf.device..' RX'})
+	serial_io = tjost.plugin({name='serial', device=conf.device}, osc_out)
+	osc_in = tjost.plugin({name='osc_in', port='osc_serial_tx', pretty=conf.device..' TX'}, serial_io)
 else
 	print('FAIL: no device given')
 end

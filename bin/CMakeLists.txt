@@ -1,6 +1,8 @@
 # convenience scripts
-set(scripts "")
 
+install (FILES tjost_cli.lua DESTINATION bin)
+
+set(scripts "")
 set(scripts ${scripts} tjost_midi2osc)
 set(scripts ${scripts} tjost_osc2midi)
 set(scripts ${scripts} tjost_audio2osc)

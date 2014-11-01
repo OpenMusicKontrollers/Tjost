@@ -1,5 +1,3 @@
-#!/usr/bin/env tjost
-
 --[[
 -- Copyright (c) 2014 Hanspeter Portner (dev@open-music-kontrollers.ch)
 -- 
@@ -23,15 +21,39 @@
 --     distribution.
 --]]
 
-cli = require('tjost_cli')
+local __newindex = function(self, k, v)
+	print('CLI parameter <' .. k .. '> does not exist')
+end
 
-conf = cli:new({
-	verbose = 0
-})
-conf:parse(argv)
+local cli = {
+	new = function(self, o)
+		o = o or {}
+		self.__index = self
+		self.__newindex = __newindex
+		setmetatable(o, self)
+		return o
+	end,
 
-osc_out = tjost.plugin({name='osc_out', port='osc_console_out', pretty='OSC Console Output'})
-dump = tjost.plugin({name='dump', verbose=conf.verbose})
+	parse = function(self, argv)
+		local conf = {}
 
-osc_in = tjost.plugin({name='osc_in', port='osc_console_in', pretty='OSC Console Input'}, dump)
-send = tjost.plugin({name='send'}, function(...) osc_out(...) end)
+		if argv then
+			for _, v in ipairs(argv) do
+				local f = loadstring('conf.' .. v)
+				if f then f() end
+			end
+		end
+
+		for k, v in pairs(conf) do
+			self[k] = v
+		end
+
+		str = ''
+		for k, v in pairs(self) do
+			str = str .. k .. '=' .. v .. ' '
+		end
+		print(str)
+	end
+}
+
+return cli

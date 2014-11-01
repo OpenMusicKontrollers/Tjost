@@ -889,6 +889,13 @@ tjost_lua_init(Tjost_Host *host, int argc, const char **argv)
 	lua_concat(L, 2);
 	lua_setfield(L, -2, "cpath");
 	lua_pop(L, 1); // package
+	
+	lua_getglobal(L, "package");
+	lua_getfield(L, -1, "path");
+	lua_pushstring(L, ";/usr/local/bin/?.lua"); //FIXME
+	lua_concat(L, 2);
+	lua_setfield(L, -2, "path");
+	lua_pop(L, 1); // package
 
 	// push command line arguments
 	lua_createtable(L, argc, 0);

@@ -23,14 +23,12 @@
 --     distribution.
 --]]
 
-device = 'virtual'
+cli = require('tjost_cli')
 
-if argv then
-	for _, v in ipairs(argv) do
-		local f = loadstring(v)
-		if f then f() end
-	end
-end
+conf = cli:new({
+	device = 'virtual'
+})
+conf:parse(argv)
 
-midi_out = tjost.plugin({name='seq_out', device=device})
+midi_out = tjost.plugin({name='seq_out', device=conf.device})
 osc_in = tjost.plugin({name='osc_in'}, midi_out)

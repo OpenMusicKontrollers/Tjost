@@ -23,14 +23,12 @@
 --     distribution.
 --]]
 
-verbose=0
+cli = require('tjost_cli')
 
-if argv then
-	for _, v in ipairs(argv) do
-		local f = loadstring(v)
-		if f then f() end
-	end
-end
+conf = cli:new({
+	verbose = 0
+})
+conf:parse(argv)
 
-dump = tjost.plugin({name='dump', verbose=verbose})
+dump = tjost.plugin({name='dump', verbose=conf.verbose})
 osc_in = tjost.plugin({name='osc_in', port='osc_dump', pretty='OSC Dump'}, dump)

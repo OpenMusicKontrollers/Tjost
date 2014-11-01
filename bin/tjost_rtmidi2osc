@@ -23,15 +23,13 @@
 --     distribution.
 --]]
 
-device = 'virtual'
-api = 'alsa'
+cli = require('tjost_cli')
 
-if argv then
-	for _, v in ipairs(argv) do
-		local f = loadstring(v)
-		if f then f() end
-	end
-end
+conf = cli:new({
+	device = 'virtual',
+	api = 0
+})
+conf:parse(argv)
 
 osc_out = tjost.plugin({name='osc_out'})
-midi_in = tjost.plugin({name='rtmidi_in', device=device, api=api}, osc_out)
+midi_in = tjost.plugin({name='rtmidi_in', device=conf.device, api=conf.api}, osc_out)

@@ -23,18 +23,16 @@
 --     distribution.
 --]]
 
-file = nil
+cli = require('tjost_cli')
 
-if argv then
-	for _, v in ipairs(argv) do
-		local f = loadstring(v)
-		if f then f() end
-	end
-end
+conf = cli:new({
+	file = 'dump.osc'
+})
+conf:parse(argv)
 
-if file then
+if conf.file then
 	osc_out = tjost.plugin({name='osc_out', port='osc_read', pretty='OSC Read'})
-	read = tjost.plugin({name='read', path=file}, osc_out)
+	read = tjost.plugin({name='read', path=conf.file}, osc_out)
 else
 	print('FAIL: no file given')
 end

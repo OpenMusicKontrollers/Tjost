@@ -23,24 +23,22 @@
 --     distribution.
 --]]
 
-url = nil
-rtprio = 50
-unroll = 'none'
+cli = require('tjost_cli')
 
-if argv then
-	for _, v in ipairs(argv) do
-		local f = loadstring(v)
-		if f then f() end
-	end
-end
+conf = cli:new({
+	url = 'osc.udp4://:3333',
+	rtprio = 50,
+	unroll = 'none'
+})
+conf:parse(argv)
 
-if url then
-	osc_out = tjost.plugin({name='osc_out', port="osc_net_rx", pretty=url})
-	net_io = tjost.plugin({name='net_in', uri=url, rtprio=rtprio, unroll=unroll}, osc_out)
+if conf.url then
+	osc_out = tjost.plugin({name='osc_out', port="osc_net_rx", pretty=conf.url})
+	net_io = tjost.plugin({name='net_in', uri=conf.url, rtprio=conf.rtprio, unroll=conf.unroll}, osc_out)
 
-	if string.match(url, 'osc.tcp[46]*://') or string.match(url, 'osc.slip.tcp[46]*://') then
+	if string.match(conf.url, 'osc.tcp[46]*://') or string.match(conf.url, 'osc.slip.tcp[46]*://') then
 	osc_in = tjost.plugin({name='osc_in', port='osc_net_tx', pretty='OSC Net TX'}, net_io)
 	end
 else
-	print('FAIL: no uri given')
+	print('FAIL: no url given')
 end
