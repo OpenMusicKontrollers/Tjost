@@ -812,7 +812,17 @@ static int
 _print(lua_State *L)
 {
 	Tjost_Host *host = lua_touserdata(L, lua_upvalueindex(1));
-	tjost_host_message_push(host, "Lua print redirect: %s", lua_tostring(L, 1));
+
+	if(lua_gettop(L) > 0)
+	{
+		while(lua_gettop(L) > 1)
+		{
+			lua_pushstring(L, "\t");
+			lua_insert(L, lua_gettop(L) - 1);
+			lua_concat(L, 3);
+		}
+		tjost_host_message_push(host, "%s", lua_tostring(L, 1));
+	}
 
 	return 0;
 }

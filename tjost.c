@@ -404,16 +404,6 @@ _process(jack_nframes_t nframes, void *arg)
 	return 0;
 }
 
-static int
-_print(lua_State *L)
-{
-	Tjost_Host *host = lua_touserdata(L, lua_upvalueindex(1));
-	tjost_host_message_push(host, "Lua print redirect: %s", lua_tostring(L, 1));
-	//FIXME support multiple arguments
-
-	return 0;
-}
-
 #define FAIL(...) \
 { \
 	fprintf(stderr, "FAIL: "__VA_ARGS__); \
