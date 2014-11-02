@@ -165,6 +165,8 @@ struct _Tjost_Host {
 	lua_State *L;
 
 	uv_signal_t sigint;
+	uv_signal_t sigterm;
+	uv_signal_t sigquit;
 	uv_async_t quit;
 
 	jack_ringbuffer_t *rb_msg;

@@ -487,6 +487,18 @@ _tjost_init(uv_loop_t *loop, Tjost_Host *host, int argc, const char **argv)
 	if((err = uv_signal_start(&host->sigint, _sig, SIGINT)))
 		FAIL("uv error: %s\n", uv_err_name(err));
 
+	host->sigterm.data = host;
+	if((err = uv_signal_init(loop, &host->sigterm)))
+		FAIL("uv error: %s\n", uv_err_name(err));
+	if((err = uv_signal_start(&host->sigterm, _sig, SIGTERM)))
+		FAIL("uv error: %s\n", uv_err_name(err));
+
+	host->sigquit.data = host;
+	if((err = uv_signal_init(loop, &host->sigquit)))
+		FAIL("uv error: %s\n", uv_err_name(err));
+	if((err = uv_signal_start(&host->sigquit, _sig, SIGQUIT)))
+		FAIL("uv error: %s\n", uv_err_name(err));
+
 	host->quit.data = host;
 	if((err = uv_async_init(loop, &host->quit, _quit)))
 		FAIL("uv error: %s\n", uv_err_name(err));
@@ -498,6 +510,19 @@ _tjost_init(uv_loop_t *loop, Tjost_Host *host, int argc, const char **argv)
 	host->rtmem.data = host;
 	if((err = uv_async_init(loop, &host->rtmem, tjost_request_memory)))
 		FAIL("uv error: %s\n", uv_err_name(err));
+
+	char *sep = strrchr(argv[1], '/');
+	if(sep)
+	{
+		char *path = strndup(argv[1], sep - argv[1]); // extract 'path' from 'path/file'
+		char *file = strdup(sep + 1); // extract 'file' from 'path/file'
+
+		uv_chdir(path); // change current working directory to 'path'
+		free(path);
+
+		strcpy((char *)argv[1], file); // overwrite 'path/file' with 'file'
+		free(file);
+	}
 
 	// init Lua
 	if(!(host->L = lua_newstate(_alloc, host)))
@@ -535,6 +560,10 @@ _tjost_deinit(Tjost_Host *host)
 
 	int err;
 	if((err = uv_signal_stop(&host->sigint)))
+		fprintf(stderr, "uv error: %s\n", uv_err_name(err));
+	if((err = uv_signal_stop(&host->sigterm)))
+		fprintf(stderr, "uv error: %s\n", uv_err_name(err));
+	if((err = uv_signal_stop(&host->sigquit)))
 		fprintf(stderr, "uv error: %s\n", uv_err_name(err));
 
 	// drain main queue
