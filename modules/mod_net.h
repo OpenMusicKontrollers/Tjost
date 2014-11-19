@@ -38,10 +38,9 @@ typedef struct _Mod_Net	Mod_Net;
 typedef enum _Unroll_Type {UNROLL_NONE, UNROLL_PARTIAL, UNROLL_FULL} Unroll_Type;
 
 struct _Mod_Net {
-	struct {
-		jack_ringbuffer_t *out;
-		jack_ringbuffer_t *in;
-	} rb;
+	jack_ringbuffer_t *rb_tx;
+	uv_async_t asio;
+	Tjost_Pipe pipe_rx;
 
 	osc_unroll_mode_t unroll;
 	jack_nframes_t tstamp;
@@ -52,7 +51,6 @@ struct _Mod_Net {
 	jack_time_t sync_jack;
 	struct timespec sync_osc;
 	
-	uv_async_t asio;
 	uint32_t delay_sec;
 	uint32_t delay_nsec;
 };

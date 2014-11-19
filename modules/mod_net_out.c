@@ -134,10 +134,10 @@ add(Tjost_Module *module)
 	Data *dat = tjost_alloc(module->host, sizeof(Data));
 	memset(dat, 0, sizeof(Data));
 
-	if(!(dat->net.rb.out = jack_ringbuffer_create(TJOST_RINGBUF_SIZE)))
+	if(!(dat->net.rb_tx = jack_ringbuffer_create(TJOST_RINGBUF_SIZE)))
 		MOD_ADD_ERR(module->host, MOD_NAME, "could not initialize ringbuffer");
-	if(!(dat->net.rb.in = jack_ringbuffer_create(TJOST_RINGBUF_SIZE)))
-		MOD_ADD_ERR(module->host, MOD_NAME, "could not initialize ringbuffer");
+	if(tjost_pipe_init(&dat->net.pipe_rx))
+		MOD_ADD_ERR(module->host, MOD_NAME, "could not initialize pipe_rx");
 
 	int err;
 	if((err = uv_loop_init(&dat->loop)))
@@ -214,10 +214,9 @@ del(Tjost_Module *module)
 
 	uv_loop_close(&dat->loop);
 
-	if(dat->net.rb.out)
-		jack_ringbuffer_free(dat->net.rb.out);
-	if(dat->net.rb.in)
-		jack_ringbuffer_free(dat->net.rb.in);
+	if(dat->net.rb_tx)
+		jack_ringbuffer_free(dat->net.rb_tx);
+	tjost_pipe_deinit(&dat->net.pipe_rx);
 
 	tjost_free(module->host, dat);
 }

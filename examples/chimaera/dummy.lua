@@ -93,8 +93,8 @@ sc1 = scsynth:new({
 
 md1 = midi:new({
 	port = 'midi.1',
-	--effect = SOUND_EFFECT_5
-	effect = VOLUME
+	effect = SOUND_EFFECT_5
+	--effect = VOLUME
 })
 
 dr1 = drum:new({
