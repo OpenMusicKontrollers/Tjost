@@ -34,6 +34,8 @@
 #include <tjost.h>
 #include <mod_net.h>
 
+#define MOD_NAME "net_out"
+
 typedef struct _Data Data;
 
 struct _Data {
@@ -57,7 +59,6 @@ process_in(jack_nframes_t nframes, void *arg)
 	return mod_net_process_in(module, nframes);
 }
 
-// TCP is bidirectional
 int
 process_out(jack_nframes_t nframes, void *arg)
 {
@@ -152,28 +153,14 @@ add(Tjost_Module *module)
 	if((err = uv_timer_start(&dat->net.sync, mod_net_sync, 0, 1000))) // ms
 		MOD_ADD_ERR(module->host, MOD_NAME, uv_err_name(err));
 
-	if(!strncmp(uri, "osc.udp://", 10) || !strncmp(uri, "osc.udp4://", 11) || !strncmp(uri, "osc.udp6://", 11))
-		dat->net.type = SOCKET_UDP;
-	else if(!strncmp(uri, "osc.tcp://", 10) || !strncmp(uri, "osc.tcp4://", 11) || !strncmp(uri, "osc.tcp6://", 11) || !strncmp(uri, "osc.slip.tcp://", 15) || !strncmp(uri, "osc.slip.tcp4://", 16) || !strncmp(uri, "osc.slip.tcp6://", 16))
-		dat->net.type = SOCKET_TCP;
-	else
-		MOD_ADD_ERR(module->host, MOD_NAME, "unknown OSC protocol layer");
+	if(osc_stream_init(&dat->loop, &dat->net.stream, uri, mod_net_recv_cb, mod_net_send_cb, module))
+		MOD_ADD_ERR(module->host, MOD_NAME, "could not initialize socket");
 
 	module->dat = dat;
-
-	switch(dat->net.type)
-	{
-		case SOCKET_UDP:
-			if(netaddr_udp_responder_init(&dat->net.handle.udp_rx, &dat->loop, uri, mod_net_recv_cb, module))
-				MOD_ADD_ERR(module->host, MOD_NAME, "could not initialize socket");
-			module->type = TJOST_MODULE_INPUT;
-			break;
-		case SOCKET_TCP:
-			if(netaddr_tcp_endpoint_init(&dat->net.handle.tcp, NETADDR_TCP_RESPONDER, &dat->loop, uri, mod_net_recv_cb, module))
-				MOD_ADD_ERR(module->host, MOD_NAME, "could not initialize socket");
-			module->type = TJOST_MODULE_IN_OUT;
-			break;
-	}
+	if(dat->net.stream.type == OSC_STREAM_TYPE_UDP)
+		module->type = TJOST_MODULE_INPUT;
+	else
+		module->type = TJOST_MODULE_IN_OUT;
 
 #ifndef _WIN32 // POSIX only
 	dat->schedp.sched_priority = rtprio;
@@ -187,6 +174,8 @@ add(Tjost_Module *module)
 		dat->net.unroll = OSC_UNROLL_MODE_PARTIAL;
 	else if(!strcmp(unroll, "full"))
 		dat->net.unroll = OSC_UNROLL_MODE_FULL;
+	else
+		; //TODO warn
 
 	if((err = uv_thread_create(&dat->thread, _thread, dat)))
 		MOD_ADD_ERR(module->host, MOD_NAME, uv_err_name(err));
@@ -205,15 +194,7 @@ del(Tjost_Module *module)
 	if((err = uv_thread_join(&dat->thread)))
 		fprintf(stderr, MOD_NAME": %s\n", uv_err_name(err));
 
-	switch(dat->net.type)
-	{
-		case SOCKET_UDP:
-			netaddr_udp_responder_deinit(&dat->net.handle.udp_rx);
-			break;
-		case SOCKET_TCP:
-			netaddr_tcp_endpoint_deinit(&dat->net.handle.tcp);
-			break;
-	}
+	osc_stream_deinit(&dat->net.stream);
 
 	if((err = uv_timer_stop(&dat->net.sync)))
 		fprintf(stderr, MOD_NAME": %s\n", uv_err_name(err));

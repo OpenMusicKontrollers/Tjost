@@ -7,3 +7,6 @@
 [submodule "libosc"]
 	path = libosc
 	url = https://github.com/OpenMusicKontrollers/libosc.git
+[submodule "libosc_stream"]
+	path = libosc_stream
+	url = https://github.com/OpenMusicKontrollers/libosc_stream.git

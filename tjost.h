@@ -78,6 +78,7 @@ typedef int (*Tjost_Pipe_Sched_Cb)(Tjost_Event *tev, osc_data_t *buf, void *arg)
 
 #define TJOST_MODULE_BROADCAST NULL
 #define TJOST_BUF_SIZE (0x4000)
+#define OSC_STREAM_BUF(TJOST_BUF_SIZ)
 #define TJOST_RINGBUF_SIZE (0x10000)
 
 #define MOD_ADD_ERR(HOST, NAME, MSG) \

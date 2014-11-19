@@ -21,6 +21,16 @@
  *     distribution.
  */
 
+#include <sched.h>
+
+#define MOD_NAME "net_in"
+
+#ifndef _WIN32 // POSIX only
+#	include <pthread.h>
+#else
+#	include <windows.h>
+#endif
+
 #include <tjost.h>
 #include <mod_net.h>
 
@@ -42,7 +52,6 @@ struct _Data {
 #endif
 };
 
-// TCP is bidirectional
 int
 process_in(jack_nframes_t nframes, void *arg)
 {
@@ -130,7 +139,7 @@ add(Tjost_Module *module)
 		MOD_ADD_ERR(module->host, MOD_NAME, "could not initialize ringbuffer");
 	if(!(dat->net.rb.in = jack_ringbuffer_create(TJOST_RINGBUF_SIZE)))
 		MOD_ADD_ERR(module->host, MOD_NAME, "could not initialize ringbuffer");
-	
+
 	int err;
 	if((err = uv_loop_init(&dat->loop)))
 		MOD_ADD_ERR(module->host, MOD_NAME, "uv_loop_init failed");
@@ -148,28 +157,11 @@ add(Tjost_Module *module)
 	if((err = uv_timer_start(&dat->net.sync, mod_net_sync, 0, 1000))) // ms
 		MOD_ADD_ERR(module->host, MOD_NAME, uv_err_name(err));
 
-	if(!strncmp(uri, "osc.udp://", 10) || !strncmp(uri, "osc.udp4://", 11) || !strncmp(uri, "osc.udp6://", 11))
-		dat->net.type = SOCKET_UDP;
-	else if(!strncmp(uri, "osc.tcp://", 10) || !strncmp(uri, "osc.tcp4://", 11) || !strncmp(uri, "osc.tcp6://", 11) || !strncmp(uri, "osc.slip.tcp://", 15) || !strncmp(uri, "osc.slip.tcp4://", 16) || !strncmp(uri, "osc.slip.tcp6://", 16))
-		dat->net.type = SOCKET_TCP;
-	else
-		MOD_ADD_ERR(module->host, MOD_NAME, "unknown OSC protocol layer");
+	if(osc_stream_init(&dat->loop, &dat->net.stream, uri, mod_net_recv_cb, mod_net_send_cb, module))
+		MOD_ADD_ERR(module->host, MOD_NAME, "could not initialize socket");
 
 	module->dat = dat;
-
-	switch(dat->net.type)
-	{
-		case SOCKET_UDP:
-			if(netaddr_udp_sender_init(&dat->net.handle.udp_tx, &dat->loop, uri, mod_net_recv_cb, module)) //TODO close?
-				MOD_ADD_ERR(module->host, MOD_NAME, "could not initialize socket");
-			module->type = TJOST_MODULE_IN_OUT;
-			break;
-		case SOCKET_TCP:
-			if(netaddr_tcp_endpoint_init(&dat->net.handle.tcp, NETADDR_TCP_SENDER, &dat->loop, uri, mod_net_recv_cb, module)) //TODO close?
-				MOD_ADD_ERR(module->host, MOD_NAME, "could not initialize socket");
-			module->type = TJOST_MODULE_IN_OUT;
-			break;
-	}
+	module->type = TJOST_MODULE_IN_OUT;
 
 #ifndef _WIN32 // POSIX only
 	dat->schedp.sched_priority = rtprio;
@@ -183,6 +175,8 @@ add(Tjost_Module *module)
 		dat->net.unroll = OSC_UNROLL_MODE_PARTIAL;
 	else if(!strcmp(unroll, "full"))
 		dat->net.unroll = OSC_UNROLL_MODE_FULL;
+	else
+		; //TODO warn
 
 	if(offset > 0.f)
 	{
@@ -212,15 +206,7 @@ del(Tjost_Module *module)
 	if((err = uv_thread_join(&dat->thread)))
 		fprintf(stderr, MOD_NAME": %s\n", uv_err_name(err));
 
-	switch(dat->net.type)
-	{
-		case SOCKET_UDP:
-			netaddr_udp_sender_deinit(&dat->net.handle.udp_tx);
-			break;
-		case SOCKET_TCP:
-			netaddr_tcp_endpoint_deinit(&dat->net.handle.tcp);
-			break;
-	}
+	osc_stream_deinit(&dat->net.stream);
 
 	if((err = uv_timer_stop(&dat->net.sync)))
 		fprintf(stderr, MOD_NAME": %s\n", uv_err_name(err));
@@ -228,7 +214,7 @@ del(Tjost_Module *module)
 	uv_close((uv_handle_t *)&dat->net.asio, NULL);
 
 	uv_loop_close(&dat->loop);
-	
+
 	if(dat->net.rb.out)
 		jack_ringbuffer_free(dat->net.rb.out);
 	if(dat->net.rb.in)

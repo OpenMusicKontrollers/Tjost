@@ -21,11 +21,11 @@
  *     distribution.
  */
 
-#include <assert.h>
-
 #include <mod_net.h>
 
 #define MOD_NAME "net"
+
+static const char *resolve_msg = "/resolve\0\0\0\0,\0\0\0";
 
 void
 mod_net_sync(uv_timer_t *handle)
@@ -47,7 +47,7 @@ _inject_stamp(uint64_t tstamp, void *dat)
 
 	double diff; // time difference of OSC timestamp to current wall clock time (s)
 
-	if(tstamp == 1ULL)
+	if(tstamp == OSC_IMMEDIATE)
 	{
 		net->tstamp = 0; // immediate execution
 		return;
@@ -75,25 +75,20 @@ _inject_message(osc_data_t *buf, size_t len, void *dat)
 
 	jack_nframes_t tstamp = net->tstamp;
 
-	if(osc_check_message(buf, len))
-	{
-		Tjost_Event tev;
-		tev.module = module;
-		tev.time = tstamp;
-		tev.size = len;
+	Tjost_Event tev;
+	tev.module = module;
+	tev.time = tstamp;
+	tev.size = len;
 
-		if(jack_ringbuffer_write_space(net->rb.in) < sizeof(Tjost_Event) + len)
-			fprintf(stderr, MOD_NAME": ringbuffer overflow\n");
-		else
-		{
-			if(jack_ringbuffer_write(net->rb.in, (const char *)&tev, sizeof(Tjost_Event)) != sizeof(Tjost_Event))
-				fprintf(stderr, MOD_NAME": ringbuffer write 1 error\n");
-			if(jack_ringbuffer_write(net->rb.in, (const char *)buf, len) != len)
-				fprintf(stderr, MOD_NAME": ringbuffer write 2 error\n");
-		}
-	}
+	if(jack_ringbuffer_write_space(net->rb.in) < sizeof(Tjost_Event) + len)
+		fprintf(stderr, MOD_NAME": ringbuffer overflow\n");
 	else
-		fprintf(stderr, MOD_NAME": rx OSC message invalid\n");
+	{
+		if(jack_ringbuffer_write(net->rb.in, (const char *)&tev, sizeof(Tjost_Event)) != sizeof(Tjost_Event))
+			fprintf(stderr, MOD_NAME": ringbuffer write 1 error\n");
+		if(jack_ringbuffer_write(net->rb.in, (const char *)buf, len) != len)
+			fprintf(stderr, MOD_NAME": ringbuffer write 2 error\n");
+	}
 }
 
 // inject whole bundle as-is
@@ -103,29 +98,24 @@ _inject_bundle(osc_data_t *buf, size_t len, void *dat)
 	Tjost_Module *module = dat;
 	Mod_Net *net = module->dat;
 	
-	if(osc_check_bundle(buf, len))
-	{
-		uint64_t timetag = be64toh(*(uint64_t *)(buf + 8));
-		_inject_stamp(timetag, dat);
-		jack_nframes_t tstamp = net->tstamp;
+	uint64_t timetag = be64toh(*(uint64_t *)(buf + 8));
+	_inject_stamp(timetag, dat);
+	jack_nframes_t tstamp = net->tstamp;
 
-		Tjost_Event tev;
-		tev.module = module;
-		tev.time = tstamp;
-		tev.size = len;
+	Tjost_Event tev;
+	tev.module = module;
+	tev.time = tstamp;
+	tev.size = len;
 
-		if(jack_ringbuffer_write_space(net->rb.in) < sizeof(Tjost_Event) + len)
-			fprintf(stderr, MOD_NAME": ringbuffer overflow\n");
-		else
-		{
-			if(jack_ringbuffer_write(net->rb.in, (const char *)&tev, sizeof(Tjost_Event)) != sizeof(Tjost_Event))
-				fprintf(stderr, MOD_NAME": ringbuffer write 1 error\n");
-			if(jack_ringbuffer_write(net->rb.in, (const char *)buf, len) != len)
-				fprintf(stderr, MOD_NAME": ringbuffer write 2 error\n");
-		}
-	}
+	if(jack_ringbuffer_write_space(net->rb.in) < sizeof(Tjost_Event) + len)
+		fprintf(stderr, MOD_NAME": ringbuffer overflow\n");
 	else
-		fprintf(stderr, MOD_NAME": rx OSC bundle invalid\n");
+	{
+		if(jack_ringbuffer_write(net->rb.in, (const char *)&tev, sizeof(Tjost_Event)) != sizeof(Tjost_Event))
+			fprintf(stderr, MOD_NAME": ringbuffer write 1 error\n");
+		if(jack_ringbuffer_write(net->rb.in, (const char *)buf, len) != len)
+			fprintf(stderr, MOD_NAME": ringbuffer write 2 error\n");
+	}
 }
 
 static osc_unroll_inject_t inject = {
@@ -135,21 +125,21 @@ static osc_unroll_inject_t inject = {
 };
 
 void
-mod_net_recv_cb(osc_data_t *buf, size_t len, void *data)
+mod_net_recv_cb(osc_stream_t *stream, osc_data_t *buf, size_t len, void *data)
 {
 	Tjost_Module *module = data;
 	Mod_Net *net = module->dat;
 
 	if(!osc_unroll_packet(buf, len, net->unroll, &inject, data))
-		fprintf(stderr, MOD_NAME": not an OSC packet\n");
+		fprintf(stderr, MOD_NAME": OSC packet not valid\n");
 }
 
 static void _next(Tjost_Module *module);
 
-static void
-_advance(size_t len, void *arg)
+void
+mod_net_send_cb(osc_stream_t *stream, size_t len, void *data)
 {
-	Tjost_Module *module = arg;
+	Tjost_Module *module = data;
 	Mod_Net *net = module->dat;
 
 	jack_ringbuffer_read_advance(net->rb.out, len);
@@ -200,108 +190,57 @@ _next(Tjost_Module *module)
 			{
 				case '#':
 				{
-					static int32_t psize;
-					psize = size;
-					psize = be32toh(psize);
-
-					uv_buf_t msg [3];
-					msg[0].base = (char *)&psize;
-					msg[0].len = sizeof(int32_t);
-
+					uv_buf_t msg [2];
 					jack_ringbuffer_data_t vec [2];
 					jack_ringbuffer_get_read_vector(net->rb.out, vec);
 
 					if(size <= vec[0].len)
 					{
 						//FIXME rewrite bundle timestamp
-						msg[1].base = vec[0].buf;
-						msg[1].len = size;
-						
-						assert((uintptr_t)msg[1].base % sizeof(uint32_t) == 0);
-
-						msg[2].len = 0;
+						msg[0].base = vec[0].buf;
+						msg[0].len = size;
+					
+						msg[1].base = NULL;
+						msg[1].len = 0;
 					}
 					else // size > vec[0].len;
 					{
-						msg[1].base = vec[0].buf;
-						msg[1].len = vec[0].len;
+						msg[0].base = vec[0].buf;
+						msg[0].len = vec[0].len;
 
-						assert((uintptr_t)msg[1].base % sizeof(uint32_t) == 0);
-
-						assert(size - vec[0].len <= vec[1].len);
-						msg[2].base = vec[1].buf;
-						msg[2].len = size - vec[0].len;
-						
-						assert((uintptr_t)msg[2].base % sizeof(uint32_t) == 0);
+						msg[1].base = vec[1].buf;
+						msg[1].len = size - vec[0].len;
 					}
 
-					switch(net->type)
-					{
-						case SOCKET_UDP:
-							netaddr_udp_sender_send(&net->handle.udp_tx, &msg[1], msg[2].len > 0 ? 2 : 1, size, _advance, module);
-							break;
-						case SOCKET_TCP:
-							netaddr_tcp_endpoint_send(&net->handle.tcp, &msg[0], msg[2].len > 0 ? 3 : 2, size, _advance, module);
-							break;
-					}
+					osc_stream_send2(&net->stream, msg, msg[1].len > 0 ? 2 : 1);
+
 					break;
 				}
 				case '/':
 				{
-					uint32_t nsize = htobe32(size);
-
-					static uint8_t header [20];
-					memcpy(header, bundle_str, 8);
-					memcpy(header+8, &sec, 4);
-					memcpy(header+12, &frac, 4);
-					memcpy(header+16, &nsize, 4);
-				
-					static int32_t psize;
-					psize = size + sizeof(header); // packet size for TCP preamble
-					psize = htobe32(psize);
-
-					uv_buf_t msg [4];
-					msg[0].base = (char *)&psize;
-					msg[0].len = sizeof(int32_t);
-
-					msg[1].base = (char *)header;
-					msg[1].len = sizeof(header);
-
+					uv_buf_t msg [2];
 					jack_ringbuffer_data_t vec [2];
 					jack_ringbuffer_get_read_vector(net->rb.out, vec);
 
 					if(size <= vec[0].len)
 					{
-						msg[2].base = vec[0].buf;
-						msg[2].len = size;
-					
-						assert((uintptr_t)msg[2].base % sizeof(uint32_t) == 0);
-
-						msg[3].len = 0;
+						msg[0].base = vec[0].buf;
+						msg[0].len = size;
+				
+						msg[1].base = NULL;
+						msg[1].len = 0;
 					}
 					else // size > vec[0].len
 					{
-						msg[2].base = vec[0].buf;
-						msg[2].len = vec[0].len;
+						msg[0].base = vec[0].buf;
+						msg[0].len = vec[0].len;
 						
-						assert((uintptr_t)msg[2].base % sizeof(uint32_t) == 0);
-
-						assert(size - vec[0].len <= vec[1].len);
-						msg[3].base = vec[1].buf;
-						msg[3].len = size - vec[0].len;
-						
-						assert((uintptr_t)msg[3].base % sizeof(uint32_t) == 0);
+						msg[1].base = vec[1].buf;
+						msg[1].len = size - vec[0].len;
 					}
 
-					switch(net->type)
-					{
-						case SOCKET_UDP:
-							netaddr_udp_sender_send(&net->handle.udp_tx, &msg[1], msg[3].len > 0 ? 3 : 2, size, _advance, module);
-							break;
-						case SOCKET_TCP:
-							netaddr_tcp_endpoint_send(&net->handle.tcp, &msg[0], msg[3].len > 0 ? 4 : 3, size, _advance, module);
-							break;
-					}
+					osc_stream_send2(&net->stream, msg, msg[1].len > 0 ? 2 : 1);
+
 					break;
 				}
 				default:
@@ -316,6 +255,7 @@ mod_net_asio(uv_async_t *handle)
 {
 	Tjost_Module *module = handle->data;
 
+	// start sending loop
 	_next(module);
 }
 

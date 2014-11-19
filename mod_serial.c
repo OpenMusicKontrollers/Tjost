@@ -25,6 +25,8 @@
 
 #include <tjost.h>
 
+#include <osc_stream.h>
+
 #define MOD_NAME "serial"
 
 #define SLICE (double)0x0.00000001p0 // smallest NTP time slice
@@ -38,21 +40,14 @@ struct _Data {
 	osc_unroll_mode_t unroll;
 	jack_nframes_t tstamp;
 
-	uv_pipe_t serial_in;
-	uv_pipe_t serial_out;
+	osc_stream_t stream;
+
 	uv_async_t asio;
 	
 	jack_time_t sync_jack;
 	struct timespec sync_osc;
 
-	struct {
-		uv_write_t req;
-	} send;
-
-	struct {
-		osc_data_t buf [TJOST_BUF_SIZE];
-		size_t nchunk;
-	} recv;
+	osc_data_t buf [TJOST_BUF_SIZE];
 };
 
 static void
@@ -140,63 +135,15 @@ static osc_unroll_inject_t inject = {
 	.bundle = _inject_bundle
 };
 
-static void
-_serial_recv_cb(Tjost_Module *module, osc_data_t * buf, size_t size)
+static
+void
+_recv_cb(osc_stream_t *stream, osc_data_t *buf, size_t size, void *data)
 {
+	Tjost_Module *module = data;
 	Data *dat = module->dat;
 
 	if(!osc_unroll_packet(buf, size, dat->unroll, &inject, module))
 		fprintf(stderr, MOD_NAME": OSC packet unroll failed\n");
-}
-
-static void
-_serial_slip_alloc(uv_handle_t *handle, size_t suggested_size, uv_buf_t *buf)
-{
-	Tjost_Module *module = handle->data;
-	Data *dat = module->dat;
-
-	buf->base = (char *)dat->recv.buf;
-	buf->base += dat->recv.nchunk; // is there remaining chunk from last call?
-	buf->len = TJOST_BUF_SIZE - dat->recv.nchunk;
-}
-
-static void
-_serial_slip_recv_cb(uv_stream_t *stream, ssize_t nread, const uv_buf_t *buf)
-{
-	Tjost_Module *module = stream->data;
-	Data *dat = module->dat;
-
-	if(nread > 0)
-	{
-		uint8_t *ptr = dat->recv.buf;
-		nread += dat->recv.nchunk; // is there remaining chunk from last call?
-		size_t size;
-		size_t parsed;
-		while( (nread > 0) && (parsed = slip_decode(ptr, nread, &size)) )
-		{
-			if(size > 0)
-				_serial_recv_cb(module, (osc_data_t *)ptr, size);
-			ptr += parsed;
-			nread -= parsed;
-		}
-		if(nread > 0) // is there remaining chunk for next call?
-		{
-			memmove(dat->recv.buf, ptr, nread);
-			dat->recv.nchunk = nread;
-		}
-		else
-			dat->recv.nchunk = 0;
-	}
-	else if (nread < 0)
-	{
-		int err;
-		if((err = uv_read_stop(stream)))
-			fprintf(stderr, "uv_read_stop: %s\n", uv_err_name(err));
-		uv_close((uv_handle_t *)stream, NULL);
-		fprintf(stderr, "_serial_slip_recv_cb: %s\n", uv_err_name(nread));
-	}
-	else // nread == 0
-		;
 }
 
 int
@@ -228,41 +175,10 @@ process_in(jack_nframes_t nframes, void *arg)
 }
 
 static void
-_serial_send_cb(uv_write_t *req, int status)
+_send_cb(osc_stream_t *stream, size_t len, void *data)
 {
-	uv_stream_t *stream = req->handle;
-	Tjost_Module *module = stream->data;
+	Tjost_Module *module = data;
 	Data *dat = module->dat;
-
-	if(!status)
-		; //FIXME dat->send.cb(dat->send.len, dat->send.dat);
-	else
-		fprintf(stderr, "_tcp_send_cb: %s\n", uv_err_name(status));
-}
-
-void
-_serial_send(Tjost_Module *module, uv_buf_t *bufs, int nbufs, size_t len)
-{
-	Data *dat = module->dat;
-
-	{
-		static uint8_t bb [TJOST_BUF_SIZE];
-		static uv_buf_t bufa;
-		bufa.base = (char *)bb;
-		bufa.len = slip_encode(bb, &bufs[0], nbufs); // discard prefix size (int32_t)
-
-		bufs = &bufa;
-		nbufs = 1;
-	}
-
-	int err;
-	{
-		uv_pipe_t *stream = &dat->serial_out;
-		uv_write_t *req = &dat->send.req;
-
-		if((err =	uv_write(req, (uv_stream_t *)stream, bufs, nbufs, _serial_send_cb)))
-			fprintf(stderr, "uv_write: %s", uv_err_name(err));
-	}
 }
 
 static void
@@ -287,16 +203,11 @@ _asio(uv_async_t *handle)
 				buffer = (osc_data_t *)vec[0].buf;
 			else
 			{
-				buffer = dat->recv.buf;
+				buffer = dat->buf;
 				jack_ringbuffer_read(dat->rb_out, (char *)buffer, tev.size);
 			}
 
-			uv_buf_t bufs = {
-				.base = (char *)buffer,
-				.len = tev.size
-			};
-
-			_serial_send(module, &bufs, 1, bufs.len);
+			osc_stream_send(&dat->stream, buffer, tev.size);
 
 			if(vec[0].len >= tev.size)
 				jack_ringbuffer_read_advance(dat->rb_out, tev.size);
@@ -363,8 +274,8 @@ add(Tjost_Module *module)
 	Data *dat = tjost_alloc(module->host, sizeof(Data));
 	memset(dat, 0, sizeof(Data));
 
-	lua_getfield(L, 1, "device");
-	const char *device = luaL_optstring(L, -1, NULL);
+	lua_getfield(L, 1, "uri");
+	const char *uri = luaL_optstring(L, -1, NULL);
 	lua_pop(L, 1);
 
 	lua_getfield(L, 1, "unroll");
@@ -378,23 +289,8 @@ add(Tjost_Module *module)
 	
 	uv_loop_t *loop = uv_default_loop();
 
-	int fd_in = open(device, O_RDONLY | O_NOCTTY | O_NONBLOCK, 0);
-	int fd_out = open(device, O_WRONLY | O_NOCTTY | O_NONBLOCK, 0);
-
-	dat->serial_in.data = module;
-	dat->serial_out.data = module;
-	int err;
-	if((err = uv_pipe_init(loop, &dat->serial_in, 0)))
-		MOD_ADD_ERR(module->host, MOD_NAME, uv_err_name(err));
-	if((err = uv_pipe_init(loop, &dat->serial_out, 0)))
-		MOD_ADD_ERR(module->host, MOD_NAME, uv_err_name(err));
-	if((err = uv_pipe_open(&dat->serial_in, fd_in)))
-		MOD_ADD_ERR(module->host, MOD_NAME, uv_err_name(err));
-	if((err = uv_pipe_open(&dat->serial_out, fd_out)))
-		MOD_ADD_ERR(module->host, MOD_NAME, uv_err_name(err));
-	dat->recv.nchunk = 0;
-	if((err = uv_read_start((uv_stream_t *)&dat->serial_in, _serial_slip_alloc, _serial_slip_recv_cb)))
-		MOD_ADD_ERR(module->host, MOD_NAME, uv_err_name(err));
+	if(osc_stream_init(loop, &dat->stream, uri, _recv_cb, _send_cb, module))
+		MOD_ADD_ERR(module->host, MOD_NAME, "could not initialize pipe");
 
 	if(!strcmp(unroll, "none"))
 		dat->unroll = OSC_UNROLL_MODE_NONE;
@@ -403,6 +299,7 @@ add(Tjost_Module *module)
 	else if(!strcmp(unroll, "full"))
 		dat->unroll = OSC_UNROLL_MODE_FULL;
 
+	int err;
 	dat->asio.data = module;
 	if((err = uv_async_init(loop, &dat->asio, _asio)))
 		MOD_ADD_ERR(module->host, MOD_NAME, uv_err_name(err));
@@ -419,9 +316,7 @@ del(Tjost_Module *module)
 	Data *dat = module->dat;
 
 	uv_close((uv_handle_t *)&dat->asio, NULL);
-	uv_read_stop((uv_stream_t *)&dat->serial_in);
-	uv_close((uv_handle_t *)&dat->serial_in, NULL);
-	uv_close((uv_handle_t *)&dat->serial_out, NULL);
+	osc_stream_deinit(&dat->stream);
 
 	if(dat->rb_in)
 		jack_ringbuffer_free(dat->rb_in);

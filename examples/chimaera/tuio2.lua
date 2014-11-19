@@ -24,9 +24,13 @@
 --]]
 
 message = tjost.plugin({name='dump'})
-status = tjost.plugin({name='osc_out', port='status'})
-data = tjost.plugin({name='osc_out', port='data'})
-chim = tjost.plugin({name='net_out', uri='osc.udp://chimaera.local:4444'})
+--data = tjost.plugin({name='osc_out', port='data'})
+chim = tjost.plugin({name='net_out', uri='osc.udp://chimaera.local:4444'}, function(time, path, fmt, ...)
+	if path == '/stream/resolve' then
+		local hostname = tjost.hostname()
+		chim(0, '/comm/address', 'is', id(), hostname..'.local')
+	end
+end)
 
 id = require('id')
 tuio2 = require('tuio2_fltr')
@@ -37,8 +41,8 @@ map = require('map')
 
 rate = 3000
 
-control = tjost.plugin({name='osc_in', port='control'}, function(time, path, fmt, ...)
-	chim(time, path, fmt, ...)
+control = tjost.plugin({name='send'}, function(...)
+	chim(...)
 end)
 
 success = function(time, uuid, path, ...)
@@ -83,8 +87,6 @@ conf = tjost.plugin({name='net_in', uri='osc.udp://:4444', rtprio=50, unroll='fu
 end)
 tjost.chain(conf, message)
 
-debug = tjost.plugin({name='net_in', uri='osc.udp://:6666', rtprio=50, unroll='full'}, status)
-
 sc1 = scsynth:new({
 	port = 'scsynth.1',
 	inst = {'base', 'lead'}
@@ -92,8 +94,8 @@ sc1 = scsynth:new({
 
 md1 = midi:new({
 	port = 'midi.1',
-	--effect = SOUND_EFFECT_5
-	effect = VOLUME
+	effect = SOUND_EFFECT_5
+	--effect = VOLUME
 })
 
 dr1 = drum:new({
@@ -107,7 +109,4 @@ tu1 = tuio2:new({}, function(...)
 end)
 
 stream = tjost.plugin({name='net_in', uri='osc.udp://:3333', rtprio=60, unroll='full'}, tu1)
-tjost.chain(stream, data)
-
-hostname = tjost.hostname()
-chim(0, '/comm/address', 'is', id(), hostname..'.local')
+--tjost.chain(stream, data)

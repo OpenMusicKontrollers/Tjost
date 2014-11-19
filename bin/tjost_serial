@@ -26,14 +26,14 @@
 cli = require('tjost_cli')
 
 conf = cli:new({
-	device = '/dev/ttyACM0'
+	url = 'osc.pipe:///dev/ttyACM0'
 })
 conf:parse(argv)
 
-if conf.device then
-	osc_out = tjost.plugin({name='osc_out', port='osc_serial_rx', pretty=conf.device..' RX'})
-	serial_io = tjost.plugin({name='serial', device=conf.device}, osc_out)
-	osc_in = tjost.plugin({name='osc_in', port='osc_serial_tx', pretty=conf.device..' TX'}, serial_io)
+if conf.url then
+	osc_out = tjost.plugin({name='osc_out', port='osc_serial_rx', pretty=conf.url..' RX'})
+	serial_io = tjost.plugin({name='serial', uri=conf.url}, osc_out)
+	osc_in = tjost.plugin({name='osc_in', port='osc_serial_tx', pretty=conf.url..' TX'}, serial_io)
 else
-	print('FAIL: no device given')
+	print('FAIL: no url given')
 end

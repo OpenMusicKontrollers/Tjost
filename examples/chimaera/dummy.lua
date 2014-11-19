@@ -25,7 +25,12 @@
 
 message = tjost.plugin({name='dump'})
 --data = tjost.plugin({name='osc_out', port='data'})
-chim = tjost.plugin({name='net_out', uri='osc.udp://chimaera.local:4444'})
+chim = tjost.plugin({name='net_out', uri='osc.udp://chimaera.local:4444'}, function(time, path, fmt, ...)
+	if path == '/stream/resolve' then
+		local hostname = tjost.hostname()
+		chim(0, '/comm/address', 'is', id(), hostname..'.local')
+	end
+end)
 
 id = require('id')
 scsynth = require('scsynth_out')
@@ -102,6 +107,3 @@ stream = tjost.plugin({name='net_in', uri='osc.tcp://:3333', rtprio=60, unroll='
 	dr1(...)
 end)
 --tjost.chain(stream, data)
-
-hostname = tjost.hostname()
-chim(0, '/comm/address', 'is', id(), hostname..'.local')

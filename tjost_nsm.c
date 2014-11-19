@@ -24,14 +24,17 @@
 #include <unistd.h>
 
 #include <tjost.h>
-#include <netaddr.h>
+
+
+#include <osc_stream.h>
 
 typedef struct _Tjost_NSM Tjost_NSM;
 
 struct _Tjost_NSM {
 	char *NSM_URL;
 	char *id;
-	NetAddr_UDP_Sender netaddr;
+	char *call;
+	osc_stream_t responder;
 	osc_data_t buf [TJOST_BUF_SIZE];
 };
 
@@ -39,7 +42,7 @@ static Tjost_NSM _nsm;
 static Tjost_NSM *nsm = &_nsm;
 
 static void
-_nsm_send_cb(size_t len, void *arg)
+_nsm_send_cb(osc_stream_t *responder, size_t len, void *arg)
 {
 	Tjost_NSM *nsm = arg;
 
@@ -102,13 +105,7 @@ _nsm_client_open(osc_time_t time, const char *path, const char *fmt, osc_data_t 
 
 	osc_data_t *ptr = osc_set_vararg(nsm->buf, nsm->buf+TJOST_BUF_SIZE, "/reply", "ss", "/nsm/client/open", "opened");
 	size_t len = ptr - nsm->buf;
-
-	uv_buf_t msg = {
-		.base = (char *)nsm->buf,
-		.len = len
-	};
-
-	netaddr_udp_sender_send(&nsm->netaddr, &msg, 1, len, _nsm_send_cb, nsm);
+	osc_stream_send(&nsm->responder, nsm->buf, len);
 
 	return 1;
 }
@@ -122,18 +119,29 @@ _nsm_client_save(osc_time_t time, const char *path, const char *fmt, osc_data_t 
 
 	osc_data_t *ptr = osc_set_vararg(nsm->buf, nsm->buf+TJOST_BUF_SIZE, "/reply", "ss", "/nsm/client/save", "saved");
 	size_t len = ptr - nsm->buf;
-
-	uv_buf_t msg = {
-		.base = (char *)nsm->buf,
-		.len = len
-	};
-
-	netaddr_udp_sender_send(&nsm->netaddr, &msg, 1, len, _nsm_send_cb, nsm);
+	osc_stream_send(&nsm->responder, nsm->buf, len);
 
 	return 1;
 }
 
-static osc_method_t methods [] = {
+static int
+_nsm_resolve(osc_time_t time, const char *path, const char *fmt, osc_data_t *buf, size_t size, void *dat)
+{
+	Tjost_NSM *nsm = dat;
+
+	// send announce message
+	pid_t pid = getpid();
+	osc_data_t *ptr = osc_set_vararg(nsm->buf, nsm->buf + TJOST_BUF_SIZE, "/nsm/server/announce", "sssiii", nsm->call, ":message:", nsm->call, 1, 2, pid);
+	size_t len = ptr - nsm->buf;
+	
+	osc_stream_send(&nsm->responder, nsm->buf, len);
+
+	return 1;
+}
+
+static osc_method_t nsm_methods [] = {
+	{"/net/resolve", "", _nsm_resolve},
+
 	{"/reply", NULL, _nsm_reply},
 	{"/error", "sis", _nsm_error},
 	
@@ -144,9 +152,10 @@ static osc_method_t methods [] = {
 };
 
 static void
-_nsm_recv_cb(osc_data_t *buf, size_t len, void *data)
+_nsm_recv_cb(osc_stream_t *responder, osc_data_t *buf, size_t len, void *data)
 {
-	osc_dispatch_method(0, buf, len, methods, NULL, NULL, data);
+	if(osc_check_packet(buf, len))
+		osc_dispatch_method(0, buf, len, nsm_methods, NULL, NULL, data);
 }
 
 const char *
@@ -154,13 +163,13 @@ tjost_nsm_init(int argc, const char **argv)
 {
 	const char *call = strrchr(argv[1], '/');
 	if(call)
-		call = call+1; // skip '/'
+		nsm->call = strdup(call+1); // skip '/'
 	else
-		call = argv[1];
+		nsm->call = strdup(argv[1]);
 
 	nsm->NSM_URL = getenv("NSM_URL");
 	if(!nsm->NSM_URL)
-		return call;
+		return nsm->call;
 
 	uv_loop_t *loop = uv_default_loop();
 
@@ -168,20 +177,8 @@ tjost_nsm_init(int argc, const char **argv)
 	if(nsm->NSM_URL[url_len-1] == '/')
 		nsm->NSM_URL[url_len-1] = '\0';
 	
-	if(netaddr_udp_sender_init(&nsm->netaddr, loop, nsm->NSM_URL, _nsm_recv_cb, nsm))
-		fprintf(stderr, "tjost_nsm: could not create UDP Sender");
-
-	// send announce message
-	pid_t pid = getpid();
-	osc_data_t *ptr = osc_set_vararg(nsm->buf, nsm->buf + TJOST_BUF_SIZE, "/nsm/server/announce", "sssiii", call, ":message:", call, 1, 2, pid);
-	size_t len = ptr - nsm->buf;
-
-	uv_buf_t msg = {
-		.base = (char *)nsm->buf,
-		.len = len
-	};
-
-	netaddr_udp_sender_send(&nsm->netaddr, &msg, 1, len, _nsm_send_cb, nsm);
+	if(osc_stream_init(loop, &nsm->responder, nsm->NSM_URL, _nsm_recv_cb, _nsm_send_cb, nsm))
+		fprintf(stderr, "tjost_nsm: could not create UDP Responder");
 
 	// wait for load signal FIXME add timeout
 	while(!nsm->id)
@@ -199,5 +196,8 @@ tjost_nsm_deinit()
 	if(nsm->id)
 		free(nsm->id);
 
-	netaddr_udp_sender_deinit(&nsm->netaddr);
+	if(nsm->call)
+		free(nsm->call);
+
+	osc_stream_deinit(&nsm->responder);
 }
