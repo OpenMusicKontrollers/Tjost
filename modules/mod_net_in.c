@@ -32,9 +32,8 @@
 #endif
 
 #include <tjost.h>
-#include <mod_net.h>
 
-#define MOD_NAME "net_out"
+#include <mod_net.h>
 
 typedef struct _Data Data;
 
