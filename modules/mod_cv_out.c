@@ -32,28 +32,28 @@
 typedef struct _Data Data;
 
 struct _Data {
-	Tjost_Module *module;
-	void *port_buf;
+	jack_port_t *port;
+	jack_default_audio_sample_t *port_buf;
+	jack_nframes_t time;
+	jack_default_audio_sample_t value;
 };
 
 static int
-_cv(osc_time_t time, const char *path, const char *fmt, osc_data_t *buf, size_t size, void *dat)
+_cv(osc_time_t time, const char *path, const char *fmt, osc_data_t *buf, size_t size, void *data)
 {
-	Data *data = dat;
+	Data *dat = data;
 
-	osc_blob_t b;
-	jack_nframes_t last;
+	float value;
+	osc_get_float(buf, &value);
 
-	osc_data_t *ptr = buf;
-	ptr = osc_get_int32(ptr, (int32_t *)&last); //TODO needs to be checked
-	ptr = osc_get_blob(ptr, &b);
+	// fill buffer up to here
+	jack_nframes_t i;
+	for(i=dat->time; i<time; i++)
+		dat->port_buf[i] = dat->value;
 
-	jack_default_audio_sample_t *port_buf_out = data->port_buf;
-
-	jack_default_audio_sample_t *load = b.payload;
-	int i;
-	for(i=0; i<b.size/sizeof(jack_default_audio_sample_t); i++)
-		port_buf_out[i] = load[i]; //FIXME ntohl
+	// change value from time
+	dat->time = time;
+	dat->value = value;
 
 	return 1;
 }
@@ -66,21 +66,16 @@ static osc_method_t methods [] = {
 int
 process_out(jack_nframes_t nframes, void *arg)
 {
-	static Data data;
-
 	Tjost_Module *module = arg;
 	Tjost_Host *host = module->host;
-	jack_port_t *port = module->dat;
+	Data *dat = module->dat;
 
-	if(!port)
+	if(!dat->port)
 		return 0;
 
 	jack_nframes_t last = jack_last_frame_time(host->client);
-
-	void *port_buf = jack_port_get_buffer(port, nframes);
-
-	data.port_buf = port_buf;
-	data.module = module;
+	dat->port_buf = jack_port_get_buffer(dat->port, nframes);
+	dat->time = 0; // reset to beginning of period
 
 	// handle events
 	Eina_Inlist *l;
@@ -97,11 +92,16 @@ process_out(jack_nframes_t nframes, void *arg)
 			tev->time = last;
 		}
 
-		osc_dispatch_method(tev->time - last, tev->buf, tev->size, methods, NULL, NULL, &data);
+		osc_dispatch_method(tev->time - last, tev->buf, tev->size, methods, NULL, NULL, dat);
 
 		module->queue = eina_inlist_remove(module->queue, EINA_INLIST_GET(tev));
 		tjost_free(host, tev);
 	}
+
+	// fill rest of buffer
+	jack_nframes_t i;
+	for(i=dat->time; i<nframes; i++)
+		dat->port_buf[i] = dat->value;
 
 	return 0;
 }
@@ -111,13 +111,14 @@ add(Tjost_Module *module)
 {
 	Tjost_Host *host = module->host;
 	lua_State *L = host->L;
-	jack_port_t *port = NULL;
+	Data *dat = tjost_alloc(module->host, sizeof(Data));
+	memset(dat, 0, sizeof(Data));
 
 	lua_getfield(L, 1, "port");
 	const char *portn = luaL_optstring(L, -1, "cv_out");
 	lua_pop(L, 1);
 
-	if(!(port = jack_port_register(module->host->client, portn, JACK_DEFAULT_AUDIO_TYPE, JackPortIsOutput, 0)))
+	if(!(dat->port = jack_port_register(module->host->client, portn, JACK_DEFAULT_AUDIO_TYPE, JackPortIsOutput, 0)))
 		MOD_ADD_ERR(module->host, MOD_NAME, "could not register jack port");
 
 #ifdef HAS_METADATA_API
@@ -125,14 +126,14 @@ add(Tjost_Module *module)
 	const char *pretty = luaL_optstring(L, -1, "Control Output");
 	lua_pop(L, 1);
 
-	jack_uuid_t uuid = jack_port_uuid(port);
+	jack_uuid_t uuid = jack_port_uuid(dat->port);
 	if(jack_set_property(module->host->client, uuid, JACK_METADATA_PRETTY_NAME, pretty, "text/plain"))
 		MOD_ADD_ERR(module->host, MOD_NAME, "could not set prettyname");
 	if(jack_set_property(module->host->client, uuid, JACKEY_SIGNAL_TYPE, "CV", "text/plain"))
 		MOD_ADD_ERR(module->host, MOD_NAME, "could not set CV event type");
 #endif
 
-	module->dat = port;
+	module->dat = dat;
 	module->type = TJOST_MODULE_OUTPUT;
 
 	return 0;
@@ -141,17 +142,19 @@ add(Tjost_Module *module)
 void
 del(Tjost_Module *module)
 {
-	jack_port_t *port = module->dat;
+	Data *dat = module->dat;
 
-	if(port)
+	if(dat->port)
 	{
 #ifdef HAS_METADATA_API
-		jack_uuid_t uuid = jack_port_uuid(port);
+		jack_uuid_t uuid = jack_port_uuid(dat->port);
 		jack_remove_property(module->host->client, uuid, JACK_METADATA_PRETTY_NAME);
 		jack_remove_property(module->host->client, uuid, JACKEY_SIGNAL_TYPE);
 #endif
-		jack_port_unregister(module->host->client, port);
+		jack_port_unregister(module->host->client, dat->port);
 	}
+	
+	tjost_free(module->host, dat);
 }
 
 Eina_Bool

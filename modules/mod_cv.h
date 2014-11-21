@@ -27,6 +27,6 @@
 #include <tjost.h>
 
 #define CV_PATH "/cv"
-#define CV_FMT "ib"
+#define CV_FMT "f"
 
 #endif
