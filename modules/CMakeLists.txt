@@ -91,16 +91,6 @@ if(USE_RTMIDI)
 	install(TARGETS rtmidi_out DESTINATION lib/tjost)
 endif()
 
-# mod_audio_in
-add_library(audio_in MODULE mod_audio_in.c)
-set_target_properties(audio_in PROPERTIES PREFIX "")
-install(TARGETS audio_in DESTINATION lib/tjost)
-
-# mod_audio_out
-add_library(audio_out MODULE mod_audio_out.c)
-set_target_properties(audio_out PROPERTIES PREFIX "")
-install(TARGETS audio_out DESTINATION lib/tjost)
-
 # mod_cv_in
 add_library(cv_in MODULE mod_cv_in.c)
 set_target_properties(cv_in PROPERTIES PREFIX "")
