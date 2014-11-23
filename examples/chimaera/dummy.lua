@@ -36,7 +36,6 @@ id = require('id')
 scsynth = require('scsynth_out')
 midi = require('midi_out')
 drum = require('drum_out')
-cv = require('cv_out')
 map = require('map')
 
 rate = 3000
@@ -98,11 +97,6 @@ md1 = midi:new({
 	--effect = VOLUME
 })
 
-cv1 = cv:new({
-	port = 'cv',
-	n = 2
-})
-
 dr1 = drum:new({
 	port = 'drum.1'
 })
@@ -110,7 +104,6 @@ dr1 = drum:new({
 stream = tjost.plugin({name='net_in', uri='osc.tcp://:3333', rtprio=60, unroll='full'}, function(...)
 	sc1(...)
 	md1(...)
-	cv1(...)
 	dr1(...)
 end)
 --tjost.chain(stream, data)

@@ -1,4 +1,4 @@
-cmake_minimum_required(VERSION 3.0)
+cmake_minimum_required(VERSION 2.8)
 
 project(tjost)
 
@@ -16,12 +16,12 @@ include_directories(${PROJECT_SOURCE_DIR}/libosc_stream)
 include_directories(${PROJECT_SOURCE_DIR}/jack_osc)
 
 # libuv
-pkg_search_module(UV REQUIRED libuv>=1.0.0)
+pkg_search_module(UV REQUIRED libuv>=1.0)
 include_directories(${UV_INCLUDE_DIRS})
 set(LIBS ${LIBS} ${UV_LDFLAGS})
 
 # jack
-pkg_search_module(JACK REQUIRED jack>=0.124.1)
+pkg_search_module(JACK REQUIRED jack)
 include_directories(${JACK_INCLUDE_DIRS})
 set(LIBS ${LIBS} ${JACK_LDFLAGS})
 
@@ -31,21 +31,21 @@ CHECK_INCLUDE_FILES("jack/metadata.h" HAS_METADATA_API)
 # alsa
 option(USE_ALSA "use ALSA" ON)
 if(USE_ALSA)
-	pkg_search_module(ALSA REQUIRED alsa>=1.0.28)
+	pkg_search_module(ALSA REQUIRED alsa>=1.0)
 	include_directories(${ALSA_INCLUDE_DIRS})
 endif()
 
 # RtMidi
 option(USE_RTMIDI "use RtMidi" ON)
 if(USE_RTMIDI)
-	pkg_search_module(RTMIDI REQUIRED librtmidi>=2.1.0)
+	pkg_search_module(RTMIDI REQUIRED librtmidi>=2.1)
 	include_directories(${RTMIDI_INCLUDE_DIRS})
 endif()
 
 # lua
 option(USE_LUAJIT "use LuaJIT" ON)
 if(USE_LUAJIT)
-	pkg_search_module(LUAJIT REQUIRED luajit>=2.0.3)
+	pkg_search_module(LUAJIT REQUIRED luajit>=2.0)
 	include_directories(${LUAJIT_INCLUDE_DIRS})
 	set(LIBS ${LIBS} ${LUAJIT_LDFLAGS})
 else()
@@ -58,7 +58,7 @@ endif()
 configure_file(${PROJECT_SOURCE_DIR}/tjost_config.h.in ${PROJECT_BINARY_DIR}/tjost_config.h @ONLY)
 
 # eina
-pkg_search_module(EINA REQUIRED eina>=1.11.2)
+pkg_search_module(EINA REQUIRED eina>=1.8)
 include_directories(${EINA_INCLUDE_DIRS})
 set(LIBS ${LIBS} ${EINA_LDFLAGS})
 
