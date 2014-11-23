@@ -29,7 +29,7 @@ LuaJIT on 64-bit platforms has custom memory allocators disabled by default beca
 
 ### Build / install
 
-	git clone git@github.com:OpenMusicKontrollers/Tjost.git Tjost
+	git clone https://github.com/OpenMusicKontrollers/Tjost.git
 	cd Tjost
 	git submodule init
 	git submodule update
