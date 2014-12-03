@@ -25,24 +25,8 @@
 
 message = tjost.plugin({name='dump'})
 --data = tjost.plugin({name='osc_out', port='data'})
-chim = tjost.plugin({name='net_out', uri='osc.udp://chimaera.local:4444'}, function(time, path, fmt, ...)
-	if path == '/stream/resolve' then
-		local hostname = tjost.hostname()
-		chim(0, '/comm/address', 'is', id(), hostname..'.local')
-	end
-end)
 
-id = require('id')
-scsynth = require('scsynth_out')
-midi = require('midi_out')
-drum = require('drum_out')
-map = require('map')
-
-rate = 3000
-
-control = tjost.plugin({name='send'}, function(...)
-	chim(...)
-end)
+chim = {}
 
 success = function(time, uuid, path, ...)
 	local methods = {
@@ -55,9 +39,9 @@ success = function(time, uuid, path, ...)
 			chim(0, '/engines/enabled', 'ii', id(), 1)
 		end,
 
-		['/comm/address'] = function(time)
+		['/engines/address'] = function(time)
 			chim(0, '/sensors/number', 'i', id())
-			chim(0, '/sensors/rate', 'ii', id(), rate)
+			chim(0, '/sensors/rate', 'ii', id(), 3000)
 			chim(0, '/sensors/group/reset', 'i', id())
 			chim(0, '/sensors/group/attributes/0', 'iffiii', id(), 0.0, 1.0, 0, 1, 0)
 			chim(0, '/sensors/group/attributes/1', 'iffiii', id(), 0.0, 1.0, 1, 0, 0)
@@ -79,12 +63,25 @@ success = function(time, uuid, path, ...)
 	end
 end
 
-conf = tjost.plugin({name='net_in', uri='osc.udp://:4444', rtprio=50, unroll='full'}, function(time, path, fmt, ...)
+chim = tjost.plugin({name='net_out', uri='osc.udp://chimaera.local:4444'}, function(time, path, fmt, ...)
 	if path == '/success' then
 		success(time, ...)
+	elseif path == '/stream/resolve' then
+		local hostname = tjost.hostname()
+		chim(0, '/engines/address', 'is', id(), hostname..'.local:3333')
 	end
 end)
-tjost.chain(conf, message)
+tjost.chain(chim, message)
+
+id = require('id')
+scsynth = require('scsynth_out')
+midi = require('midi_out')
+drum = require('drum_out')
+map = require('map')
+
+control = tjost.plugin({name='send'}, function(...)
+	chim(...)
+end)
 
 sc1 = scsynth:new({
 	port = 'scsynth.1',
