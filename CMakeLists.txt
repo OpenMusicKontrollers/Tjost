@@ -14,6 +14,7 @@ include_directories(${PROJECT_SOURCE_DIR}/jackey)
 include_directories(${PROJECT_SOURCE_DIR}/libosc)
 include_directories(${PROJECT_SOURCE_DIR}/libosc_stream)
 include_directories(${PROJECT_SOURCE_DIR}/jack_osc)
+include_directories(${PROJECT_SOURCE_DIR}/inlist)
 
 # libuv
 pkg_search_module(UV REQUIRED libuv>=1.0)
