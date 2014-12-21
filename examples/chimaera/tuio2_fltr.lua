@@ -33,7 +33,7 @@ local tuio2 = class:new({
 		self.cb = cb
 	end,
 
-	['/tuio2/frm'] = function(self, time, fid, stamp)
+	['/tuio2/frm'] = function(self, time, fid, stamp, dim, src)
 		if ( (fid > self.last_fid) and (time >= self.last_time) or (fid == 1) ) then
 			self.ignore = false
 			self.last_fid = fid
