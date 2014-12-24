@@ -53,6 +53,7 @@ success = function(time, uuid, path, ...)
 			chim(0, '/engines/reset', 'i', id())
 
 			chim(0, '/engines/tuio2/enabled', 'ii', id(), 1)
+			chim(0, '/engines/tuio2/derivatives', 'ii', id(), 0)
 		end
 	}
 

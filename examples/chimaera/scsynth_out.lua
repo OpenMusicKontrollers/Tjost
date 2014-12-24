@@ -35,12 +35,17 @@ local scsynth = class:new({
 		self.serv = tjost.plugin({name='osc_out', port=self.port})
 	end,
 
-	['/on'] = function(self, time, sid, gid, pid, x, y)
+	['/on'] = function(self, time, sid, gid, pid, x, y, vx, vy)
 		sid = sid%self.wrap + self.sid_offset
-		self.serv(0, '/s_new', 'siiisisi',
-			self.inst[gid+1], sid, 0, gid+self.gid_offset, 'out', gid+self.out_offset, 'gate', 0)
-		self.serv(time, '/n_set', 'iififiisi',
-			sid, 0, x, 1, y, 2, pid, 'gate', 1)
+		self.serv(0, '/s_new', 'siiiiisisi',
+			self.inst[gid+1], sid, 0, gid+self.gid_offset, 4, pid, 'out', gid+self.out_offset, 'gate', 1)
+		if(vx) then
+			self.serv(time, '/n_setn', 'iiiffff',
+				sid, 0, 4, x, y, vx, vy)
+		else
+			self.serv(time, '/n_setn', 'iiiff',
+				sid, 0, 2, x, y)
+		end
 	end,
 
 	['/off'] = function(self, time, sid)
@@ -49,10 +54,15 @@ local scsynth = class:new({
 			sid, 'gate', 0)
 	end,
 
-	['/set'] = function(self, time, sid, x, y)
+	['/set'] = function(self, time, sid, x, y, vx, vy)
 		sid = sid%self.wrap + self.sid_offset
-		self.serv(time, '/n_set', 'iifif',
-			sid, 0, x, 1, y)
+		if(vx) then
+			self.serv(time, '/n_setn', 'iiiffff',
+				sid, 0, 4, x, y, vx, vy)
+		else
+			self.serv(time, '/n_setn', 'iiiff',
+				sid, 0, 2, x, y)
+		end
 	end
 })
 

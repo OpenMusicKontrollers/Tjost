@@ -47,18 +47,20 @@ local tuio2 = class:new({
 		self.old_blobs = self.new_blobs or {}
 	end,
 
-	['/tuio2/tok'] = function(self, time, sid, pid, gid, x, y, a)
+	['/tuio2/tok'] = function(self, time, sid, pid, gid, x, y, a, X, Y, A, m, R)
 		if self.ignore then return end
 
 		-- add blob to hash
 		local elmnt
-		elmnt = self.blobs[sid] or {0, 0, 0, 0, 0}
+		elmnt = self.blobs[sid] or {0, 0, 0, 0, 0, 0, 0}
 		elmnt[1] = sid
 		elmnt[2] = gid
 		elmnt[3] = pid
 		elmnt[4] = x
 		elmnt[5] = y
 		-- a is ignored
+		elmnt[6] = X -- may be nil
+		elmnt[7] = Y -- may be nil
 		self.blobs[sid] = elmnt
 	end,
 
@@ -101,9 +103,9 @@ local tuio2 = class:new({
 			end
 			local b = self.blobs[w]
 			if found then
-				self.cb(time, '/set', 'iff', b[1], b[4], b[5])
+				self.cb(time, '/set', 'iffff', b[1], b[4], b[5], b[6], b[7])
 			else
-				self.cb(time, '/on', 'iiiff', unpack(b))
+				self.cb(time, '/on', 'iiiffff', unpack(b))
 			end
 		end
 	end

@@ -35,8 +35,8 @@ success = function(time, uuid, path, ...)
 			local range = n/3
 
 			chim(0, '/engines/oscmidi/reset', 'i', id())
-			chim(0, '/engines/oscmidi/attributes/0', 'isffi', id(), 'note_pressure', bot, range, 0x07)
-			chim(0, '/engines/oscmidi/attributes/1', 'isffi', id(), 'note_pressure', bot, range, 0x07)
+			chim(0, '/engines/oscmidi/attributes/0', 'isffi', id(), 'control_change', bot, range, 0x07)
+			chim(0, '/engines/oscmidi/attributes/1', 'isffi', id(), 'control_change', bot, range, 0x07)
 			message(time, '/number', 'iff', n, bot, range)
 		end,
 
