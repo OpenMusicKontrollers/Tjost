@@ -66,7 +66,8 @@ local midi = class:new({
 		self.serv = tjost.plugin({name='midi_out', port=self.port})
 	end,
 
-	['/on'] = function(self, time, sid, gid, pid, x, y)
+	['/on'] = function(self, time, sid, gid, pid, x, y, vx, vy)
+		--TODO vx, vy
 		local key, base, bend, eff
 
 		key = self.map(x)
@@ -128,7 +129,8 @@ local midi = class:new({
 		self.serv(time, mpath, 'm', unpack(m, 1, 1))
 	end,
 
-	['/set'] = function(self, time, sid, x, y)
+	['/set'] = function(self, time, sid, x, y, vx, vy)
+		--TODO vx, vy
 		local key = self.map(x)
 		local base, gid = unpack(self.bases[sid])
 		local bend = (key-base)/self.map.range*0x2000 + 0x1fff

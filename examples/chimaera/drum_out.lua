@@ -89,7 +89,7 @@ local drum = class:new({
 		self.raw = midi_t(self.m.raw)
 	end,
 
-	['/on'] = function(self, time, sid, gid, pid, x, y)
+	['/on'] = function(self, time, sid, gid, pid, x, y, vx, vy)
 		if gid ~= 0 then return end
 
 		self.counter = self.counter + 1
