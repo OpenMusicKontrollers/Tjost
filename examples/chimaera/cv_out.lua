@@ -38,12 +38,13 @@ local cv = class:new({
 		end
 	end,
 
-	['/on'] = function(self, time, sid, gid, pid, x, y)
+	['/on'] = function(self, time, sid, gid, pid, x, y, vx, vy)
 		gid = gid + 1
 		self.hash[sid] = gid
 		self.gate[gid](cvpath, cvfmt, 1.0)
 		self.x[gid](cvpath, cvfmt, x)
 		self.y[gid](cvpath, cvfmt, y)
+		--TODO vx, vy
 	end,
 
 	['/off'] = function(self, time, sid)
@@ -52,10 +53,11 @@ local cv = class:new({
 		self.gate[gid](cvpath, cvfmt, 0.0)
 	end,
 
-	['/set'] = function(self, time, sid, x, y)
+	['/set'] = function(self, time, sid, x, y, vx, vy)
 		local gid = self.hash[sid]
 		self.x[gid](cvpath, cvfmt, x)
 		self.y[gid](cvpath, cvfmt, y)
+		--TODO vx, vy
 	end
 })
 
