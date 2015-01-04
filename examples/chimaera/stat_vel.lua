@@ -19,9 +19,10 @@
 
 id = require('id')
 
+message = tjost.plugin({name='dump'})
+
 methods = {
-	['/dump'] = tjost.plugin({name='write', path='stat.dump.osc'}),
-	['/set'] = tjost.plugin({name='write', path='stat.evnt.osc'})
+	['/set'] = tjost.plugin({name='write', path='stat_vel.osc'})
 }
 
 stream = tjost.plugin({name='net_in', uri='osc.udp://:3333', rtprio=60, unroll='full'}, function(time, path, ...)
@@ -31,13 +32,14 @@ stream = tjost.plugin({name='net_in', uri='osc.udp://:3333', rtprio=60, unroll='
 	end
 end)
 			
-chim = tjost.plugin({name='net_out', uri='osc.udp://chimaera.local:4444'})
+chim = tjost.plugin({name='net_out', uri='osc.udp://chimaera.local:4444'}, function(time, path, fmt, ...)
+	if path == '/stream/resolve' then
+		chim(0, '/engines/dummy/enabled', 'ii', id(), 1)
+		chim(0, '/engines/dummy/redundancy', 'ii', id(), 0)
+		chim(0, '/engines/dummy/derivatives', 'ii', id(), 1)
 
-chim(0, '/sensors/movingaverage', 'ii', id(), 8)
---chim(0, '/sensors/interpolation', 'is', id(), 'none')
-chim(0, '/sensors/interpolation', 'is', id(), 'quadratic')
---chim(0, '/sensors/interpolation', 'is', id(), 'catmullrom')
---chim(0, '/sensors/interpolation', 'is', id(), 'lagrange')
-chim(0, '/engines/dump/enabled', 'ii', id(), 1)
-chim(0, '/engines/dummy/enabled', 'ii', id(), 1)
-chim(0, '/engines/dummy/redundancy', 'ii', id(), 1)
+		local hostname = tjost.hostname()
+		chim(0, '/engines/address', 'is', id(), hostname..'.local:3333')
+	end
+end)
+tjost.chain(chim, message)
